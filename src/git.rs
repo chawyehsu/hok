@@ -1,19 +1,12 @@
 use crate::Scoop;
-use git2::{Config, ConfigEntries, Repository};
 use git2::build::RepoBuilder;
 use std::io::Write;
 use serde_json::Value;
 
-// fn repo_builder() -> RepoBuilder {
-//   let mut fo = git2::FetchOptions::new();
-//   fo.proxy_options(opts)
-//   let mut repo_builder = git2::build::RepoBuilder::new();
-// }
-
 impl Scoop {
 
   fn repo_builder(&self) -> RepoBuilder {
-    let mut repo_builder = git2::build::RepoBuilder::new();
+    let mut repo_builder = RepoBuilder::new();
 
     match self.config["proxy"].clone() {
       Value::String(mut proxy) => {
@@ -38,7 +31,6 @@ impl Scoop {
   pub fn clone(&self, bucket_name: &str, bucket_url: &str) {
     print!("Checking repo... ");
     std::io::stdout().flush().unwrap();
-    // println!("{}, {}", bucket_name, bucket_url);
 
     let mut rb = self.repo_builder();
     match rb.clone(

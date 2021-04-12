@@ -63,10 +63,6 @@ impl Scoop {
     let persist_dir: PathBuf = root_dir.join("persist");
     let shims_dir: PathBuf = root_dir.join("shims");
 
-    // println!("{}", root_dir.to_str().unwrap());
-    // println!("{}", cache_dir.to_str().unwrap());
-    // println!("{}", global_dir.to_str().unwrap());
-
     Scoop {
       config, root_dir, cache_dir, global_dir, apps_dir,
       buckets_dir, modules_dir, persist_dir, shims_dir

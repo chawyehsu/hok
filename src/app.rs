@@ -42,6 +42,7 @@ pub fn build_app() -> App<'static, 'static> {
             .arg(
               Arg::with_name("name")
                 .help("The bucket name")
+                .required(true)
             )
         )
     )
