@@ -1,6 +1,5 @@
 extern crate remove_dir_all;
-
-use scoop::{Scoop, app, config};
+use scoop::*;
 
 fn main() {
   let app = app::build_app();
@@ -25,19 +24,13 @@ fn main() {
           .expect("<repo> is required for unknown bucket");
         scoop.clone(bucket_name, bucket_url);
       }
-    }
-
-    if let Some(sub_m2) = sub_m.subcommand_matches("list") {
+    } else if let Some(sub_m2) = sub_m.subcommand_matches("list") {
       drop(sub_m2);
       scoop.buckets();
-    }
-
-    if let Some(sub_m2) = sub_m.subcommand_matches("known") {
+    } else if let Some(sub_m2) = sub_m.subcommand_matches("known") {
       drop(sub_m2);
       Scoop::get_known_buckets();
-    }
-
-    if let Some(sub_m2) = sub_m.subcommand_matches("rm") {
+    } else if let Some(sub_m2) = sub_m.subcommand_matches("rm") {
       let bucket_name = sub_m2.value_of("name").unwrap();
 
       if scoop.is_added_bucket(bucket_name) {
@@ -52,9 +45,73 @@ fn main() {
         println!("The '{}' bucket not found.", bucket_name);
       }
     }
-  }
+  // scoop cache show|rm [<app>]
+  } else if let Some(sub_m) = matches.subcommand_matches("cache") {
+    let cache_dir = &scoop.cache_dir;
 
-  if let Some(sub_m) = matches.subcommand_matches("home") {
+    if let Some(sub_m2) = sub_m.subcommand_matches("rm") {
+      if let Some(app_name) = sub_m2.value_of("app") {
+        if app_name.eq("*") {
+          if cache_dir.exists() {
+            match remove_dir_all::remove_dir_contents(cache_dir) {
+              Ok(()) => println!("All downloaded caches was removed."),
+              Err(e) => panic!("failed to clear the caches. {}", e)
+            };
+          }
+        } else {
+          let app_cache_files =
+            std::fs::read_dir(cache_dir)
+              .unwrap()
+              .map(|p| p.unwrap())
+              .filter(|p|
+                app_name.eq(
+                  p
+                    .file_name()
+                    .to_str()
+                    .unwrap()
+                    .split_once("#")
+                    .unwrap()
+                    .0
+                )
+              );
+
+          for f in app_cache_files {
+            match std::fs::remove_file(f.path()) {
+              Ok(()) => println!("All caches of app '{}' was removed.", app_name),
+              Err(e) => panic!("failed to remove caches of app '{}'. {}", app_name, e)
+            }
+          }
+        }
+      } else if sub_m2.is_present("all") {
+        if cache_dir.exists() {
+          match remove_dir_all::remove_dir_contents(cache_dir) {
+            Ok(()) => println!("All downloaded caches was removed."),
+            Err(e) => panic!("failed to clear the caches. {}", e)
+          };
+        }
+      }
+    } else {
+      // let cache_files =
+      //   std::fs::read_dir(cache_dir)
+      //     .unwrap()
+      //     .map(|p|
+      //       p
+      //         .unwrap()
+      //         .file_name()
+      //         .to_str()
+      //         .unwrap()
+      //         .split("#")
+      //         .collect()
+      //     );
+
+
+      // if let Some(sub_m2) = sub_m.subcommand_matches("show") {
+
+      // }
+    }
+  } else if let Some(sub_m) = matches.subcommand_matches("home") {
     println!("You want to open home of {}", sub_m.value_of("app").unwrap())
   }
+
+  // println!("{:?}", scoop);
 }

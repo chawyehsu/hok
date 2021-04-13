@@ -1,10 +1,12 @@
-use clap::{App, Arg, SubCommand, crate_name, crate_version, crate_description};
+use clap::{App, Arg, AppSettings, SubCommand, crate_name, crate_version, crate_description};
 
 pub fn build_app() -> App<'static, 'static> {
   let app = App::new(crate_name!())
     .version(crate_version!())
     .about(crate_description!())
     .after_help("Type 'scoop help <command>' to get help for a specific command.")
+    .setting(AppSettings::ArgRequiredElseHelp)
+    .setting(AppSettings::VersionlessSubcommands)
     .subcommand(
       SubCommand::with_name("alias")
         .about("Manage scoop aliases")
@@ -12,9 +14,11 @@ pub fn build_app() -> App<'static, 'static> {
     .subcommand(
       SubCommand::with_name("bucket")
         .about("Manage Scoop buckets")
+        .setting(AppSettings::ArgRequiredElseHelp)
         .subcommand(
           SubCommand::with_name("add")
           .about("Add a bucket")
+          .setting(AppSettings::ArgRequiredElseHelp)
           .arg(
             Arg::with_name("name")
               .help("The bucket name")
@@ -49,6 +53,34 @@ pub fn build_app() -> App<'static, 'static> {
     .subcommand(
       SubCommand::with_name("cache")
         .about("Show or clear the download cache")
+        .setting(AppSettings::VersionlessSubcommands)
+        .subcommand(
+          SubCommand::with_name("show")
+          .about("Show the download cache")
+          .arg(
+            Arg::with_name("app")
+              .help("The app name")
+              .index(1)
+              .required(false)
+          )
+        )
+        .subcommand(
+          SubCommand::with_name("rm")
+          .about("Remove the download cache")
+          .alias("remove")
+          .setting(AppSettings::ArgRequiredElseHelp)
+          .arg(
+            Arg::with_name("app")
+              .help("The app name")
+          )
+          .arg(
+            Arg::with_name("all")
+              .help("Remove all download caches")
+              .short("a")
+              .long("all")
+              .conflicts_with("app")
+          )
+        )
     )
     .subcommand(
       SubCommand::with_name("cleanup")
@@ -68,8 +100,12 @@ pub fn build_app() -> App<'static, 'static> {
         )
     )
     .subcommand(
+      SubCommand::with_name("info")
+        .about("Display information about an app")
+    )
+    .subcommand(
       SubCommand::with_name("list")
-        .about("Get or set configuration values")
+        .about("List installed apps")
     );
 
   app
