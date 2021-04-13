@@ -1,3 +1,5 @@
+extern crate remove_dir_all;
+
 use scoop::{Scoop, app, config};
 
 fn main() {
@@ -5,7 +7,7 @@ fn main() {
   let matches = app.get_matches();
   let scoop = Scoop::from_cfg(config::load_cfg());
 
-  // scoop bucket add|list|known|rm [<args>]
+  // scoop bucket add|list|known|rm [<repo>]
   if let Some(sub_m) = matches.subcommand_matches("bucket") {
     if let Some(sub_m2) = sub_m.subcommand_matches("add") {
       let bucket_name = sub_m2.value_of("name").unwrap();
@@ -40,10 +42,12 @@ fn main() {
 
       if scoop.is_added_bucket(bucket_name) {
         let bucket_dir = scoop.buckets_dir.join(bucket_name);
-        match std::fs::remove_dir_all(bucket_dir) {
-          Ok(()) => {},
-          Err(e) => panic!("failed to remove '{}' bucket. {}", bucket_name, e)
-        };
+        if bucket_dir.exists() {
+          match remove_dir_all::remove_dir_all(bucket_dir) {
+            Ok(()) => {},
+            Err(e) => panic!("failed to remove '{}' bucket. {}", bucket_name, e)
+          };
+        }
       } else {
         println!("The '{}' bucket not found.", bucket_name);
       }
