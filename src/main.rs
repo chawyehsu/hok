@@ -110,47 +110,18 @@ fn main() {
           );
 
           for f in app_cache_files {
-            let fmeta = std::fs::metadata(f.path()).unwrap();
-            let ff = f.file_name().into_string().unwrap();
-            let fname: Vec<&str> = ff.split("#").collect();
-
-            println!("{: >6} {} ({}) {}",
-              utils::filesize(fmeta.len(), true),
-              fname[0],
-              fname[1],
-              ff
-            );
+            scoop.cache_show(f);
           }
-        } else {
-          for f in cache_files {
-            let fmeta = std::fs::metadata(f.path()).unwrap();
-            let ff = f.file_name().into_string().unwrap();
-            let fname: Vec<&str> = ff.split("#").collect();
 
-            println!("{: >6} {} ({}) {}",
-              utils::filesize(fmeta.len(), true),
-              fname[0],
-              fname[1],
-              ff
-            );
-          }
-        }
-      } else {
-        for f in cache_files {
-          let fmeta = std::fs::metadata(f.path()).unwrap();
-          let ff = f.file_name().into_string().unwrap();
-          let fname: Vec<&str> = ff.split("#").collect();
-
-          println!("{: >4} {} ({}) {}",
-            utils::filesize(fmeta.len(), true),
-            fname[0],
-            fname[1],
-            ff
-          );
+          return;
         }
       }
+
+      for f in cache_files {
+        scoop.cache_show(f);
+      }
     }
-  } else if let Some(sub_m) = matches.subcommand_matches("home") {
+  } else if let Some(_sub_m) = matches.subcommand_matches("home") {
     // println!("You want to open home of {}", sub_m.value_of("app").unwrap())
   }
 
