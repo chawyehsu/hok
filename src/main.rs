@@ -91,26 +91,67 @@ fn main() {
         }
       }
     } else {
-      // let cache_files =
-      //   std::fs::read_dir(cache_dir)
-      //     .unwrap()
-      //     .map(|p|
-      //       p
-      //         .unwrap()
-      //         .file_name()
-      //         .to_str()
-      //         .unwrap()
-      //         .split("#")
-      //         .collect()
-      //     );
+      let cache_files =
+        std::fs::read_dir(cache_dir)
+          .unwrap()
+          .map(|p| p.unwrap())
+          ;
 
+      if let Some(sub_m2) = sub_m.subcommand_matches("show") {
+        if let Some(app_name) = sub_m2.value_of("app") {
+          let app_cache_files = cache_files.filter(
+            |c| app_name.eq(c
+              .file_name()
+              .into_string()
+              .unwrap()
+              .split_once("#")
+              .unwrap()
+              .0)
+          );
 
-      // if let Some(sub_m2) = sub_m.subcommand_matches("show") {
+          for f in app_cache_files {
+            let fmeta = std::fs::metadata(f.path()).unwrap();
+            let ff = f.file_name().into_string().unwrap();
+            let fname: Vec<&str> = ff.split("#").collect();
 
-      // }
+            println!("{: >6} {} ({}) {}",
+              utils::filesize(fmeta.len(), true),
+              fname[0],
+              fname[1],
+              ff
+            );
+          }
+        } else {
+          for f in cache_files {
+            let fmeta = std::fs::metadata(f.path()).unwrap();
+            let ff = f.file_name().into_string().unwrap();
+            let fname: Vec<&str> = ff.split("#").collect();
+
+            println!("{: >6} {} ({}) {}",
+              utils::filesize(fmeta.len(), true),
+              fname[0],
+              fname[1],
+              ff
+            );
+          }
+        }
+      } else {
+        for f in cache_files {
+          let fmeta = std::fs::metadata(f.path()).unwrap();
+          let ff = f.file_name().into_string().unwrap();
+          let fname: Vec<&str> = ff.split("#").collect();
+
+          println!("{: >4} {} ({}) {}",
+            utils::filesize(fmeta.len(), true),
+            fname[0],
+            fname[1],
+            ff
+          );
+        }
+      }
     }
   } else if let Some(sub_m) = matches.subcommand_matches("home") {
-    println!("You want to open home of {}", sub_m.value_of("app").unwrap())
+    // println!("You want to open home of {}", sub_m.value_of("app").unwrap())
   }
 
   // println!("{:?}", scoop);

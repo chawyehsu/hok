@@ -1,8 +1,9 @@
 pub mod app;
-pub mod buckets;
+pub mod bucket;
 pub mod cache;
 pub mod config;
 pub mod git;
+pub mod utils;
 
 use dirs;
 use std::env;
