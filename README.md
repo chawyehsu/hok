@@ -7,8 +7,8 @@ The Scoop Windows command line installer rewritten in Rust
 
 **core features** implementation
 
-- [ ] bucket management
-- [ ] cache management
+- [x] bucket management
+- [x] cache management
 - [ ] config management
 - [ ] manifest manipulation
 - [ ] search functionality

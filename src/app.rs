@@ -5,12 +5,12 @@ pub fn build_app() -> App<'static, 'static> {
     .version(crate_version!())
     .about(crate_description!())
     .after_help("Type 'scoop help <command>' to get help for a specific command.")
+    .global_setting(AppSettings::VersionlessSubcommands)
     .setting(AppSettings::ArgRequiredElseHelp)
-    .setting(AppSettings::VersionlessSubcommands)
-    .subcommand(
-      SubCommand::with_name("alias")
-        .about("Manage scoop aliases")
-    )
+    // .subcommand(
+    //   SubCommand::with_name("alias")
+    //     .about("Manage scoop aliases")
+    // )
     .subcommand(
       SubCommand::with_name("bucket")
         .about("Manage Scoop buckets")
@@ -53,7 +53,6 @@ pub fn build_app() -> App<'static, 'static> {
     .subcommand(
       SubCommand::with_name("cache")
         .about("Show or clear the download cache")
-        .setting(AppSettings::VersionlessSubcommands)
         .subcommand(
           SubCommand::with_name("show")
           .about("Show the download cache")
@@ -82,30 +81,31 @@ pub fn build_app() -> App<'static, 'static> {
           )
         )
     )
-    .subcommand(
-      SubCommand::with_name("cleanup")
-        .about("Cleanup apps by removing old versions")
-    )
+    // .subcommand(
+    //   SubCommand::with_name("cleanup")
+    //     .about("Cleanup apps by removing old versions")
+    // )
     .subcommand(
       SubCommand::with_name("config")
         .about("Get or set configuration values")
-    )
-    .subcommand(
-      SubCommand::with_name("home")
-        .about("Opens the app homepage")
-        .arg(
-          Arg::with_name("app")
-            .help("The app name")
-            .required(true)
-        )
-    )
-    .subcommand(
-      SubCommand::with_name("info")
-        .about("Display information about an app")
-    )
-    .subcommand(
-      SubCommand::with_name("list")
-        .about("List installed apps")
+        .setting(AppSettings::ArgRequiredElseHelp)
+    // )
+    // .subcommand(
+    //   SubCommand::with_name("home")
+    //     .about("Opens the app homepage")
+    //     .arg(
+    //       Arg::with_name("app")
+    //         .help("The app name")
+    //         .required(true)
+    //     )
+    // )
+    // .subcommand(
+    //   SubCommand::with_name("info")
+    //     .about("Display information about an app")
+    // )
+    // .subcommand(
+    //   SubCommand::with_name("list")
+    //     .about("List installed apps")
     );
 
   app
