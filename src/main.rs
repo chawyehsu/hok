@@ -1,10 +1,11 @@
 extern crate remove_dir_all;
+
 use scoop::*;
 
 fn main() {
   let app = app::build_app();
   let matches = app.get_matches();
-  let scoop = Scoop::from_cfg(config::load_cfg());
+  let mut scoop = Scoop::from_cfg(config::load_cfg());
 
   // scoop bucket add|list|known|rm [<repo>]
   if let Some(sub_m) = matches.subcommand_matches("bucket") {
@@ -121,8 +122,23 @@ fn main() {
         scoop.cache_show(f);
       }
     }
-  } else if let Some(_sub_m) = matches.subcommand_matches("home") {
-    // println!("You want to open home of {}", sub_m.value_of("app").unwrap())
+  } else if let Some(sub_m) = matches.subcommand_matches("config") {
+    if let Some(sub_m2) = sub_m.subcommand_matches("rm") {
+      let key = sub_m2.value_of("name").unwrap();
+      scoop.set_config(key, "null");
+    } else {
+      let key = sub_m.value_of("name").unwrap();
+
+      if let Some(value) = sub_m.value_of("value") {
+        scoop.set_config(key, value)
+      } else {
+        let value = scoop.get_config(key);
+        match value.as_str() {
+          "null" => println!("No configration named '{}' found.", key),
+          _ => println!("{}", value),
+        }
+      }
+    }
   }
 
   // println!("{:?}", scoop);

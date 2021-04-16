@@ -89,6 +89,25 @@ pub fn build_app() -> App<'static, 'static> {
       SubCommand::with_name("config")
         .about("Get or set configuration values")
         .setting(AppSettings::ArgRequiredElseHelp)
+        .setting(AppSettings::ArgsNegateSubcommands)
+        .subcommand(
+          SubCommand::with_name("rm")
+          .about("Remove a configuration value")
+          .alias("remove")
+          .setting(AppSettings::ArgRequiredElseHelp)
+          .arg(
+            Arg::with_name("name")
+              .help("The name of a configuration")
+          )
+        )
+        .arg(
+          Arg::with_name("name")
+            .help("The name of a configuration")
+        )
+        .arg(
+          Arg::with_name("value")
+            .help("The value of a configuration")
+        )
     // )
     // .subcommand(
     //   SubCommand::with_name("home")
