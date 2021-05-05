@@ -104,15 +104,15 @@ pub fn build_app() -> App<'static, 'static> {
           Arg::with_name("value")
             .help("The value of a configuration")
         )
-    // )
-    // .subcommand(
-    //   SubCommand::with_name("home")
-    //     .about("Opens the app homepage")
-    //     .arg(
-    //       Arg::with_name("app")
-    //         .help("The app name")
-    //         .required(true)
-    //     )
+    )
+    .subcommand(
+      SubCommand::with_name("home")
+        .about("Opens the app homepage")
+        .arg(
+          Arg::with_name("app")
+            .help("The app name")
+            .required(true)
+        )
     // )
     // .subcommand(
     //   SubCommand::with_name("info")

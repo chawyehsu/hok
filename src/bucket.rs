@@ -1,3 +1,6 @@
+use std::path::PathBuf;
+
+use anyhow::Result;
 use lazy_static::lazy_static;
 use serde_json::{json, Value};
 use crate::Scoop;
@@ -30,15 +33,12 @@ impl Scoop {
     KNOWN_BUCKETS[bucket_name].as_str().unwrap()
   }
 
-  pub fn get_added_buckets(&self) -> Vec<String> {
-    let buckets = std::fs::read_dir(&self.buckets_dir).unwrap();
-    let mut ret: Vec<String> = Vec::new();
-
-    for b in buckets {
-      ret.push(b.unwrap().file_name().to_str().unwrap().to_owned());
-    }
-
-    ret
+  pub fn get_added_buckets(&self) -> Result<Vec<String>> {
+    let buckets = std::fs::read_dir(&self.buckets_dir)?
+      .filter_map(Result::ok)
+      .map(|entry| entry.file_name().to_str().unwrap().to_owned())
+      .collect();
+    Ok(buckets)
   }
 
   pub fn is_known_bucket(bucket_name: &str) -> bool {
@@ -46,14 +46,24 @@ impl Scoop {
   }
 
   pub fn buckets(&self) {
-    let buckets = self.get_added_buckets();
+    let buckets = self.get_added_buckets().unwrap();
     for b in buckets {
       println!("{}", b);
     }
   }
 
   pub fn is_added_bucket(&self, bucket_name: &str) -> bool {
-    let buckets = self.get_added_buckets();
+    let buckets = self.get_added_buckets().unwrap();
     buckets.contains(&bucket_name.to_string())
+  }
+
+  pub fn path_of(&self, bucket_name: &str) -> PathBuf {
+    let p = self.buckets_dir.join(bucket_name);
+
+    if p.join("bucket").exists() {
+      p.join("bucket")
+    } else {
+      p
+    }
   }
 }

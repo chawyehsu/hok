@@ -1,6 +1,8 @@
 extern crate anyhow;
 extern crate remove_dir_all;
 
+use std::process::Command;
+
 use anyhow::Result;
 use scoop::*;
 
@@ -60,6 +62,24 @@ fn main() -> Result<()> {
         scoop.cache_show(sub_m2.value_of("app"))?;
       } else {
         scoop.cache_show(None)?;
+      }
+    }
+    // scoop home <app>
+  } else if let Some(sub_m) = matches.subcommand_matches("home") {
+    if let Some(app_name) = sub_m.value_of("app") {
+      // find manifest and parse it
+      match scoop.manifest(app_name) {
+        Some(manifest) => {
+          if let Some(url) = manifest.get("homepage") {
+            let url = std::ffi::OsStr::new(url.as_str().unwrap());
+            Command::new("cmd").arg("/C").arg("start").arg(url).spawn()?;
+          } else {
+            println!("Could not find homepage in manifest for '{}'.", app_name);
+          }
+        },
+        None => {
+          println!("Could not find manifest for '{}'.", app_name);
+        }
       }
     }
   } else if let Some(sub_m) = matches.subcommand_matches("config") {
