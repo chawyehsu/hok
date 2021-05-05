@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use crate::{Scoop, utils};
 
 impl Scoop {
@@ -35,6 +35,49 @@ impl Scoop {
             fname_split[1],
             fname
           );
+        }
+      }
+    }
+
+    Ok(())
+  }
+
+  pub fn cache_clean(&self) -> Result<()> {
+    let ref cache_dir = self.cache_dir;
+
+    if cache_dir.exists() {
+      match remove_dir_all::remove_dir_contents(cache_dir) {
+        Ok(()) => println!("All downloaded caches were removed."),
+        Err(_e) => return Err(anyhow!("Failed to clear the caches"))
+      };
+    }
+
+    Ok(())
+  }
+
+  pub fn cache_rm(&self, app_name: &str) -> Result<()> {
+    match app_name {
+      "*" => self.cache_clean()?,
+      _ => {
+        let entries = std::fs::read_dir(&self.cache_dir)?;
+
+        for entry in entries {
+          let entry = entry?;
+          let fname = entry.file_name();
+          let fname = fname.to_str().unwrap();
+          let fname_split: Vec<&str> = fname.split("#").collect();
+
+          // filter files not downloaded by Scoop
+          if 2 > fname_split.len() {
+            continue;
+          }
+
+          if app_name.eq(fname_split[0]) {
+            match std::fs::remove_file(entry.path()) {
+              Ok(()) => println!("All caches of app '{}' was removed.", app_name),
+              Err(_e) => return Err(anyhow!("Failed to remove caches of app '{}'.", app_name))
+            }
+          }
         }
       }
     }

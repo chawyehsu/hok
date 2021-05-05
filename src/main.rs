@@ -49,48 +49,11 @@ fn main() -> Result<()> {
     }
   // scoop cache show|rm [<app>]
   } else if let Some(sub_m) = matches.subcommand_matches("cache") {
-    let ref cache_dir = scoop.cache_dir;
-
     if let Some(sub_m2) = sub_m.subcommand_matches("rm") {
       if let Some(app_name) = sub_m2.value_of("app") {
-        if app_name.eq("*") {
-          if cache_dir.exists() {
-            match remove_dir_all::remove_dir_contents(cache_dir) {
-              Ok(()) => println!("All downloaded caches was removed."),
-              Err(e) => panic!("failed to clear the caches. {}", e)
-            };
-          }
-        } else {
-          let app_cache_files =
-            std::fs::read_dir(cache_dir)
-              .unwrap()
-              .map(|p| p.unwrap())
-              .filter(|p|
-                app_name.eq(
-                  p
-                    .file_name()
-                    .to_str()
-                    .unwrap()
-                    .split_once("#")
-                    .unwrap()
-                    .0
-                )
-              );
-
-          for f in app_cache_files {
-            match std::fs::remove_file(f.path()) {
-              Ok(()) => println!("All caches of app '{}' was removed.", app_name),
-              Err(e) => panic!("failed to remove caches of app '{}'. {}", app_name, e)
-            }
-          }
-        }
+        scoop.cache_rm(app_name)?;
       } else if sub_m2.is_present("all") {
-        if cache_dir.exists() {
-          match remove_dir_all::remove_dir_contents(cache_dir) {
-            Ok(()) => println!("All downloaded caches was removed."),
-            Err(e) => panic!("failed to clear the caches. {}", e)
-          };
-        }
+        scoop.cache_clean()?;
       }
     } else {
       if let Some(sub_m2) = sub_m.subcommand_matches("show") {
