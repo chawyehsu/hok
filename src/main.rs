@@ -1,8 +1,10 @@
+extern crate anyhow;
 extern crate remove_dir_all;
 
+use anyhow::Result;
 use scoop::*;
 
-fn main() {
+fn main() -> Result<()> {
   let app = app::build_app();
   let matches = app.get_matches();
   let mut scoop = Scoop::from_cfg(config::load_cfg());
@@ -14,7 +16,6 @@ fn main() {
 
       if scoop.is_added_bucket(bucket_name) {
         println!("The '{}' already exists.", bucket_name);
-        return;
       }
 
       if Scoop::is_known_bucket(bucket_name) {
@@ -48,7 +49,7 @@ fn main() {
     }
   // scoop cache show|rm [<app>]
   } else if let Some(sub_m) = matches.subcommand_matches("cache") {
-    let cache_dir = &scoop.cache_dir;
+    let ref cache_dir = scoop.cache_dir;
 
     if let Some(sub_m2) = sub_m.subcommand_matches("rm") {
       if let Some(app_name) = sub_m2.value_of("app") {
@@ -92,34 +93,10 @@ fn main() {
         }
       }
     } else {
-      let cache_files =
-        std::fs::read_dir(cache_dir)
-          .unwrap()
-          .map(|p| p.unwrap())
-          ;
-
       if let Some(sub_m2) = sub_m.subcommand_matches("show") {
-        if let Some(app_name) = sub_m2.value_of("app") {
-          let app_cache_files = cache_files.filter(
-            |c| app_name.eq(c
-              .file_name()
-              .into_string()
-              .unwrap()
-              .split_once("#")
-              .unwrap()
-              .0)
-          );
-
-          for f in app_cache_files {
-            scoop.cache_show(f);
-          }
-
-          return;
-        }
-      }
-
-      for f in cache_files {
-        scoop.cache_show(f);
+        scoop.cache_show(sub_m2.value_of("app"))?;
+      } else {
+        scoop.cache_show(None)?;
       }
     }
   } else if let Some(sub_m) = matches.subcommand_matches("config") {
@@ -142,4 +119,5 @@ fn main() {
   }
 
   // println!("{:?}", scoop);
+  Ok(())
 }

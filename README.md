@@ -11,7 +11,7 @@ The Scoop Windows command line installer rewritten in Rust
 
 - [x] bucket management (bucket)
 - [x] cache management (cache)
-- [ ] config management (config/alias)
+- [x] config management (config)
 - [ ] manifest manipulation (home/info/create)
 - [ ] search functionality (search)
 - [ ] app management (list/install/uninstall/update/cleanup/reset/hold/unhold)

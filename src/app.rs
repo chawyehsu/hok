@@ -7,10 +7,6 @@ pub fn build_app() -> App<'static, 'static> {
     .after_help("Type 'scoop help <command>' to get help for a specific command.")
     .global_setting(AppSettings::VersionlessSubcommands)
     .setting(AppSettings::ArgRequiredElseHelp)
-    // .subcommand(
-    //   SubCommand::with_name("alias")
-    //     .about("Manage scoop aliases")
-    // )
     .subcommand(
       SubCommand::with_name("bucket")
         .about("Manage Scoop buckets")
