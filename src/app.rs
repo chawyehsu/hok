@@ -113,6 +113,15 @@ pub fn build_app() -> App<'static, 'static> {
             .help("The app name")
             .required(true)
         )
+    )
+    .subcommand(
+      SubCommand::with_name("search")
+        .about("Searches for apps that are available to install")
+        .arg(
+          Arg::with_name("query")
+            .help("The query string (regex is support)")
+            .required(true)
+        )
     // )
     // .subcommand(
     //   SubCommand::with_name("info")

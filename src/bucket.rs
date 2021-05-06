@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::fs::DirEntry;
 
 use anyhow::Result;
 use lazy_static::lazy_static;
@@ -64,6 +65,24 @@ impl Scoop {
       p.join("bucket")
     } else {
       p
+    }
+  }
+
+  pub fn apps_in_bucket(&self, bucket_name: &str) -> Result<Option<Vec<DirEntry>>> {
+    let p = self.path_of(bucket_name);
+
+    let entries: Vec<DirEntry> = std::fs::read_dir(p.as_path())?
+      .filter_map(Result::ok)
+      .filter(|entry| {
+        let fname = entry.file_name();
+        fname.to_str().unwrap().ends_with(".json")
+      })
+      .collect();
+
+    if entries.len() == 0 {
+      Ok(None)
+    } else {
+      Ok(Some(entries))
     }
   }
 }

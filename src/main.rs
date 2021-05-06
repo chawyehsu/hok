@@ -64,7 +64,7 @@ fn main() -> Result<()> {
         scoop.cache_show(None)?;
       }
     }
-    // scoop home <app>
+  // scoop home <app>
   } else if let Some(sub_m) = matches.subcommand_matches("home") {
     if let Some(app_name) = sub_m.value_of("app") {
       // find manifest and parse it
@@ -81,6 +81,11 @@ fn main() -> Result<()> {
           println!("Could not find manifest for '{}'.", app_name);
         }
       }
+    }
+  // scoop search <query>
+  } else if let Some(sub_m) = matches.subcommand_matches("search") {
+    if let Some(query) = sub_m.value_of("query") {
+      scoop.search(query)?;
     }
   } else if let Some(sub_m) = matches.subcommand_matches("config") {
     if let Some(sub_m2) = sub_m.subcommand_matches("rm") {

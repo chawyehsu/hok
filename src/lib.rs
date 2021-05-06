@@ -4,6 +4,7 @@ pub mod cache;
 pub mod config;
 pub mod git;
 pub mod manifest;
+pub mod search;
 pub mod utils;
 
 use dirs;

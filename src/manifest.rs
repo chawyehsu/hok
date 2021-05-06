@@ -28,4 +28,12 @@ impl Scoop {
     let u = serde_json::from_reader(reader)?;
     Ok(u)
   }
+
+  pub fn manifest_from_url(&self, manifest_url: &str) -> Result<Value> {
+    let body: serde_json::Value = ureq::get(manifest_url)
+      .call()?
+      .into_json()?;
+
+    Ok(body)
+  }
 }
