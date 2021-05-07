@@ -11,7 +11,7 @@ struct SearchMatch {
 impl Scoop {
   pub fn search(&self, query: &str) -> Result<()> {
     let re = Regex::new(query)?;
-    let buckets = self.get_added_buckets()?;
+    let buckets = self.get_local_buckets_name()?;
 
     for bucket in buckets {
       let mut matches: Vec<SearchMatch> = Vec::new();

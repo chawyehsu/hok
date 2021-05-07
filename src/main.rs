@@ -22,11 +22,11 @@ fn main() -> Result<()> {
 
       if Scoop::is_known_bucket(bucket_name) {
         let bucket_url = Scoop::get_known_bucket_url(bucket_name);
-        scoop.clone(bucket_name, bucket_url);
+        scoop.clone(bucket_name, bucket_url)?;
       } else {
         let bucket_url = sub_m2.value_of("repo")
           .expect("<repo> is required for unknown bucket");
-        scoop.clone(bucket_name, bucket_url);
+        scoop.clone(bucket_name, bucket_url)?;
       }
     } else if let Some(sub_m2) = sub_m.subcommand_matches("list") {
       drop(sub_m2);
@@ -87,8 +87,11 @@ fn main() -> Result<()> {
     if let Some(query) = sub_m.value_of("query") {
       scoop.search(query)?;
     }
+  // scoop config list|remove
   } else if let Some(sub_m) = matches.subcommand_matches("config") {
-    if let Some(sub_m2) = sub_m.subcommand_matches("rm") {
+    if let Some(_sub_m2) = sub_m.subcommand_matches("list") {
+      todo!();
+    } else if let Some(sub_m2) = sub_m.subcommand_matches("remove") {
       let key = sub_m2.value_of("name").unwrap();
       scoop.set_config(key, "null");
     } else {
@@ -104,6 +107,9 @@ fn main() -> Result<()> {
         }
       }
     }
+  // scoop update
+  } else if let Some(_sub_m) = matches.subcommand_matches("update") {
+    scoop.update_buckets()?;
   }
 
   // println!("{:?}", scoop);

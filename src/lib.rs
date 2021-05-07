@@ -6,6 +6,7 @@ pub mod git;
 pub mod manifest;
 pub mod search;
 pub mod utils;
+pub mod update;
 
 use dirs;
 use std::env;

@@ -23,6 +23,13 @@ lazy_static! {
 }
 
 impl Scoop {
+  pub fn get_local_buckets_entry(&self) -> Result<Vec<DirEntry>> {
+    let buckets = std::fs::read_dir(&self.buckets_dir)?
+      .filter_map(Result::ok)
+      .collect();
+    Ok(buckets)
+  }
+
   pub fn get_known_buckets() {
     let buckets = KNOWN_BUCKETS.as_object().unwrap().keys();
     for b in buckets {
@@ -34,7 +41,7 @@ impl Scoop {
     KNOWN_BUCKETS[bucket_name].as_str().unwrap()
   }
 
-  pub fn get_added_buckets(&self) -> Result<Vec<String>> {
+  pub fn get_local_buckets_name(&self) -> Result<Vec<String>> {
     let buckets = std::fs::read_dir(&self.buckets_dir)?
       .filter_map(Result::ok)
       .map(|entry| entry.file_name().to_str().unwrap().to_owned())
@@ -47,14 +54,14 @@ impl Scoop {
   }
 
   pub fn buckets(&self) {
-    let buckets = self.get_added_buckets().unwrap();
+    let buckets = self.get_local_buckets_name().unwrap();
     for b in buckets {
       println!("{}", b);
     }
   }
 
   pub fn is_added_bucket(&self, bucket_name: &str) -> bool {
-    let buckets = self.get_added_buckets().unwrap();
+    let buckets = self.get_local_buckets_name().unwrap();
     buckets.contains(&bucket_name.to_string())
   }
 

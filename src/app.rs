@@ -87,9 +87,14 @@ pub fn build_app() -> App<'static, 'static> {
         .setting(AppSettings::ArgRequiredElseHelp)
         .setting(AppSettings::ArgsNegateSubcommands)
         .subcommand(
-          SubCommand::with_name("rm")
+          SubCommand::with_name("list")
+          .about("List all configurations")
+          .alias("ls")
+        )
+        .subcommand(
+          SubCommand::with_name("remove")
           .about("Remove a configuration value")
-          .alias("remove")
+          .alias("rm")
           .setting(AppSettings::ArgRequiredElseHelp)
           .arg(
             Arg::with_name("name")
@@ -122,6 +127,10 @@ pub fn build_app() -> App<'static, 'static> {
             .help("The query string (regex is support)")
             .required(true)
         )
+    )
+    .subcommand(
+      SubCommand::with_name("update")
+        .about("Fetch and update all buckets")
     // )
     // .subcommand(
     //   SubCommand::with_name("info")

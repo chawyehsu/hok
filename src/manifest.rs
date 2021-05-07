@@ -7,7 +7,7 @@ use crate::Scoop;
 
 impl Scoop {
   pub fn manifest(&self, app_name: &str) -> Option<Value> {
-    let buckets = self.get_added_buckets().unwrap();
+    let buckets = self.get_local_buckets_name().unwrap();
 
     for bucket in buckets {
       let bucket_path = self.path_of(bucket.as_str());
