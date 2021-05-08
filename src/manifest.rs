@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::{io::BufReader, path::PathBuf};
 
 use serde_json::Value;
@@ -25,8 +25,14 @@ impl Scoop {
     let file = std::fs::File::open(manifest_path.as_path())?;
     let reader = BufReader::new(file);
 
-    let u = serde_json::from_reader(reader)?;
-    Ok(u)
+    match serde_json::from_reader(reader) {
+      Ok(m) => return Ok(m),
+      Err(_e) => {
+        let msg = format!("Failed to parse manifest '{}'",
+          manifest_path.to_str().unwrap());
+        return Err(anyhow!(msg));
+      }
+    }
   }
 
   pub fn manifest_from_url(&self, manifest_url: &str) -> Result<Value> {

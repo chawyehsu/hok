@@ -85,7 +85,8 @@ fn main() -> Result<()> {
   // scoop search <query>
   } else if let Some(sub_m) = matches.subcommand_matches("search") {
     if let Some(query) = sub_m.value_of("query") {
-      scoop.search(query)?;
+      let with_binary = sub_m.is_present("binary");
+      scoop.search(query, with_binary)?;
     }
   // scoop config list|remove
   } else if let Some(sub_m) = matches.subcommand_matches("config") {

@@ -127,6 +127,12 @@ pub fn build_app() -> App<'static, 'static> {
             .help("The query string (regex is support)")
             .required(true)
         )
+        .arg(
+          Arg::with_name("binary")
+            .help("Search 'bin' property")
+            .short("b")
+            .long("with-binary")
+        )
     )
     .subcommand(
       SubCommand::with_name("update")
