@@ -1,7 +1,7 @@
 # scoop-rs
 The Scoop Windows command line installer rewritten in Rust
 
-🚧 **Under heavy development, things may change without notice. Do NOT use itfor production. Take care of your data!**
+🚧 **Under heavy development, things may change without notice. Do NOT use it for production. Take care of your data!**
 
 ## Roadmap
 
@@ -12,7 +12,7 @@ The Scoop Windows command line installer rewritten in Rust
 - [x] bucket management (bucket)
 - [x] cache management (cache)
 - [x] config management (config)
-- [ ] manifest manipulation (home/info/create)
+- [x] manifest manipulation (home/info)
 - [x] search functionality (search)
 - [ ] app management (list/install/uninstall/update/cleanup/reset/hold/unhold)
 - [ ] status subcommand (status)

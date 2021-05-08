@@ -112,8 +112,13 @@ fn main() -> Result<()> {
   // scoop update
   } else if let Some(_sub_m) = matches.subcommand_matches("update") {
     scoop.update_buckets()?;
+  // scoop info <app>
+  } else if let Some(_sub_m) = matches.subcommand_matches("info") {
+    todo!();
+  // scoop list
+  } else if let Some(_sub_m) = matches.subcommand_matches("list") {
+    scoop.installed_apps()?;
   }
 
-  // println!("{:?}", scoop);
   Ok(())
 }

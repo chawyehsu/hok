@@ -36,7 +36,26 @@ impl Scoop {
   }
 
   pub fn manifest_from_url(&self, manifest_url: &str) -> Result<Value> {
-    let body: serde_json::Value = ureq::get(manifest_url)
+    // Use proxy from Scoop's config
+    let agent = match self.config["proxy"].clone() {
+      Value::String(mut proxy) => {
+        if !proxy.starts_with("http") {
+          proxy.insert_str(0, "http://");
+        }
+
+        let proxy = ureq::Proxy::new(proxy)?;
+
+        ureq::AgentBuilder::new()
+          .proxy(proxy)
+          .build()
+      },
+      _ => {
+        ureq::AgentBuilder::new()
+          .build()
+      }
+    };
+
+    let body: serde_json::Value = agent.get(manifest_url)
       .call()?
       .into_json()?;
 

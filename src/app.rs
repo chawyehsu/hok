@@ -77,10 +77,6 @@ pub fn build_app() -> App<'static, 'static> {
           )
         )
     )
-    // .subcommand(
-    //   SubCommand::with_name("cleanup")
-    //     .about("Cleanup apps by removing old versions")
-    // )
     .subcommand(
       SubCommand::with_name("config")
         .about("Get or set configuration values")
@@ -143,14 +139,14 @@ pub fn build_app() -> App<'static, 'static> {
     .subcommand(
       SubCommand::with_name("update")
         .about("Fetch and update all buckets")
-    // )
-    // .subcommand(
-    //   SubCommand::with_name("info")
-    //     .about("Display information about an app")
-    // )
-    // .subcommand(
-    //   SubCommand::with_name("list")
-    //     .about("List installed apps")
+    )
+    .subcommand(
+      SubCommand::with_name("info")
+        .about("Display information about an app")
+    )
+    .subcommand(
+      SubCommand::with_name("list")
+        .about("List installed apps")
     );
 
   app
