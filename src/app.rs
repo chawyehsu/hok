@@ -124,7 +124,7 @@ pub fn build_app() -> App<'static, 'static> {
         .about("Searches for apps that are available to install")
         .arg(
           Arg::with_name("query")
-            .help("The query string, explicit sarch by default")
+            .help("The query string, precision searching by default")
             .required(true)
         )
         .arg(
