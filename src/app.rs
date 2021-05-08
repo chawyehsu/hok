@@ -124,12 +124,18 @@ pub fn build_app() -> App<'static, 'static> {
         .about("Searches for apps that are available to install")
         .arg(
           Arg::with_name("query")
-            .help("The query string (regex is support)")
+            .help("The query string, explicit sarch by default")
             .required(true)
         )
         .arg(
+          Arg::with_name("fuzzy")
+            .help("Enable regex query for fuzzy search")
+            .short("r")
+            .long("fuzzy")
+        )
+        .arg(
           Arg::with_name("binary")
-            .help("Search 'bin' property")
+            .help("Enable search on manifest 'bin' property")
             .short("b")
             .long("with-binary")
         )

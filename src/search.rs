@@ -12,10 +12,17 @@ struct SearchMatch {
 }
 
 impl Scoop {
-  pub fn search(&self, query: &str, with_binary: bool) -> Result<()> {
+  pub fn search(&self, query: &str, fuzzy: bool, with_binary: bool) -> Result<()> {
+    let buckets = self.get_local_buckets_name()?;
     let re = RegexBuilder::new(query)
       .case_insensitive(true).build()?;
-    let buckets = self.get_local_buckets_name()?;
+    let match_helper = |input: String| -> bool {
+      if fuzzy {
+        re.is_match(input.as_str())
+      } else {
+        input.eq(query)
+      }
+    };
 
     for bucket in buckets {
       let mut matches: Vec<SearchMatch> = Vec::new();
@@ -25,7 +32,7 @@ impl Scoop {
           let app_name = app.file_name();
           let app_name = app_name.to_str().unwrap().trim_end_matches(".json");
 
-          if re.is_match(app_name) {
+          if match_helper(app_name.to_owned()) {
             let manifest = self.manifest_from_local(app.path());
             if manifest.is_err() { continue; }
             let manifest = manifest?;
@@ -68,7 +75,7 @@ impl Scoop {
                 let bin = Path::new(bin)
                   .file_name().unwrap().to_str().unwrap();
 
-                if re.is_match(bin) {
+                if match_helper(bin.to_owned()) {
                   Some(vec![format!("'{}'", bin.to_string())])
                 } else {
                   None
@@ -83,7 +90,7 @@ impl Scoop {
                       let bin = Path::new(bin)
                         .file_name().unwrap().to_str().unwrap();
 
-                      if re.is_match(bin) {
+                      if match_helper(bin.to_owned()) {
                         bin_matches.push(format!("'{}'", bin.to_string()));
                         continue;
                       }
@@ -96,7 +103,7 @@ impl Scoop {
                           let bin = Path::new(bin)
                             .file_name().unwrap().to_str().unwrap();
 
-                          if re.is_match(bin) {
+                          if match_helper(bin.to_owned()) {
                             bin_matches.push(format!("'{}'", bin.to_string()));
                             continue;
                           }
@@ -108,7 +115,7 @@ impl Scoop {
                       let bin = bin_pair.get(1).unwrap();
                       match bin {
                         Value::String(bin) => {
-                          if re.is_match(bin) {
+                          if match_helper(bin.to_owned()) {
                             bin_matches.push(format!("'{}'", bin.to_string()));
                             continue;
                           }
