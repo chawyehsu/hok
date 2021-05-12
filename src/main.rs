@@ -2,12 +2,12 @@ extern crate anyhow;
 extern crate remove_dir_all;
 
 use std::process::Command;
-
+use serde_json::Value;
 use anyhow::Result;
 use scoop::*;
 
 fn main() -> Result<()> {
-  let app = app::build_app();
+  let app = cli::build_app();
   let matches = app.get_matches();
   let mut scoop = Scoop::new(config::load_cfg()?);
 
@@ -113,12 +113,52 @@ fn main() -> Result<()> {
   // scoop update
   } else if let Some(_sub_m) = matches.subcommand_matches("update") {
     scoop.update_buckets()?;
-  // scoop info <app>
-  } else if let Some(_sub_m) = matches.subcommand_matches("info") {
+  // scoop install [FLAGS] <app>...
+  } else if let Some(sub_m) = matches.subcommand_matches("install") {
     todo!();
   // scoop list
   } else if let Some(_sub_m) = matches.subcommand_matches("list") {
-    scoop.installed_apps()?;
+    let brew_list_mode = scoop.config.get("brewListMode")
+      .unwrap_or(&Value::Bool(false)).as_bool().unwrap();
+
+    let apps = scoop.installed_apps()?;
+    if apps.len() > 0 {
+      if brew_list_mode {
+        todo!();
+      } else {
+        println!("Installed apps:");
+        for app in apps {
+          let version = scoop.current_version(&app.entry)?;
+          let install_info = scoop.install_info(&app.entry, &version);
+
+          // name, version
+          print!("  {} {}", app.name, version);
+          // global
+          if app.global {
+            print!(" *global*");
+          }
+          // failed
+          if install_info.is_err() {
+            print!(" *failed*");
+          }
+          // hold
+          let install_info = install_info?;
+          if install_info.get("hold").is_some() {
+            print!(" *hold*");
+          }
+          // bucket
+          let bucket_info = install_info.get("bucket");
+          if bucket_info.is_some() {
+            print!(" [{}]", bucket_info.unwrap().as_str().unwrap());
+          } else if install_info.get("url").is_some() {
+            print!(" [{}]", install_info.get("url").unwrap().as_str().unwrap());
+          }
+          // arch
+          // TODO
+          print!("\n");
+        }
+      }
+    }
   }
 
   Ok(())

@@ -145,6 +145,35 @@ pub fn build_app() -> App<'static, 'static> {
         .about("Display information about an app")
     )
     .subcommand(
+      SubCommand::with_name("install")
+        .about("Install apps")
+        .setting(AppSettings::ArgRequiredElseHelp)
+        .arg(
+          Arg::with_name("app")
+            .help("The app to be installed")
+            .required(true)
+            .multiple(true)
+        )
+        .arg(
+          Arg::with_name("global")
+            .help("Install the app globally")
+            .short("g")
+            .long("global")
+        )
+        .arg(
+          Arg::with_name("nocache")
+            .help("Don't use the download cache")
+            .short("k")
+            .long("no-cache")
+        )
+        .arg(
+          Arg::with_name("skip")
+            .help("Skip hash validation (use with caution!)")
+            .short("s")
+            .long("skip")
+        )
+    )
+    .subcommand(
       SubCommand::with_name("list")
         .about("List installed apps")
     );
