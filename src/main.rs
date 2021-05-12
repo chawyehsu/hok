@@ -9,7 +9,7 @@ use scoop::*;
 fn main() -> Result<()> {
   let app = app::build_app();
   let matches = app.get_matches();
-  let mut scoop = Scoop::from_cfg(config::load_cfg());
+  let mut scoop = Scoop::new(config::load_cfg()?);
 
   // scoop bucket add|list|known|rm [<repo>]
   if let Some(sub_m) = matches.subcommand_matches("bucket") {
@@ -92,20 +92,21 @@ fn main() -> Result<()> {
   // scoop config list|remove
   } else if let Some(sub_m) = matches.subcommand_matches("config") {
     if let Some(_sub_m2) = sub_m.subcommand_matches("list") {
-      todo!();
+      for (key, value) in scoop.config.as_object().unwrap() {
+        println!("{}: {}", key, value);
+      }
     } else if let Some(sub_m2) = sub_m.subcommand_matches("remove") {
       let key = sub_m2.value_of("name").unwrap();
-      scoop.set_config(key, "null");
+      scoop.set_config(key, "null")?;
     } else {
       let key = sub_m.value_of("name").unwrap();
 
       if let Some(value) = sub_m.value_of("value") {
-        scoop.set_config(key, value)
+        scoop.set_config(key, value)?
       } else {
-        let value = scoop.get_config(key);
-        match value.as_str() {
-          "null" => println!("No configration named '{}' found.", key),
-          _ => println!("{}", value),
+        match scoop.get_config(key) {
+          Some(value) => println!("{}", value.as_str().unwrap()),
+          None => println!("No configration named '{}' found.", key),
         }
       }
     }
