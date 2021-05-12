@@ -1,10 +1,10 @@
 extern crate anyhow;
 extern crate remove_dir_all;
 
-use std::process::Command;
+use std::process::{exit, Command};
 use serde_json::Value;
 use anyhow::Result;
-use scoop::*;
+use scoop::{cli, config, bucket, Scoop};
 
 fn main() -> Result<()> {
   let app = cli::build_app();
@@ -16,28 +16,37 @@ fn main() -> Result<()> {
     if let Some(sub_m2) = sub_m.subcommand_matches("add") {
       let bucket_name = sub_m2.value_of("name").unwrap();
 
-      if scoop.is_added_bucket(bucket_name) {
+      if scoop.is_local_bucket(bucket_name)? {
         println!("The '{}' already exists.", bucket_name);
+        exit(1);
       }
 
-      if Scoop::is_known_bucket(bucket_name) {
-        let bucket_url = Scoop::get_known_bucket_url(bucket_name);
+      if bucket::is_known_bucket(bucket_name) {
+        let bucket_url = bucket::known_bucket_url(bucket_name).unwrap();
         scoop.clone(bucket_name, bucket_url)?;
       } else {
-        let bucket_url = sub_m2.value_of("repo")
-          .expect("<repo> is required for unknown bucket");
-        scoop.clone(bucket_name, bucket_url)?;
+        match sub_m2.value_of("repo") {
+          Some(repo) => {
+            scoop.clone(bucket_name, repo)?;
+          },
+          None => {
+            eprintln!("<repo> is required for unknown bucket.");
+            exit(1);
+          }
+        }
       }
-    } else if let Some(sub_m2) = sub_m.subcommand_matches("list") {
-      drop(sub_m2);
-      scoop.buckets();
-    } else if let Some(sub_m2) = sub_m.subcommand_matches("known") {
-      drop(sub_m2);
-      Scoop::get_known_buckets();
+    } else if let Some(_sub_m2) = sub_m.subcommand_matches("list") {
+      for b in scoop.local_buckets()? {
+        println!("{}", b.name.as_str());
+      }
+    } else if let Some(_sub_m2) = sub_m.subcommand_matches("known") {
+      for b in bucket::known_buckets() {
+        println!("{}", b);
+      }
     } else if let Some(sub_m2) = sub_m.subcommand_matches("rm") {
       let bucket_name = sub_m2.value_of("name").unwrap();
 
-      if scoop.is_added_bucket(bucket_name) {
+      if scoop.is_local_bucket(bucket_name)? {
         let bucket_dir = scoop.buckets_dir.join(bucket_name);
         if bucket_dir.exists() {
           match remove_dir_all::remove_dir_all(bucket_dir) {

@@ -7,10 +7,10 @@ use crate::Scoop;
 
 impl Scoop {
   pub fn manifest(&self, app_name: &str) -> Option<Value> {
-    let buckets = self.get_local_buckets_name().unwrap();
+    let buckets = self.local_buckets().unwrap();
 
     for bucket in buckets {
-      let bucket_path = self.path_of(bucket.as_str());
+      let bucket_path = bucket.entry.unwrap().path();
       let manifest_path = bucket_path.join(format!("{}.json", app_name));
 
       if manifest_path.exists() {

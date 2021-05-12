@@ -68,11 +68,7 @@ impl Scoop {
     }
 
     // Ensure config directory exists
-    let config_dir = CONCFG_PATH.parent().unwrap();
-    if !config_dir.exists() {
-      std::fs::create_dir_all(config_dir)?;
-      drop(config_dir);
-    }
+    crate::fs::ensure_dir(CONCFG_PATH.parent().unwrap())?;
 
     // Read or create config file
     let file = OpenOptions::new()

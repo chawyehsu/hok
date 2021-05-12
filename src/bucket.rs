@@ -1,12 +1,12 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::io;
 use std::fs::DirEntry;
 
 use once_cell::sync::Lazy;
 use anyhow::Result;
 use crate::Scoop;
 
-static KNOWN_BUCKETS: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
-  let knowns = vec![
+static KNOWN_BUCKETS: Lazy<Vec<(&str, &str)>> = Lazy::new(|| {
+  vec![
     ("main", "https://github.com/ScoopInstaller/Main"),
     ("extras", "https://github.com/lukesampson/scoop-extras"),
     ("versions", "https://github.com/ScoopInstaller/Versions"),
@@ -18,83 +18,91 @@ static KNOWN_BUCKETS: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
     ("java", "https://github.com/ScoopInstaller/Java"),
     ("games", "https://github.com/Calinou/scoop-games"),
     ("jetbrains", "https://github.com/Ash258/Scoop-JetBrains")
-  ];
-
-  let mut m = HashMap::new();
-  for (bucket, url) in knowns.iter() {
-    m.insert(*bucket, *url);
-  }
-  return m;
+  ]
 });
 
+pub struct ScoopBucket {
+  pub name: String,
+  pub entry: Option<DirEntry>,
+  pub remote: Option<String>
+}
+
+/// Collect known buckets
+pub fn known_buckets() -> Vec<&'static str> {
+  let buckets: Vec<&str> = KNOWN_BUCKETS
+    .iter().map(|p| p.0).collect();
+  buckets
+}
+
+/// Return url of given known `bucket_name` bucket.
+pub fn known_bucket_url(bucket_name: &str) -> Option<&'static str> {
+  for (name, url) in KNOWN_BUCKETS.iter() {
+    if bucket_name.eq(*name) {
+      return Some(url);
+    }
+  }
+
+  None
+}
+
+/// Test given `bucket_name` is a known bucket or not.
+pub fn is_known_bucket(bucket_name: &str) -> bool {
+  known_buckets().contains(&bucket_name)
+}
+
+
 impl Scoop {
-  pub fn get_local_buckets_entry(&self) -> Result<Vec<DirEntry>> {
-    let buckets = std::fs::read_dir(&self.buckets_dir)?
-      .filter_map(Result::ok)
-      .collect();
-    Ok(buckets)
-  }
+  /// Collect local buckets
+  pub fn local_buckets(&self) -> Result<Vec<ScoopBucket>, io::Error> {
+    let ref buckets_dir = self.buckets_dir;
+    // Ensure `buckets` dir
+    crate::fs::ensure_dir(buckets_dir)?;
 
-  pub fn get_known_buckets() {
-    let buckets: Vec<&str> = KNOWN_BUCKETS.iter().map(|p| *p.0).collect();
+    let mut sbs = Vec::new();
+    let buckets: Vec<DirEntry> = std::fs::read_dir(buckets_dir)?
+      .filter_map(Result::ok)
+      .filter(|de| de.file_type().unwrap().is_dir())
+      .collect();
+
     for b in buckets {
-      println!("{}", b);
+      let name = b.file_name().into_string().unwrap();
+      sbs.push(ScoopBucket {
+        name,
+        entry: Some(b),
+        remote: None // FIXME
+      });
     }
+
+    Ok(sbs)
   }
 
-  pub fn get_known_bucket_url(bucket_name: &str) -> &'static str {
-    KNOWN_BUCKETS.get(bucket_name).unwrap()
-  }
-
-  pub fn get_local_buckets_name(&self) -> Result<Vec<String>> {
-    let buckets = std::fs::read_dir(&self.buckets_dir)?
-      .filter_map(Result::ok)
-      .filter_map(|x| x.file_name().into_string().ok())
-      .collect();
-    Ok(buckets)
-  }
-
-  pub fn is_known_bucket(bucket_name: &str) -> bool {
-    KNOWN_BUCKETS.contains_key(bucket_name)
-  }
-
-  pub fn buckets(&self) {
-    let buckets = self.get_local_buckets_name().unwrap();
-    for b in buckets {
-      println!("{}", b);
+  /// Return [`DirEntry`] of given local `bucket_name` bucket.
+  pub fn local_bucket_entry<T: AsRef<str>>(&self, bucket_name: T)
+    -> Result<Option<DirEntry>, io::Error> {
+    for bucket in self.local_buckets()? {
+      if bucket.name.eq(bucket_name.as_ref()) {
+        return Ok(bucket.entry);
+      }
     }
+
+    Ok(None)
   }
 
-  pub fn is_added_bucket(&self, bucket: &str) -> bool {
-    let buckets = self.get_local_buckets_name().unwrap();
-    buckets.contains(&bucket.to_string())
+  /// Test given `bucket_name` is a local bucket or not.
+  pub fn is_local_bucket<T: AsRef<str>>(&self, bucket_name: T)
+    -> Result<bool, io::Error> {
+    let buckets: Vec<String> = self.local_buckets()?
+      .iter().map(|p| p.name.to_string()).collect();
+
+    Ok(buckets.contains(&bucket_name.as_ref().to_string()))
   }
 
-  pub fn path_of(&self, bucket_name: &str) -> PathBuf {
-    let p = self.buckets_dir.join(bucket_name);
+  /// Collect apps located in given `bucket_name` bucket.
+  pub fn apps_in_local_bucket<T: AsRef<str>>(&self, bucket_name: T)
+    -> Result<Vec<DirEntry>> {
+    let entry = self.local_bucket_entry(bucket_name.as_ref())?.unwrap();
+    let apps = crate::fs::read_dir_json(entry.path())?;
 
-    if p.join("bucket").exists() {
-      p.join("bucket")
-    } else {
-      p
-    }
-  }
-
-  pub fn apps_in_bucket(&self, bucket_name: &str) -> Result<Option<Vec<DirEntry>>> {
-    let p = self.path_of(bucket_name);
-
-    let entries: Vec<DirEntry> = std::fs::read_dir(p.as_path())?
-      .filter_map(Result::ok)
-      .filter(|entry| {
-        let fname = entry.file_name();
-        fname.to_str().unwrap().ends_with(".json")
-      })
-      .collect();
-
-    if entries.len() == 0 {
-      Ok(None)
-    } else {
-      Ok(Some(entries))
-    }
+    Ok(apps)
   }
 }

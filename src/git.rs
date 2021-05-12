@@ -1,6 +1,6 @@
 use crate::Scoop;
 use git2::Repository;
-use std::{io::Write, path::PathBuf};
+use std::{io::Write, path::Path};
 use serde_json::Value;
 use anyhow::{anyhow, Result};
 
@@ -74,8 +74,8 @@ impl Scoop {
   }
 
   // NOTE: this will discard all local changes.
-  pub fn reset_head(&self, path: PathBuf) -> Result<()> {
-    let repo = Repository::open(path)?;
+  pub fn reset_head<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+    let repo = Repository::open(path.as_ref())?;
 
     let mut origin = repo.find_remote("origin")?;
     // fetch origin all refs

@@ -3,8 +3,8 @@ use std::{path::Path};
 use anyhow::Result;
 use futures::{executor::block_on, future::join_all};
 use serde_json::Value;
-use crate::Scoop;
 use regex::RegexBuilder;
+use crate::Scoop;
 
 struct SearchMatch {
   name: String,
@@ -25,135 +25,135 @@ impl Scoop {
     match_helper: F
   ) -> Result<Matches> where F: Fn(String) -> bool {
     let mut search_matches: Vec<SearchMatch> = Vec::new();
-    if let Some(apps) = self.apps_in_bucket(bucket_name.as_str())? {
-      for app in apps.iter() {
-        let app_name = app.file_name();
-        let app_name = app_name.to_str().unwrap().trim_end_matches(".json");
+    let apps = self.apps_in_local_bucket(&bucket_name)?;
 
-        if match_helper(app_name.to_owned()) {
-          let manifest = self.manifest_from_local(app.path());
-          if manifest.is_err() { continue; }
-          let manifest = manifest?;
-          let version = manifest.get("version");
+    for app in apps.iter() {
+      let app_name = app.file_name();
+      let app_name = app_name.to_str().unwrap().trim_end_matches(".json");
 
-          // filter bad manifest doesn't contain `version`
-          if version.is_none() {
-            continue;
-          }
+      if match_helper(app_name.to_owned()) {
+        let manifest = self.manifest_from_local(app.path());
+        if manifest.is_err() { continue; }
+        let manifest = manifest?;
+        let version = manifest.get("version");
 
-          let name = app_name.to_string();
-          let version = version.unwrap().as_str().unwrap().to_owned();
-          let bin: Option<String> = None;
+        // filter bad manifest doesn't contain `version`
+        if version.is_none() {
+          continue;
+        }
 
-          let sm = SearchMatch {
-            name,
-            version,
-            bin
-          };
+        let name = app_name.to_string();
+        let version = version.unwrap().as_str().unwrap().to_owned();
+        let bin: Option<String> = None;
 
-          search_matches.push(sm);
-        } else {
-          // Searching binaries requires a very-high overhead (reading all json files),
-          // will not do binary search without the option.
-          if !with_binary { continue; }
+        let sm = SearchMatch {
+          name,
+          version,
+          bin
+        };
 
-          let manifest = self.manifest_from_local(app.path());
-          if manifest.is_err() { continue; }
-          let manifest = manifest?;
-          let bin = manifest.get("bin");
+        search_matches.push(sm);
+      } else {
+        // Searching binaries requires a very-high overhead (reading all json files),
+        // will not do binary search without the option.
+        if !with_binary { continue; }
 
-          // filter manifest doesn't contain `bin`
-          if bin.is_none() {
-            continue;
-          }
+        let manifest = self.manifest_from_local(app.path());
+        if manifest.is_err() { continue; }
+        let manifest = manifest?;
+        let bin = manifest.get("bin");
 
-          let bin = bin.unwrap();
-          let match_bin: Option<Vec<String>> = match bin {
-            Value::String(bin) => {
-              let bin = Path::new(bin)
-                .file_name().unwrap().to_str().unwrap();
+        // filter manifest doesn't contain `bin`
+        if bin.is_none() {
+          continue;
+        }
 
-              if match_helper(bin.to_owned()) {
-                Some(vec![format!("'{}'", bin.to_string())])
-              } else {
-                None
-              }
-            },
-            Value::Array(bins) => {
-              let mut bin_matches = Vec::new();
+        let bin = bin.unwrap();
+        let match_bin: Option<Vec<String>> = match bin {
+          Value::String(bin) => {
+            let bin = Path::new(bin)
+              .file_name().unwrap().to_str().unwrap();
 
-              for bin in bins {
-                match bin {
-                  Value::String(bin) => {
-                    let bin = Path::new(bin)
-                      .file_name().unwrap().to_str().unwrap();
-
-                    if match_helper(bin.to_owned()) {
-                      bin_matches.push(format!("'{}'", bin.to_string()));
-                      continue;
-                    }
-                  },
-                  Value::Array(bin_pair) => {
-                    // test bin
-                    let bin = bin_pair.get(0).unwrap();
-                    match bin {
-                      Value::String(bin) => {
-                        let bin = Path::new(bin)
-                          .file_name().unwrap().to_str().unwrap();
-
-                        if match_helper(bin.to_owned()) {
-                          bin_matches.push(format!("'{}'", bin.to_string()));
-                          continue;
-                        }
-                      },
-                      _ => {}
-                    }
-
-                    // test alias
-                    let bin = bin_pair.get(1).unwrap();
-                    match bin {
-                      Value::String(bin) => {
-                        if match_helper(bin.to_owned()) {
-                          bin_matches.push(format!("'{}'", bin.to_string()));
-                          continue;
-                        }
-                      },
-                      _ => {}
-                    }
-                  },
-                  _ => {}
-                }
-              }
-
-              if bin_matches.len() > 0 {
-                Some(bin_matches)
-              } else {
-                None
-              }
-            },
-            _ => {
+            if match_helper(bin.to_owned()) {
+              Some(vec![format!("'{}'", bin.to_string())])
+            } else {
               None
             }
-          };
+          },
+          Value::Array(bins) => {
+            let mut bin_matches = Vec::new();
 
-          match match_bin {
-            Some(bins) => {
-              let version = manifest.get("version");
-              let name = app_name.to_string();
-              let version = version.unwrap().as_str().unwrap().to_owned();
-              let bin: Option<String> = Some(bins.get(0).unwrap().to_owned());
+            for bin in bins {
+              match bin {
+                Value::String(bin) => {
+                  let bin = Path::new(bin)
+                    .file_name().unwrap().to_str().unwrap();
 
-              let sm = SearchMatch {
-                name,
-                version,
-                bin
-              };
+                  if match_helper(bin.to_owned()) {
+                    bin_matches.push(format!("'{}'", bin.to_string()));
+                    continue;
+                  }
+                },
+                Value::Array(bin_pair) => {
+                  // test bin
+                  let bin = bin_pair.get(0).unwrap();
+                  match bin {
+                    Value::String(bin) => {
+                      let bin = Path::new(bin)
+                        .file_name().unwrap().to_str().unwrap();
 
-              search_matches.push(sm);
-            },
-            None => {
-              continue;
+                      if match_helper(bin.to_owned()) {
+                        bin_matches.push(format!("'{}'", bin.to_string()));
+                        continue;
+                      }
+                    },
+                    _ => {}
+                  }
+
+                  // test alias
+                  let bin = bin_pair.get(1).unwrap();
+                  match bin {
+                    Value::String(bin) => {
+                      if match_helper(bin.to_owned()) {
+                        bin_matches.push(format!("'{}'", bin.to_string()));
+                        continue;
+                      }
+                    },
+                    _ => {}
+                  }
+                },
+                _ => {}
+              }
             }
+
+            if bin_matches.len() > 0 {
+              Some(bin_matches)
+            } else {
+              None
+            }
+          },
+          _ => {
+            None
+          }
+        };
+
+        match match_bin {
+          Some(bins) => {
+            let version = manifest.get("version");
+            let name = app_name.to_string();
+            let version = version.unwrap().as_str().unwrap().to_owned();
+            let bin: Option<String> = Some(bins.get(0).unwrap().to_owned());
+
+            let sm = SearchMatch {
+              name,
+              version,
+              bin
+            };
+
+            search_matches.push(sm);
+          },
+          None => {
+            continue;
           }
         }
       }
@@ -166,7 +166,7 @@ impl Scoop {
   }
 
   pub fn search(&self, query: &str, fuzzy: bool, with_binary: bool) -> Result<()> {
-    let buckets = self.get_local_buckets_name()?;
+    let buckets = self.local_buckets()?;
     let re = RegexBuilder::new(query)
       .case_insensitive(true).build()?;
     let match_helper = |input: String| -> bool {
@@ -183,7 +183,7 @@ impl Scoop {
     for bucket in buckets {
       futures.push(
         self.walk_manifests(
-          bucket,
+          bucket.name,
           with_binary,
           match_helper)
       );
