@@ -1,26 +1,31 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 use std::fs::DirEntry;
 
+use once_cell::sync::Lazy;
 use anyhow::Result;
-use lazy_static::lazy_static;
-use serde_json::{json, Value};
 use crate::Scoop;
 
-lazy_static! {
-  static ref KNOWN_BUCKETS: Value = json!({
-    "main": "https://github.com/ScoopInstaller/Main",
-    "extras": "https://github.com/lukesampson/scoop-extras",
-    "versions": "https://github.com/ScoopInstaller/Versions",
-    "nightlies": "https://github.com/ScoopInstaller/Nightlies",
-    "nirsoft": "https://github.com/kodybrown/scoop-nirsoft",
-    "php": "https://github.com/ScoopInstaller/PHP",
-    "nerd-fonts": "https://github.com/matthewjberger/scoop-nerd-fonts",
-    "nonportable": "https://github.com/TheRandomLabs/scoop-nonportable",
-    "java": "https://github.com/ScoopInstaller/Java",
-    "games": "https://github.com/Calinou/scoop-games",
-    "jetbrains": "https://github.com/Ash258/Scoop-JetBrains"
-  });
-}
+static KNOWN_BUCKETS: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
+  let knowns = vec![
+    ("main", "https://github.com/ScoopInstaller/Main"),
+    ("extras", "https://github.com/lukesampson/scoop-extras"),
+    ("versions", "https://github.com/ScoopInstaller/Versions"),
+    ("nightlies", "https://github.com/ScoopInstaller/Nightlies"),
+    ("nirsoft", "https://github.com/kodybrown/scoop-nirsoft"),
+    ("php", "https://github.com/ScoopInstaller/PHP"),
+    ("nerd-fonts", "https://github.com/matthewjberger/scoop-nerd-fonts"),
+    ("nonportable", "https://github.com/TheRandomLabs/scoop-nonportable"),
+    ("java", "https://github.com/ScoopInstaller/Java"),
+    ("games", "https://github.com/Calinou/scoop-games"),
+    ("jetbrains", "https://github.com/Ash258/Scoop-JetBrains")
+  ];
+
+  let mut m = HashMap::new();
+  for (bucket, url) in knowns.iter() {
+    m.insert(*bucket, *url);
+  }
+  return m;
+});
 
 impl Scoop {
   pub fn get_local_buckets_entry(&self) -> Result<Vec<DirEntry>> {
@@ -31,26 +36,26 @@ impl Scoop {
   }
 
   pub fn get_known_buckets() {
-    let buckets = KNOWN_BUCKETS.as_object().unwrap().keys();
+    let buckets: Vec<&str> = KNOWN_BUCKETS.iter().map(|p| *p.0).collect();
     for b in buckets {
       println!("{}", b);
     }
   }
 
   pub fn get_known_bucket_url(bucket_name: &str) -> &'static str {
-    KNOWN_BUCKETS[bucket_name].as_str().unwrap()
+    KNOWN_BUCKETS.get(bucket_name).unwrap()
   }
 
   pub fn get_local_buckets_name(&self) -> Result<Vec<String>> {
     let buckets = std::fs::read_dir(&self.buckets_dir)?
       .filter_map(Result::ok)
-      .map(|entry| entry.file_name().to_str().unwrap().to_owned())
+      .filter_map(|x| x.file_name().into_string().ok())
       .collect();
     Ok(buckets)
   }
 
   pub fn is_known_bucket(bucket_name: &str) -> bool {
-    KNOWN_BUCKETS.as_object().unwrap().contains_key(bucket_name)
+    KNOWN_BUCKETS.contains_key(bucket_name)
   }
 
   pub fn buckets(&self) {
@@ -60,9 +65,9 @@ impl Scoop {
     }
   }
 
-  pub fn is_added_bucket(&self, bucket_name: &str) -> bool {
+  pub fn is_added_bucket(&self, bucket: &str) -> bool {
     let buckets = self.get_local_buckets_name().unwrap();
-    buckets.contains(&bucket_name.to_string())
+    buckets.contains(&bucket.to_string())
   }
 
   pub fn path_of(&self, bucket_name: &str) -> PathBuf {

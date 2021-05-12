@@ -29,7 +29,7 @@ pub struct Scoop {
 }
 
 impl Scoop {
-  pub fn from_cfg(config: Value) -> Scoop {
+  pub fn new(config: Value) -> Scoop {
     let root_dir: PathBuf = config["rootPath"]
       .as_str()
       .map(PathBuf::from)
