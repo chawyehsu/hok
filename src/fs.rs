@@ -11,6 +11,13 @@ pub fn ensure_dir<P: AsRef<Path>>(path: P) -> io::Result<()> {
   }
 }
 
+pub fn empty_dir<P: AsRef<Path>>(path: P) -> io::Result<()> {
+  match path.as_ref().exists() {
+    true => remove_dir_all::remove_dir_contents(path.as_ref()),
+    false => Ok(())
+  }
+}
+
 pub fn read_dir_json<P: AsRef<Path>>(path: P) -> io::Result<Vec<fs::DirEntry>> {
   let jsons = fs::read_dir(path.as_ref())?
     .filter_map(Result::ok)

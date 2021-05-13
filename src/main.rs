@@ -4,7 +4,7 @@ extern crate remove_dir_all;
 use std::process::{exit, Command};
 use serde_json::Value;
 use anyhow::Result;
-use scoop::{cli, config, bucket, Scoop};
+use scoop::{cli, config, bucket, utils, Scoop};
 
 fn main() -> Result<()> {
   let app = cli::build_app();
@@ -62,16 +62,73 @@ fn main() -> Result<()> {
   } else if let Some(sub_m) = matches.subcommand_matches("cache") {
     if let Some(sub_m2) = sub_m.subcommand_matches("rm") {
       if let Some(app_name) = sub_m2.value_of("app") {
-        scoop.cache_rm(app_name)?;
+        match scoop.cache_remove(app_name) {
+          Ok(()) => {
+            println!("All caches that match '{}' were removed.", app_name);
+            exit(0);
+          },
+          Err(_e) => {
+            eprintln!("Failed to remove '{}' caches.", app_name);
+            exit(1);
+          }
+        }
       } else if sub_m2.is_present("all") {
-        scoop.cache_clean()?;
+        match scoop.cache_clean() {
+          Ok(()) => {
+            println!("All download caches were removed.");
+            exit(0);
+          },
+          Err(_e) => {
+            eprintln!("Failed to clear caches.");
+            exit(1);
+          }
+        }
       }
     } else {
+      let cache_items = scoop.cache_get_all()?;
+      let mut total_size: u64 = 0;
+      let total_count = cache_items.len();
+
       if let Some(sub_m2) = sub_m.subcommand_matches("show") {
-        scoop.cache_show(sub_m2.value_of("app"))?;
-      } else {
-        scoop.cache_show(None)?;
+        if let Some(app) = sub_m2.value_of("app") {
+          let mut filter_size: u64 = 0;
+          let mut filter_count: u64 = 0;
+          for sci in cache_items {
+            if sci.app.contains(app) {
+              filter_size = filter_size + sci.size;
+              filter_count = filter_count + 1;
+              println!("{: >6} {} ({}) {}",
+                utils::filesize(sci.size, true),
+                sci.app,
+                sci.version,
+                sci.filename
+              );
+            }
+          }
+          if filter_count > 0 {
+            println!();
+          }
+          println!("Total: {} files, {}",
+            filter_count, utils::filesize(filter_size, true));
+          exit(0);
+        }
       }
+
+      for sci in cache_items {
+        total_size = total_size + sci.size;
+        println!("{: >6} {} ({}) {}",
+          utils::filesize(sci.size, true),
+          sci.app,
+          sci.version,
+          sci.filename
+        );
+      }
+      if total_count > 0 {
+        println!();
+      }
+      println!("Total: {} files, {}",
+        total_count, utils::filesize(total_size, true));
+      exit(0);
     }
   // scoop home <app>
   } else if let Some(sub_m) = matches.subcommand_matches("home") {
@@ -125,6 +182,20 @@ fn main() -> Result<()> {
   // scoop install [FLAGS] <app>...
   } else if let Some(sub_m) = matches.subcommand_matches("install") {
     todo!();
+    // let apps: Vec<_> = sub_m.values_of("app").unwrap().collect();
+
+    // let app_count = apps.len();
+    // for app in apps {
+    //   let app_parsed = scoop.parse_app(app);
+
+    //   let app_is_installed = scoop.is_installed(app_parsed.0);
+
+    //   if app_count == 1 && app_is_installed && app_parsed.2.is_none() {
+
+    //   }
+
+    //   println!("{:?}", app_parsed);
+    // }
   // scoop list
   } else if let Some(_sub_m) = matches.subcommand_matches("list") {
     let brew_list_mode = scoop.config.get("brewListMode")

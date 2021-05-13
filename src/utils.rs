@@ -9,7 +9,7 @@ pub fn filesize(length: u64, with_unit: bool) -> String {
     let j = (flength / gb).round();
 
     if with_unit {
-      format!("{}GB", j)
+      format!("{} GB", j)
     } else {
       j.to_string()
     }
@@ -17,7 +17,7 @@ pub fn filesize(length: u64, with_unit: bool) -> String {
     let j = (flength / mb).round();
 
     if with_unit {
-      format!("{}MB", j)
+      format!("{} MB", j)
     } else {
       j.to_string()
     }
@@ -25,15 +25,16 @@ pub fn filesize(length: u64, with_unit: bool) -> String {
     let j = (flength / kb).round();
 
     if with_unit {
-      format!("{}KB", j)
+      format!("{} KB", j)
     } else {
       j.to_string()
     }
   } else {
     if with_unit {
-      format!("{}B", flength)
+      format!("{} B", flength)
     } else {
       flength.to_string()
     }
   }
 }
+
