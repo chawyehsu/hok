@@ -4,12 +4,10 @@ use chrono::{Utc, SecondsFormat};
 
 impl Scoop {
   pub fn update_buckets(&mut self) -> Result<()> {
-    let buckets = self.local_buckets()?;
+    for bucket in self.local_buckets()? {
+      print!("Updating '{}' bucket...", bucket.0.as_str());
 
-    for bucket in buckets.into_iter() {
-      print!("Updating '{}' bucket...", bucket.name.as_str());
-
-      match self.reset_head(bucket.entry.unwrap().path()) {
+      match self.reset_head(bucket.1.path()) {
         Ok(()) => {},
         Err(e) => {
           print!(" failed. ({})", e);

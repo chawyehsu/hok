@@ -183,7 +183,7 @@ impl Scoop {
     for bucket in buckets {
       futures.push(
         self.walk_manifests(
-          bucket.name,
+          bucket.0.to_string(),
           with_binary,
           match_helper)
       );
