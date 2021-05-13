@@ -38,12 +38,12 @@ impl Scoop {
     Ok(entries)
   }
 
-  /// Collect cache files, which its name matching given `partten`,
+  /// Collect cache files, which its name matching given `pattern`,
   /// represented as [`ScoopCacheItem`]
-  pub fn cache_get<T: AsRef<str>>(&self, partten: T) -> Result<Vec<ScoopCacheItem>> {
+  pub fn cache_get<T: AsRef<str>>(&self, pattern: T) -> Result<Vec<ScoopCacheItem>> {
     let all_cache_items = self.cache_get_all();
 
-    match partten.as_ref() {
+    match pattern.as_ref() {
       "*" => all_cache_items,
       query => {
         if query.ends_with("*") {
@@ -67,7 +67,7 @@ impl Scoop {
     crate::fs::empty_dir(&self.cache_dir)
   }
 
-  /// Remove `app_name` related cache files, `*` wildcard partten is support.
+  /// Remove `app_name` related cache files, `*` wildcard pattern is support.
   pub fn cache_remove<T: AsRef<str>>(&self, app_name: T) -> Result<()> {
     match app_name.as_ref() {
       "*" => self.cache_clean()?,
