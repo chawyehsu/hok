@@ -143,6 +143,12 @@ pub fn build_app() -> App<'static, 'static> {
     .subcommand(
       SubCommand::with_name("info")
         .about("Display information about an app")
+        .setting(AppSettings::ArgRequiredElseHelp)
+        .arg(
+          Arg::with_name("app")
+            .help("The app to be inspected")
+            .required(true)
+        )
     )
     .subcommand(
       SubCommand::with_name("install")

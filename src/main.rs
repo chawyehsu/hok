@@ -4,7 +4,7 @@ extern crate remove_dir_all;
 use std::process::{exit, Command};
 use serde_json::Value;
 use anyhow::Result;
-use scoop::{cli, config, bucket, utils, Scoop};
+use scoop::{cli, config, bucket, utils, manifest, Scoop};
 
 fn main() -> Result<()> {
   let app = cli::build_app();
@@ -179,6 +179,76 @@ fn main() -> Result<()> {
   // scoop update
   } else if let Some(_sub_m) = matches.subcommand_matches("update") {
     scoop.update_buckets()?;
+  // scoop update
+  } else if let Some(sub_m) = matches.subcommand_matches("info") {
+    let app = sub_m.value_of("app").unwrap();
+    match scoop.find_local_manifest(app) {
+      Ok(Some(manifest)) => {
+        // Name
+        println!("Name: {}", manifest.app);
+        // Description
+        if manifest.json.get("description").is_some() {
+          println!("Description: {}", manifest.json.get("description").unwrap().as_str().unwrap());
+        }
+        // Version
+        println!("Version: {}", manifest.version);
+        // Homepage
+        if manifest.json.get("homepage").is_some() {
+          println!("Website: {}", manifest.json.get("homepage").unwrap().as_str().unwrap());
+        }
+        // License
+        if manifest.json.get("license").is_some() {
+          let license = manifest.json.get("license").unwrap();
+          match license {
+            Value::String(license) => {
+              println!("License: {} (https://spdx.org/licenses/{}.html)", license, license);
+            },
+            Value::Object(license_pair) => {
+              let identifier = license_pair.get("identifier").unwrap().as_str().unwrap();
+              if license_pair.get("url").is_some() {
+                let url = license_pair.get("url").unwrap().as_str().unwrap();
+                println!("License: {} ({})", identifier, url);
+              } else {
+                println!("License: {}", identifier);
+              }
+            },
+            _ => {} // no-op
+          }
+        }
+        // Manifest
+        match manifest.from {
+          manifest::ManifestFromType::Local(path) => {
+            println!("Manifest: \n  {}", path.to_str().unwrap());
+          },
+          manifest::ManifestFromType::Remote(url) => {} // FIXME
+        }
+        // Binaries
+        match manifest.json.get("bin") {
+          Some(Value::String(single)) => {
+            println!("Binaries: \n  {}", single);
+          },
+          Some(Value::Array(multiple)) => {
+            println!("Binaries:");
+            // for s in multiple {
+            //   match s {
+            //     Value::String(s) =>
+            //   }
+            // }
+          },
+          _ => {} // no-op
+        }
+
+        exit(0);
+      },
+      Ok(None) => {
+        eprintln!("Could not find manifest for '{}'", app);
+        exit(1);
+      },
+      Err(e) => {
+        eprintln!("Failed to operate. ({})", e);
+        exit(1);
+      }
+    }
   // scoop install [FLAGS] <app>...
   } else if let Some(_sub_m) = matches.subcommand_matches("install") {
     todo!();

@@ -19,7 +19,7 @@ pub struct ScoopAppManifest {
 }
 
 impl ScoopAppManifest {
-  pub fn from_path<P: AsRef<Path>>(path: P) -> Result<ScoopAppManifest> {
+  pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
     let file = std::fs::File::open(path.as_ref())?;
     let reader = BufReader::new(file);
 
@@ -36,7 +36,7 @@ impl ScoopAppManifest {
         return Ok(ScoopAppManifest {
           app: fs::leaf_base(path.as_ref()),
           bucket: None, // FIXME
-          version: version.unwrap().to_string(),
+          version: version.unwrap().as_str().unwrap().to_string(),
           json,
           from: ManifestFromType::Local(path.as_ref().to_path_buf())
         });
@@ -49,7 +49,7 @@ impl ScoopAppManifest {
     }
   }
 
-  pub fn from_url<T: AsRef<str>>(url: T) -> Result<ScoopAppManifest> {
+  pub fn from_url<T: AsRef<str>>(url: T) -> Result<Self> {
     todo!()
   }
 }
