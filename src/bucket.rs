@@ -4,7 +4,7 @@ use std::fs::DirEntry;
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use anyhow::Result;
-use crate::Scoop;
+use crate::{Scoop, fs};
 
 static KNOWN_BUCKETS: Lazy<Vec<(&str, &str)>> = Lazy::new(|| {
   vec![
@@ -99,7 +99,7 @@ impl Scoop {
       .collect();
 
     for entry in buckets {
-      let name = entry.file_name().into_string().unwrap();
+      let name = fs::leaf_base(entry.path());
 
       unsafe {
         if !LOCAL_BUCKETS.contains_key(&name) {
@@ -132,7 +132,7 @@ impl Scoop {
   pub fn apps_in_local_bucket<T: AsRef<str>>(&self, bucket_name: T)
     -> Result<Vec<DirEntry>> {
     let bucket = self.local_bucket(bucket_name.as_ref())?.unwrap();
-    let apps = crate::fs::read_dir_json(bucket.path())?;
+    let apps = crate::fs::read_dir_json(bucket.root())?;
 
     Ok(apps)
   }

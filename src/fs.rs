@@ -23,7 +23,7 @@ pub fn read_dir_json<P: AsRef<Path>>(path: P) -> io::Result<Vec<fs::DirEntry>> {
   let jsons = fs::read_dir(path.as_ref())?
     .filter_map(Result::ok)
     .filter(|entry| {
-      entry.path().extension().unwrap().eq("json")
+      entry.file_name().into_string().unwrap().ends_with(".json")
     })
     .collect();
 
