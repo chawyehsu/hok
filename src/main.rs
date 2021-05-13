@@ -37,7 +37,7 @@ fn main() -> Result<()> {
       }
     } else if let Some(_sub_m2) = sub_m.subcommand_matches("list") {
       for b in scoop.local_buckets()? {
-        println!("{}", b.name.as_str());
+        println!("{}", b.0.as_str());
       }
     } else if let Some(_sub_m2) = sub_m.subcommand_matches("known") {
       for b in bucket::known_buckets() {
@@ -133,10 +133,10 @@ fn main() -> Result<()> {
   // scoop home <app>
   } else if let Some(sub_m) = matches.subcommand_matches("home") {
     if let Some(app_name) = sub_m.value_of("app") {
-      // find manifest and parse it
-      match scoop.manifest(app_name) {
+      // find local manifest and parse it
+      match scoop.find_local_manifest(app_name)? {
         Some(manifest) => {
-          if let Some(url) = manifest.get("homepage") {
+          if let Some(url) = manifest.json.get("homepage") {
             let url = std::ffi::OsStr::new(url.as_str().unwrap());
             Command::new("cmd").arg("/C").arg("start").arg(url).spawn()?;
           } else {
@@ -180,7 +180,7 @@ fn main() -> Result<()> {
   } else if let Some(_sub_m) = matches.subcommand_matches("update") {
     scoop.update_buckets()?;
   // scoop install [FLAGS] <app>...
-  } else if let Some(sub_m) = matches.subcommand_matches("install") {
+  } else if let Some(_sub_m) = matches.subcommand_matches("install") {
     todo!();
     // let apps: Vec<_> = sub_m.values_of("app").unwrap().collect();
 

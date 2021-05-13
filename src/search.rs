@@ -4,7 +4,7 @@ use anyhow::Result;
 use futures::{executor::block_on, future::join_all};
 use serde_json::Value;
 use regex::RegexBuilder;
-use crate::Scoop;
+use crate::{Scoop, manifest::ScoopAppManifest};
 
 struct SearchMatch {
   name: String,
@@ -32,18 +32,11 @@ impl Scoop {
       let app_name = app_name.to_str().unwrap().trim_end_matches(".json");
 
       if match_helper(app_name.to_owned()) {
-        let manifest = self.manifest_from_local(app.path());
+        let manifest = ScoopAppManifest::from_path(app.path());
         if manifest.is_err() { continue; }
         let manifest = manifest?;
-        let version = manifest.get("version");
-
-        // filter bad manifest doesn't contain `version`
-        if version.is_none() {
-          continue;
-        }
-
+        let version = manifest.version;
         let name = app_name.to_string();
-        let version = version.unwrap().as_str().unwrap().to_owned();
         let bin: Option<String> = None;
 
         let sm = SearchMatch {
@@ -58,10 +51,10 @@ impl Scoop {
         // will not do binary search without the option.
         if !with_binary { continue; }
 
-        let manifest = self.manifest_from_local(app.path());
+        let manifest = ScoopAppManifest::from_path(app.path());
         if manifest.is_err() { continue; }
         let manifest = manifest?;
-        let bin = manifest.get("bin");
+        let bin = manifest.json.get("bin");
 
         // filter manifest doesn't contain `bin`
         if bin.is_none() {
@@ -139,7 +132,7 @@ impl Scoop {
 
         match match_bin {
           Some(bins) => {
-            let version = manifest.get("version");
+            let version = manifest.json.get("version");
             let name = app_name.to_string();
             let version = version.unwrap().as_str().unwrap().to_owned();
             let bin: Option<String> = Some(bins.get(0).unwrap().to_owned());
