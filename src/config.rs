@@ -3,7 +3,7 @@ use std::io::{BufReader, BufWriter};
 use std::path::PathBuf;
 
 use dirs;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use once_cell::sync::Lazy;
 use serde_json::{Map, Value};
 use crate::Scoop;
@@ -54,7 +54,8 @@ impl Scoop {
     self.config.get(k)
   }
 
-  pub fn set_config(&mut self, key: &str, value: &str) -> Result<()> {
+  pub fn set_config<S: AsRef<str>>(&mut self, key: &str, value: S) -> Result<()> {
+    let value = value.as_ref();
     let k = key.to_ascii_lowercase();
 
     if value.eq("null") || value.eq("none") { // FIXME
@@ -72,18 +73,15 @@ impl Scoop {
 
     // Read or create config file
     let file = OpenOptions::new()
-      .write(true).create(true).open(CONCFG_PATH.as_path());
+      .write(true).create(true).truncate(true).open(CONCFG_PATH.as_path());
 
     match file {
       Ok(file) => {
         let buffer = BufWriter::new(file);
-        serde_json::to_writer_pretty(buffer, &self.config)
-        .expect("Failed to save configs.");
-        return Ok(());
+        serde_json::to_writer_pretty(buffer, &self.config)?;
+        Ok(())
       },
-      Err(_e) => return Err(
-        anyhow::anyhow!("Failed to create config file.")
-      )
+      Err(_e) => return Err(anyhow!("Failed to open config file."))
     }
   }
 }
