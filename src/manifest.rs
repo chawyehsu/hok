@@ -1,11 +1,11 @@
 use anyhow::{anyhow, Result};
-use std::{io::BufReader, path::{Path, PathBuf}};
+use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
-use crate::{Scoop, fs};
+use crate::{Scoop, fs, spdx};
 
-pub enum ManifestFromType {
+pub enum ManifestKind {
   Local(PathBuf),
   Remote(String)
 }
@@ -14,16 +14,16 @@ pub struct ScoopAppManifest {
   pub app: String,
   pub bucket: Option<String>,
   pub version: String,
+  pub license: Option<Vec<(String, Option<String>)>>,
   pub json: Value,
-  pub from: ManifestFromType,
+  pub kind: ManifestKind,
 }
 
 impl ScoopAppManifest {
-  pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+  pub fn from_path<P: AsRef<Path>>(path: P, bucket: Option<String>) -> Result<Self> {
     let file = std::fs::File::open(path.as_ref())?;
-    let reader = BufReader::new(file);
 
-    match serde_json::from_reader(reader) {
+    match serde_json::from_reader(file) {
       Ok(v) => {
         let json: Value = v;
         let version = json.get("version");
@@ -35,10 +35,11 @@ impl ScoopAppManifest {
 
         return Ok(ScoopAppManifest {
           app: fs::leaf_base(path.as_ref()),
-          bucket: None, // FIXME
+          bucket,
           version: version.unwrap().as_str().unwrap().to_string(),
+          license: Self::license(json.get("license")),
           json,
-          from: ManifestFromType::Local(path.as_ref().to_path_buf())
+          kind: ManifestKind::Local(path.as_ref().to_path_buf())
         });
       },
       Err(_e) => {
@@ -49,8 +50,54 @@ impl ScoopAppManifest {
     }
   }
 
-  pub fn from_url<T: AsRef<str>>(url: T) -> Result<Self> {
+  pub fn from_url<T: AsRef<str>>(_url: T) -> Result<Self> {
     todo!()
+  }
+
+  /// Extract license pair from the JSON `license` field
+  fn license(val: Option<&Value>) -> Option<Vec<(String, Option<String>)>> {
+    let generator = |license| -> (String, Option<String>) {
+      let url = match license {
+        "Freeware" => Some("https://en.wikipedia.org/wiki/Freeware".to_string()),
+        "Public Domain" => Some("https://en.wikipedia.org/wiki/Public_domain_software".to_string()),
+        "Shareware" => Some("https://en.wikipedia.org/wiki/Shareware".to_string()),
+        "Proprietary" => Some("https://en.wikipedia.org/wiki/Proprietary_software".to_string()),
+        "Unknown" => None,
+        license => {
+          match spdx::SPDX.contains(license) {
+            true => Some(format!("https://spdx.org/licenses/{}.html", license)),
+            false => None
+          }
+        }
+      };
+      (license.to_string(), url)
+    };
+
+    match val {
+      Some(Value::String(str)) => {
+        let mut license_pair: Vec<(String, Option<String>)> = vec![];
+        if str.contains("|") {
+          str.split("|").filter(|s| !(*s).eq("..."))
+            .for_each(|s| license_pair.push(generator(s)));
+        } else if str.contains(",") {
+          str.split(",").filter(|s| !(*s).eq("..."))
+            .for_each(|s| license_pair.push(generator(s)));
+        } else {
+          license_pair.push(generator(str));
+        }
+        return Some(license_pair);
+      },
+      Some(Value::Object(pair)) => {
+        if pair.get("identifier").is_none() { return None; }
+        let license = pair.get("identifier").unwrap().to_string();
+        let url = match pair.get("url") {
+          Some(url) => Some(url.to_string()),
+          None => None
+        };
+        return Some(vec![(license, url)]);
+      },
+      _ => None
+    }
   }
 }
 
@@ -62,7 +109,8 @@ impl Scoop {
   /// ```
   /// find_local_manifest("main/gcc")
   /// ```
-  pub fn find_local_manifest<T: AsRef<str>>(&self, pattern: T) -> Result<Option<ScoopAppManifest>> {
+  pub fn find_local_manifest<T: AsRef<str>>(&self, pattern: T)
+    -> Result<Option<ScoopAppManifest>> {
     // Detect given pattern whether having bucket name prefix
     let (bucket_name, app_name) =
       match pattern.as_ref().contains("/") {
@@ -80,7 +128,9 @@ impl Scoop {
         let manifest_path = bucket.root()
           .join(format!("{}.json", app_name));
         match manifest_path.exists() {
-          true => Ok(Some(ScoopAppManifest::from_path(manifest_path)?)),
+          true => Ok(Some(
+            ScoopAppManifest::from_path(
+              manifest_path, Some(bucket.name.to_string()))?)),
           false => Ok(None)
         }
       },
@@ -89,7 +139,9 @@ impl Scoop {
           let manifest_path = bucket.1.root()
             .join(format!("{}.json", app_name));
           match manifest_path.exists() {
-            true => return Ok(Some(ScoopAppManifest::from_path(manifest_path)?)),
+            true => return Ok(Some(
+              ScoopAppManifest::from_path(
+                manifest_path, Some(bucket.1.name.to_string()))?)),
             false => {}
           }
         }

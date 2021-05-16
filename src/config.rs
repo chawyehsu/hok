@@ -1,5 +1,5 @@
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, BufWriter};
+use std::io::BufReader;
 use std::path::PathBuf;
 
 use dirs;
@@ -77,8 +77,7 @@ impl Scoop {
 
     match file {
       Ok(file) => {
-        let buffer = BufWriter::new(file);
-        serde_json::to_writer_pretty(buffer, &self.config)?;
+        serde_json::to_writer_pretty(file, &self.config)?;
         Ok(())
       },
       Err(_e) => return Err(anyhow!("Failed to open config file."))

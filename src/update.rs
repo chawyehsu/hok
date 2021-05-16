@@ -20,8 +20,5 @@ impl Scoop {
     // update lastupdate
     self.set_config("lastupdate", Utc::now()
       .to_rfc3339_opts(SecondsFormat::Micros, false).as_str())
-      .unwrap();
-
-    Ok(())
   }
 }

@@ -32,7 +32,8 @@ impl Scoop {
       let app_name = app_name.to_str().unwrap().trim_end_matches(".json");
 
       if match_helper(app_name.to_owned()) {
-        let manifest = ScoopAppManifest::from_path(app.path());
+        let manifest =
+          ScoopAppManifest::from_path(app.path(), Some(bucket_name.to_string()));
         if manifest.is_err() { continue; }
         let manifest = manifest?;
         let version = manifest.version;
@@ -51,7 +52,8 @@ impl Scoop {
         // will not do binary search without the option.
         if !with_binary { continue; }
 
-        let manifest = ScoopAppManifest::from_path(app.path());
+        let manifest =
+          ScoopAppManifest::from_path(app.path(), Some(bucket_name.to_string()));
         if manifest.is_err() { continue; }
         let manifest = manifest?;
         let bin = manifest.json.get("bin");

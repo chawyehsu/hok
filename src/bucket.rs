@@ -73,6 +73,10 @@ impl ScoopBucket {
     let entries = crate::fs::read_dir_json(self.root())?;
     Ok(entries)
   }
+
+  pub fn is_known_bucket(&self) -> bool {
+    is_known_bucket(self.name.as_ref())
+  }
 }
 
 impl Scoop {

@@ -186,6 +186,10 @@ fn main() -> Result<()> {
       Ok(Some(manifest)) => {
         // Name
         println!("Name: {}", manifest.app);
+        // Bucket
+        if manifest.bucket.is_some() {
+          println!("Bucket: {}", manifest.bucket.unwrap());
+        }
         // Description
         if manifest.json.get("description").is_some() {
           println!("Description: {}", manifest.json.get("description").unwrap().as_str().unwrap());
@@ -197,37 +201,39 @@ fn main() -> Result<()> {
           println!("Website: {}", manifest.json.get("homepage").unwrap().as_str().unwrap());
         }
         // License
-        if manifest.json.get("license").is_some() {
-          let license = manifest.json.get("license").unwrap();
-          match license {
-            Value::String(license) => {
-              println!("License: {} (https://spdx.org/licenses/{}.html)", license, license);
-            },
-            Value::Object(license_pair) => {
-              let identifier = license_pair.get("identifier").unwrap().as_str().unwrap();
-              if license_pair.get("url").is_some() {
-                let url = license_pair.get("url").unwrap().as_str().unwrap();
-                println!("License: {} ({})", identifier, url);
-              } else {
-                println!("License: {}", identifier);
+        if manifest.license.is_some() {
+          let licenses = manifest.license.unwrap();
+
+          if licenses.len() == 1 {
+            print!("License:");
+            let pair = licenses.first().unwrap();
+            match pair.1.as_ref() {
+              Some(url) => print!(" {} ({})\n", pair.0, url),
+              None => print!(" {}\n", pair.0)
+            }
+          } else {
+            println!("License:");
+            for pair in licenses {
+              match pair.1 {
+                Some(url) => println!("  {} ({})", pair.0, url),
+                None => println!("  {}", pair.0)
               }
-            },
-            _ => {} // no-op
+            }
           }
         }
         // Manifest
-        match manifest.from {
-          manifest::ManifestFromType::Local(path) => {
+        match manifest.kind {
+          manifest::ManifestKind::Local(path) => {
             println!("Manifest: \n  {}", path.to_str().unwrap());
           },
-          manifest::ManifestFromType::Remote(url) => {} // FIXME
+          manifest::ManifestKind::Remote(_url) => {} // FIXME
         }
         // Binaries
         match manifest.json.get("bin") {
           Some(Value::String(single)) => {
             println!("Binaries: \n  {}", single);
           },
-          Some(Value::Array(multiple)) => {
+          Some(Value::Array(_multiple)) => {
             println!("Binaries:");
             // for s in multiple {
             //   match s {

@@ -6,6 +6,7 @@ pub mod fs;
 pub mod git;
 pub mod manifest;
 pub mod search;
+pub mod spdx;
 pub mod utils;
 pub mod update;
 pub mod versions;
