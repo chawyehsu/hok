@@ -1,10 +1,28 @@
-use crate::Scoop;
-use git2::Repository;
+use crate::config::Config;
+use git2::{Repository, ProxyOptions};
 use std::{io::Write, path::Path};
-use serde_json::Value;
 use anyhow::{anyhow, Result};
 
-impl Scoop {
+#[derive(Debug)]
+pub struct Git {
+  proxy: Option<String>
+}
+
+impl Git {
+  pub fn new(config: &Config) -> Git {
+    match config.get("proxy") {
+      Some(proxy) => {
+        let mut proxy = proxy.as_str().unwrap().to_string();
+
+        if !proxy.starts_with("http") {
+          proxy.insert_str(0, "http://");
+        }
+
+        Git { proxy: Some(proxy) }
+      },
+      None => Git { proxy: None }
+    }
+  }
 
   fn fetch_options(&self) -> git2::FetchOptions {
     let mut fo = git2::FetchOptions::new();
@@ -30,19 +48,13 @@ impl Scoop {
 
     fo.remote_callbacks(cb);
 
-    // Use proxy from Scoop's config
-    match self.config["proxy"].clone() {
-      Value::String(mut proxy) => {
-        let mut po = git2::ProxyOptions::new();
-
-        if !proxy.starts_with("http") {
-          proxy.insert_str(0, "http://");
-        }
-
+    match &self.proxy {
+      Some(proxy) => {
+        let mut po = ProxyOptions::new();
         po.url(proxy.as_str());
         fo.proxy_options(po);
       },
-      _ => {}
+      None => {}
     }
 
     fo
@@ -55,21 +67,21 @@ impl Scoop {
     repo_builder
   }
 
-  pub fn clone(&self, bucket_name: &str, bucket_url: &str) -> Result<()> {
+  pub fn clone<S: AsRef<str>, P: AsRef<Path>>(&self, local_path: P, remote_url: S) -> Result<()> {
     print!("Checking repo... ");
     std::io::stdout().flush().unwrap();
 
     let mut rb = self.repo_builder();
     match rb.clone(
-      bucket_url, &self.buckets_dir.join(bucket_name)
+      remote_url.as_ref(), local_path.as_ref()
     ) {
       Ok(_repo) => {
         print!("ok\n");
         std::io::stdout().flush().unwrap();
-        println!("The {} bucket was added successfully.", bucket_name);
+        println!("The {} bucket was added successfully.", local_path.as_ref().to_str().unwrap());
         return Ok(());
       },
-      Err(_e) => return Err(anyhow!("Failed to clone repo {} as bucket.", bucket_url)),
+      Err(_e) => return Err(anyhow!("Failed to clone repo {} as bucket.", remote_url.as_ref())),
     }
   }
 

@@ -4,7 +4,7 @@ use anyhow::Result;
 use futures::{executor::block_on, future::join_all};
 use serde_json::Value;
 use regex::RegexBuilder;
-use crate::{Scoop, manifest::ScoopAppManifest};
+use crate::{Scoop, manifest::Manifest};
 
 struct SearchMatch {
   name: String,
@@ -25,7 +25,7 @@ impl Scoop {
     match_helper: F
   ) -> Result<Matches> where F: Fn(String) -> bool {
     let mut search_matches: Vec<SearchMatch> = Vec::new();
-    let apps = self.apps_in_local_bucket(&bucket_name)?;
+    let apps = self.bucket_manager.apps_in_local_bucket(&bucket_name)?;
 
     for app in apps.iter() {
       let app_name = app.file_name();
@@ -33,7 +33,7 @@ impl Scoop {
 
       if match_helper(app_name.to_owned()) {
         let manifest =
-          ScoopAppManifest::from_path(app.path(), Some(bucket_name.to_string()));
+          Manifest::from_path(app.path(), Some(bucket_name.to_string()));
         if manifest.is_err() { continue; }
         let manifest = manifest?;
         let version = manifest.version;
@@ -53,7 +53,7 @@ impl Scoop {
         if !with_binary { continue; }
 
         let manifest =
-          ScoopAppManifest::from_path(app.path(), Some(bucket_name.to_string()));
+          Manifest::from_path(app.path(), Some(bucket_name.to_string()));
         if manifest.is_err() { continue; }
         let manifest = manifest?;
         let bin = manifest.json.get("bin");
@@ -161,7 +161,7 @@ impl Scoop {
   }
 
   pub fn search(&self, query: &str, fuzzy: bool, with_binary: bool) -> Result<()> {
-    let buckets = self.local_buckets()?;
+    let buckets = self.bucket_manager.local_buckets()?;
     let re = RegexBuilder::new(query)
       .case_insensitive(true).build()?;
     let match_helper = |input: String| -> bool {

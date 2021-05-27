@@ -1,8 +1,8 @@
-use std::fs::DirEntry;
+use std::{fs::DirEntry, path::PathBuf};
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
 use anyhow::Result;
-use crate::Scoop;
+use crate::config::Config;
 
 pub struct ScoopCacheItem {
   pub app: String,
@@ -12,15 +12,28 @@ pub struct ScoopCacheItem {
   pub version: String
 }
 
-impl Scoop {
+#[derive(Debug)]
+pub struct CacheManager {
+  cache_dir: PathBuf
+}
+
+impl CacheManager {
+  pub fn new(config: &Config) -> CacheManager {
+    let cache_dir = PathBuf::from(
+      config.get("cache_path").unwrap().as_str().unwrap()
+    );
+
+    CacheManager { cache_dir }
+  }
+
   /// Collect all cache files represented as [`ScoopCacheItem`]
-  pub fn cache_get_all(&self) -> Result<Vec<ScoopCacheItem>> {
+  pub fn get_all(&self) -> Result<Vec<ScoopCacheItem>> {
     static RE: Lazy<Regex> = Lazy::new(|| {
       RegexBuilder::new(r"(?P<app>[a-zA-Z0-9-_.]+)#(?P<version>[a-zA-Z0-9-.]+)#(?P<url>.*)")
       .build().unwrap()
     });
 
-    let entries = std::fs::read_dir(&self.cache_dir)?
+    let entries = std::fs::read_dir(self.cache_dir.as_path())?
       .filter_map(Result::ok)
       .filter(|de| RE.is_match(de.file_name().to_str().unwrap()))
       .map(|entry| {
@@ -40,8 +53,8 @@ impl Scoop {
 
   /// Collect cache files, which its name matching given `pattern`,
   /// represented as [`ScoopCacheItem`]
-  pub fn cache_get<T: AsRef<str>>(&self, pattern: T) -> Result<Vec<ScoopCacheItem>> {
-    let all_cache_items = self.cache_get_all();
+  pub fn get<T: AsRef<str>>(&self, pattern: T) -> Result<Vec<ScoopCacheItem>> {
+    let all_cache_items = self.get_all();
 
     match pattern.as_ref() {
       "*" => all_cache_items,
@@ -63,16 +76,16 @@ impl Scoop {
   }
 
   /// Remove all Scoop cache files
-  pub fn cache_clean(&self) -> Result<(), std::io::Error> {
-    crate::fs::empty_dir(&self.cache_dir)
+  pub fn clean(&self) -> Result<(), std::io::Error> {
+    crate::fs::empty_dir(self.cache_dir.as_path())
   }
 
   /// Remove `app_name` related cache files, `*` wildcard pattern is support.
-  pub fn cache_remove<T: AsRef<str>>(&self, app_name: T) -> Result<()> {
+  pub fn remove<T: AsRef<str>>(&self, app_name: T) -> Result<()> {
     match app_name.as_ref() {
-      "*" => self.cache_clean()?,
+      "*" => self.clean()?,
       _ => {
-        let cache_items = self.cache_get(app_name.as_ref())?;
+        let cache_items = self.get(app_name.as_ref())?;
         for item in cache_items {
           std::fs::remove_file(item.entry.path())?;
         }

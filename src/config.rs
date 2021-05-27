@@ -142,6 +142,7 @@ impl Config {
       );
     } else {
       error!("invalid config key name '{}'", key.as_ref());
+      std::process::exit(1);
     }
 
     self

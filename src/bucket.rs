@@ -4,7 +4,8 @@ use std::fs::DirEntry;
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use anyhow::Result;
-use crate::{Scoop, fs};
+use crate::config::Config;
+use crate::fs;
 
 static KNOWN_BUCKETS: Lazy<Vec<(&str, &str)>> = Lazy::new(|| {
   vec![
@@ -22,13 +23,18 @@ static KNOWN_BUCKETS: Lazy<Vec<(&str, &str)>> = Lazy::new(|| {
   ]
 });
 
-pub struct ScoopBucket {
+pub struct Bucket {
   pub name: String,
   pub entry: DirEntry,
 }
 
 /// ordered hash table for O(1) searching perf.
-pub type ScoopBuckets = IndexMap<String, ScoopBucket>;
+pub type Buckets = IndexMap<String, Bucket>;
+
+#[derive(Debug)]
+pub struct BucketManager {
+  bucket_dir: PathBuf
+}
 
 /// Collect known buckets
 pub fn known_buckets() -> Vec<&'static str> {
@@ -53,8 +59,12 @@ pub fn is_known_bucket(bucket_name: &str) -> bool {
   known_buckets().contains(&bucket_name)
 }
 
-impl ScoopBucket {
-  /// Return local bucket's path
+impl Bucket {
+  pub fn new(name: String, entry: DirEntry) -> Bucket {
+    Bucket { name, entry }
+  }
+
+  /// Return bucket's path
   pub fn path(&self) -> PathBuf {
     self.entry.path()
   }
@@ -74,16 +84,25 @@ impl ScoopBucket {
     Ok(entries)
   }
 
-  pub fn is_known_bucket(&self) -> bool {
+  /// Check if the bucket is a known bucket
+  pub fn is_known(&self) -> bool {
     is_known_bucket(self.name.as_ref())
   }
 }
 
-impl Scoop {
+impl BucketManager {
+  pub fn new(config: &Config) -> BucketManager {
+    let bucket_dir = PathBuf::from(
+      config.get("root_path").unwrap().as_str().unwrap()
+    ).join("buckets");
+
+    BucketManager { bucket_dir }
+  }
+
   /// Collect local buckets
-  pub fn local_buckets(&self) -> Result<&ScoopBuckets, io::Error> {
+  pub fn local_buckets(&self) -> Result<&Buckets, io::Error> {
     // let mut sbs = IndexMap::new(); // Can we cache the initialized map?
-    static mut LOCAL_BUCKETS: Lazy<ScoopBuckets> = Lazy::new(|| {
+    static mut LOCAL_BUCKETS: Lazy<Buckets> = Lazy::new(|| {
       IndexMap::new()
     });
 
@@ -93,7 +112,7 @@ impl Scoop {
       }
     }
 
-    let ref buckets_dir = self.buckets_dir;
+    let ref buckets_dir = self.bucket_dir;
     // Ensure `buckets` dir
     crate::fs::ensure_dir(buckets_dir)?;
 
@@ -109,7 +128,7 @@ impl Scoop {
         if !LOCAL_BUCKETS.contains_key(&name) {
           LOCAL_BUCKETS.insert(
             name.clone(),
-            ScoopBucket { name, entry }
+            Bucket { name, entry }
           );
         }
       }
@@ -122,7 +141,7 @@ impl Scoop {
 
   /// Return local bucket of given `bucket_name` represented as [`ScoopBucket`]
   pub fn local_bucket<T: AsRef<str>>(&self, bucket_name: T)
-    -> Result<Option<&ScoopBucket>, io::Error> {
+    -> Result<Option<&Bucket>, io::Error> {
       Ok(self.local_buckets()?.get(bucket_name.as_ref()))
   }
 

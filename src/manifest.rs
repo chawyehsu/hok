@@ -10,7 +10,7 @@ pub enum ManifestKind {
   Remote(String)
 }
 
-pub struct ScoopAppManifest {
+pub struct Manifest {
   pub app: String,
   pub bucket: Option<String>,
   pub version: String,
@@ -19,7 +19,7 @@ pub struct ScoopAppManifest {
   pub kind: ManifestKind,
 }
 
-impl ScoopAppManifest {
+impl Manifest {
   pub fn from_path<P: AsRef<Path>>(path: P, bucket: Option<String>) -> Result<Self> {
     let file = std::fs::File::open(path.as_ref())?;
 
@@ -33,7 +33,7 @@ impl ScoopAppManifest {
           return Err(anyhow!(msg));
         }
 
-        return Ok(ScoopAppManifest {
+        return Ok(Manifest {
           app: fs::leaf_base(path.as_ref()),
           bucket,
           version: version.unwrap().as_str().unwrap().to_string(),
@@ -101,6 +101,7 @@ impl ScoopAppManifest {
   }
 }
 
+
 impl Scoop {
   /// Find and return local manifest represented as [`ScoopAppManifest`],
   /// using given `pattern`.
@@ -110,7 +111,7 @@ impl Scoop {
   /// find_local_manifest("main/gcc")
   /// ```
   pub fn find_local_manifest<T: AsRef<str>>(&self, pattern: T)
-    -> Result<Option<ScoopAppManifest>> {
+    -> Result<Option<Manifest>> {
     // Detect given pattern whether having bucket name prefix
     let (bucket_name, app_name) =
       match pattern.as_ref().contains("/") {
@@ -124,23 +125,23 @@ impl Scoop {
 
     match bucket_name {
       Some(bucket_name) => {
-        let bucket = self.local_bucket(bucket_name)?.unwrap();
+        let bucket = self.bucket_manager.local_bucket(bucket_name)?.unwrap();
         let manifest_path = bucket.root()
           .join(format!("{}.json", app_name));
         match manifest_path.exists() {
           true => Ok(Some(
-            ScoopAppManifest::from_path(
+            Manifest::from_path(
               manifest_path, Some(bucket.name.to_string()))?)),
           false => Ok(None)
         }
       },
       None => {
-        for bucket in self.local_buckets()? {
+        for bucket in self.bucket_manager.local_buckets()? {
           let manifest_path = bucket.1.root()
             .join(format!("{}.json", app_name));
           match manifest_path.exists() {
             true => return Ok(Some(
-              ScoopAppManifest::from_path(
+              Manifest::from_path(
                 manifest_path, Some(bucket.1.name.to_string()))?)),
             false => {}
           }
@@ -151,32 +152,32 @@ impl Scoop {
     }
   }
 
-  /// Deprecated, will be replaced by ScoopAppManifest::from_url()
-  #[deprecated]
-  pub fn manifest_from_url(&self, manifest_url: &str) -> Result<Value> {
-    // Use proxy from Scoop's config
-    let agent = match self.config["proxy"].clone() {
-      Value::String(mut proxy) => {
-        if !proxy.starts_with("http") {
-          proxy.insert_str(0, "http://");
-        }
+  // Deprecated, will be replaced by ScoopAppManifest::from_url()
+  // #[deprecated]
+  // pub fn manifest_from_url(&self, manifest_url: &str) -> Result<Value> {
+  //   // Use proxy from Scoop's config
+  //   let agent = match self.config["proxy"].clone() {
+  //     Value::String(mut proxy) => {
+  //       if !proxy.starts_with("http") {
+  //         proxy.insert_str(0, "http://");
+  //       }
 
-        let proxy = ureq::Proxy::new(proxy)?;
+  //       let proxy = ureq::Proxy::new(proxy)?;
 
-        ureq::AgentBuilder::new()
-          .proxy(proxy)
-          .build()
-      },
-      _ => {
-        ureq::AgentBuilder::new()
-          .build()
-      }
-    };
+  //       ureq::AgentBuilder::new()
+  //         .proxy(proxy)
+  //         .build()
+  //     },
+  //     _ => {
+  //       ureq::AgentBuilder::new()
+  //         .build()
+  //     }
+  //   };
 
-    let body: serde_json::Value = agent.get(manifest_url)
-      .call()?
-      .into_json()?;
+  //   let body: serde_json::Value = agent.get(manifest_url)
+  //     .call()?
+  //     .into_json()?;
 
-    Ok(body)
-  }
+  //   Ok(body)
+  // }
 }

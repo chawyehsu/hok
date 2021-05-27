@@ -1,9 +1,11 @@
 pub mod cli;
 pub mod bucket;
 pub mod cache;
+pub mod cmd;
 pub mod config;
 pub mod fs;
 pub mod git;
+pub mod http;
 pub mod manifest;
 pub mod search;
 pub mod spdx;
@@ -11,13 +13,17 @@ pub mod utils;
 pub mod update;
 pub mod versions;
 
-use dirs;
+use bucket::BucketManager;
+use cache::CacheManager;
+use git::Git;
+use http::Client;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
-use std::{env, fs::DirEntry, io::BufReader};
+use std::{fs::DirEntry, io::BufReader};
 use std::path::PathBuf;
 use serde_json::Value;
 use anyhow::{anyhow, Result};
+use crate::config::Config;
 
 #[derive(Debug)]
 pub struct ScoopApp {
@@ -28,63 +34,25 @@ pub struct ScoopApp {
 
 #[derive(Debug)]
 pub struct Scoop {
-  pub config: Value,
-  pub root_dir: PathBuf,
-  pub cache_dir: PathBuf,
-  pub global_dir: PathBuf,
-  pub apps_dir: PathBuf,
-  pub buckets_dir: PathBuf,
-  pub modules_dir: PathBuf,
-  pub persist_dir: PathBuf,
-  pub shims_dir: PathBuf
+  pub config: Config,
+  pub http: Client,
+  pub bucket_manager: BucketManager,
+  pub cacher: CacheManager,
+  pub git: Git
 }
 
 impl Scoop {
-  pub fn new(config: Value) -> Scoop {
-    let root_dir: PathBuf = config["rootPath"]
-      .as_str()
-      .map(PathBuf::from)
-      .unwrap_or_else(
-        || env::var_os("SCOOP")
-          .map(PathBuf::from).filter(|p| p.is_absolute())
-          .unwrap_or_else(
-            || dirs::home_dir().map(|p| p.join("scoop")).unwrap()
-        )
-      );
+  pub fn new(config: Config) -> Scoop {
+    let http = Client::new(&config).unwrap();
+    let bucket_manager = BucketManager::new(&config);
+    let cacher = CacheManager::new(&config);
+    let git = Git::new(&config);
+    Scoop { config, http, bucket_manager, cacher, git }
+  }
 
-    let cache_dir: PathBuf = config["cachePath"]
-      .as_str()
-      .map(PathBuf::from)
-      .unwrap_or_else(
-        || env::var_os("SCOOP_CACHE")
-          .map(PathBuf::from).filter(|p| p.is_absolute())
-          .unwrap_or_else(
-            || dirs::home_dir().map(|p| p.join("scoop\\cache")).unwrap()
-        )
-      );
-
-    let global_dir: PathBuf = config["cachePath"]
-      .as_str()
-      .map(PathBuf::from)
-      .unwrap_or_else(
-        || env::var_os("SCOOP_GLOBAL")
-          .map(PathBuf::from).filter(|p| p.is_absolute())
-          .unwrap_or_else(
-            || env::var_os("ProgramData")
-              .map(PathBuf::from).map(|p| p.join("scoop")).unwrap()
-        )
-      );
-
-    let apps_dir: PathBuf = root_dir.join("apps");
-    let buckets_dir: PathBuf = root_dir.join("buckets");
-    let modules_dir: PathBuf = root_dir.join("modules");
-    let persist_dir: PathBuf = root_dir.join("persist");
-    let shims_dir: PathBuf = root_dir.join("shims");
-
-    Scoop {
-      config, root_dir, cache_dir, global_dir, apps_dir,
-      buckets_dir, modules_dir, persist_dir, shims_dir
-    }
+  pub fn dir<S: AsRef<str>>(&self, dir: S) -> PathBuf {
+    self.config.get("root_path").unwrap()
+      .as_str().map(PathBuf::from).unwrap().join(dir.as_ref())
   }
 
   pub fn install_info(&self, app: &DirEntry, version: &String) -> Result<Value> {
@@ -106,7 +74,7 @@ impl Scoop {
   }
 
   pub fn installed_apps(&self) -> Result<Vec<ScoopApp>> {
-    let mut apps: Vec<ScoopApp> = std::fs::read_dir(&self.apps_dir)?
+    let mut apps: Vec<ScoopApp> = std::fs::read_dir(self.dir("apps"))?
       .filter_map(Result::ok)
       .filter(|x| !x.file_name().to_str().unwrap().starts_with("scoop"))
       .map(|e| ScoopApp {
@@ -116,8 +84,12 @@ impl Scoop {
       })
       .collect();
 
-    if self.global_dir.exists() {
-      let global_apps: Vec<ScoopApp> = std::fs::read_dir(&self.global_dir)?
+    let global_path = PathBuf::from(
+      self.config.get("global_path").unwrap()
+      .as_str().unwrap());
+
+    if global_path.exists() {
+      let global_apps: Vec<ScoopApp> = std::fs::read_dir(global_path.as_path())?
         .filter_map(Result::ok)
         .map(|e| ScoopApp {
           name: e.file_name().to_str().unwrap().to_string(),
