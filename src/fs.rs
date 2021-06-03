@@ -30,16 +30,21 @@ pub fn read_dir_json<P: AsRef<Path>>(path: P) -> io::Result<Vec<fs::DirEntry>> {
   Ok(jsons)
 }
 
-/// Return the Leaf, i.e. filename with extension, of given path.
+/// Return the Leaf, i.e. file name (with extension), or directory name
+/// of given path.
 pub fn leaf<P: AsRef<Path>>(path: P) -> String {
-  path.as_ref().file_name().unwrap().to_os_string().into_string().unwrap()
+  path.as_ref().file_name().unwrap().to_str().unwrap().to_string()
 }
 
-/// Return the LeafBase, i.e. filename without extension, of given path.
+/// Return the LeafBase, i.e. file name without extension, for given file path.
+///
+/// If the given path is a directory, it returns the [Leaf] of the path instead.
+///
+/// [Leaf]: self::leaf
 pub fn leaf_base<P: AsRef<Path>>(path: P) -> String {
-  let leaf = leaf(path.as_ref());
-  match leaf.contains(".") {
-    false => leaf,
-    true => leaf.split_once(".").unwrap().0.to_string()
+  if path.as_ref().is_file() {
+    path.as_ref().file_stem().unwrap().to_str().unwrap().to_string()
+  } else {
+    self::leaf(path)
   }
 }

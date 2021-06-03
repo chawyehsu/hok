@@ -125,7 +125,7 @@ impl BucketManager {
       let name = fs::leaf_base(entry.path());
 
       unsafe {
-        if !LOCAL_BUCKETS.contains_key(&name) {
+        if !LOCAL_BUCKETS.contains_key(name.as_str()) {
           LOCAL_BUCKETS.insert(
             name.clone(),
             Bucket { name, entry }

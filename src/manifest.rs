@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use std::path::{Path, PathBuf};
+use std::fs::File;
 
 use serde_json::Value;
 
@@ -9,7 +10,6 @@ pub enum ManifestKind {
   Local(PathBuf),
   Remote(String)
 }
-
 pub struct Manifest {
   pub app: String,
   pub bucket: Option<String>,
@@ -21,7 +21,7 @@ pub struct Manifest {
 
 impl Manifest {
   pub fn from_path<P: AsRef<Path>>(path: P, bucket: Option<String>) -> Result<Self> {
-    let file = std::fs::File::open(path.as_ref())?;
+    let file = File::open(path.as_ref())?;
 
     match serde_json::from_reader(file) {
       Ok(v) => {
@@ -34,7 +34,7 @@ impl Manifest {
         }
 
         return Ok(Manifest {
-          app: fs::leaf_base(path.as_ref()),
+          app: fs::leaf_base(path.as_ref()).to_string(),
           bucket,
           version: version.unwrap().as_str().unwrap().to_string(),
           license: Self::license(json.get("license")),
