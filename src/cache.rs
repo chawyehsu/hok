@@ -4,17 +4,49 @@ use regex::{Regex, RegexBuilder};
 use anyhow::Result;
 use crate::config::Config;
 
-pub struct ScoopCacheItem {
-  pub app: String,
-  pub entry: DirEntry,
-  pub filename: String,
-  pub size: u64,
-  pub version: String
+/// A struct represents a downloaded cache item of scoop.
+#[derive(Debug)]
+pub struct CacheEntry {
+  entry: DirEntry,
+  app_name: String,
+  version: String,
+  file_name: String,
 }
 
 #[derive(Debug)]
 pub struct CacheManager {
   cache_dir: PathBuf
+}
+
+impl CacheEntry {
+  /// Create a new Scoop [`CacheEntry`] from given [`DirEntry`]
+  ///
+  /// Caveat: the constructor does not validate given DirEntry.
+  pub fn new(entry: DirEntry) -> CacheEntry {
+    let fname = entry.file_name().into_string().unwrap();
+    let meta = fname.split("#").collect::<Vec<_>>();
+    let (app_name, version, file_name) = (
+      meta[0].to_string(), meta[1].to_string(), meta[2].to_string()
+    );
+
+    CacheEntry { entry, app_name, version, file_name }
+  }
+
+  pub fn app_name(&self) -> &str {
+    &self.app_name
+  }
+
+  pub fn file_name(&self) -> &str {
+    &self.file_name
+  }
+
+  pub fn size(&self) -> u64 {
+    self.entry.metadata().unwrap().len()
+  }
+
+  pub fn version(&self) -> &str {
+    &self.version
+  }
 }
 
 impl CacheManager {
@@ -26,8 +58,8 @@ impl CacheManager {
     CacheManager { cache_dir }
   }
 
-  /// Collect all cache files represented as [`ScoopCacheItem`]
-  pub fn get_all(&self) -> Result<Vec<ScoopCacheItem>> {
+  /// Collect all cache files represented as [`CacheEntry`]
+  pub fn get_all(&self) -> Result<Vec<CacheEntry>> {
     static RE: Lazy<Regex> = Lazy::new(|| {
       RegexBuilder::new(r"(?P<app>[a-zA-Z0-9-_.]+)#(?P<version>[a-zA-Z0-9-.]+)#(?P<url>.*)")
       .build().unwrap()
@@ -36,41 +68,28 @@ impl CacheManager {
     let entries = std::fs::read_dir(self.cache_dir.as_path())?
       .filter_map(Result::ok)
       .filter(|de| RE.is_match(de.file_name().to_str().unwrap()))
-      .map(|entry| {
-        let filename = entry.file_name().into_string().unwrap();
-        let size = entry.metadata().unwrap().len();
-        let (a, b) = filename.split_once("#").unwrap();
-        let (version, filename) = b.split_once("#").unwrap();
-        ScoopCacheItem {
-          entry, size, app: a.to_string(),
-          filename: filename.to_string(), version: version.to_string()
-        }
-      })
+      .map(|entry| CacheEntry::new(entry))
       .collect();
 
     Ok(entries)
   }
 
   /// Collect cache files, which its name matching given `pattern`,
-  /// represented as [`ScoopCacheItem`]
-  pub fn get<T: AsRef<str>>(&self, pattern: T) -> Result<Vec<ScoopCacheItem>> {
+  /// represented as [`CacheEntry`]
+  pub fn get<T: AsRef<str>>(&self, pattern: T) -> Result<Vec<CacheEntry>> {
     let all_cache_items = self.get_all();
 
     match pattern.as_ref() {
       "*" => all_cache_items,
-      query => {
+      mut query => {
         if query.ends_with("*") {
-          let query = query.trim_end_matches("*");
-          let filtered = all_cache_items?.into_iter()
-            .filter(|item| item.app.starts_with(query))
-            .collect();
-          Ok(filtered)
-        } else {
-          let filtered = all_cache_items?.into_iter()
-            .filter(|item| item.app.contains(query))
-            .collect();
-          Ok(filtered)
+          query = query.trim_end_matches("*")
         }
+
+        let filtered = all_cache_items?.into_iter()
+            .filter(|ce| ce.app_name().starts_with(query))
+            .collect();
+          Ok(filtered)
       }
     }
   }

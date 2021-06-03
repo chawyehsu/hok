@@ -22,11 +22,7 @@ impl Client {
       .user_agent(SCOOP_USER_AGENT);
     // Add proxy
     if proxy.is_some() {
-      let mut proxy = proxy.unwrap().as_str().unwrap().to_string();
-      if !proxy.starts_with("http") {
-        proxy.insert_str(0, "http://");
-      }
-
+      let proxy = proxy.unwrap().as_str().unwrap();
       builder = builder.proxy(Proxy::all(proxy)?)
     }
 

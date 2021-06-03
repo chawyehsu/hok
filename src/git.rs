@@ -4,12 +4,12 @@ use std::{io::Write, path::Path};
 use anyhow::{anyhow, Result};
 
 #[derive(Debug)]
-pub struct Git {
+pub struct GitTool {
   proxy: Option<String>
 }
 
-impl Git {
-  pub fn new(config: &Config) -> Git {
+impl GitTool {
+  pub fn new(config: &Config) -> GitTool {
     match config.get("proxy") {
       Some(proxy) => {
         let mut proxy = proxy.as_str().unwrap().to_string();
@@ -18,9 +18,9 @@ impl Git {
           proxy.insert_str(0, "http://");
         }
 
-        Git { proxy: Some(proxy) }
+        GitTool { proxy: Some(proxy) }
       },
-      None => Git { proxy: None }
+      None => GitTool { proxy: None }
     }
   }
 

@@ -37,14 +37,14 @@ pub fn cmd_cache(matches: &ArgMatches, scoop: &mut Scoop) {
         let mut filter_size: u64 = 0;
         let mut filter_count: u64 = 0;
         for sci in cache_items {
-          if sci.app.contains(app) {
-            filter_size = filter_size + sci.size;
+          if sci.app_name().contains(app) {
+            filter_size = filter_size + sci.size();
             filter_count = filter_count + 1;
             println!("{: >6} {} ({}) {}",
-              utils::filesize(sci.size, true),
-              sci.app,
-              sci.version,
-              sci.filename
+              utils::filesize(sci.size(), true),
+              sci.app_name(),
+              sci.version(),
+              sci.file_name()
             );
           }
         }
@@ -58,12 +58,12 @@ pub fn cmd_cache(matches: &ArgMatches, scoop: &mut Scoop) {
     }
 
     for sci in cache_items {
-      total_size = total_size + sci.size;
+      total_size = total_size + sci.size();
       println!("{: >6} {} ({}) {}",
-        utils::filesize(sci.size, true),
-        sci.app,
-        sci.version,
-        sci.filename
+        utils::filesize(sci.size(), true),
+        sci.app_name(),
+        sci.version(),
+        sci.file_name()
       );
     }
     if total_count > 0 {

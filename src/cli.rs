@@ -5,8 +5,9 @@ pub fn build_app() -> App<'static, 'static> {
     .version(crate_version!())
     .about(crate_description!())
     .after_help("Type 'scoop help <command>' to get help for a specific command.")
+    .global_setting(AppSettings::UnifiedHelpMessage)
     .global_setting(AppSettings::VersionlessSubcommands)
-    .setting(AppSettings::ArgRequiredElseHelp)
+    .setting(AppSettings::SubcommandRequiredElseHelp)
     .subcommand(
       SubCommand::with_name("bucket")
         .about("Manage Scoop buckets")
@@ -36,9 +37,9 @@ pub fn build_app() -> App<'static, 'static> {
             .about("List known buckets")
         )
         .subcommand(
-          SubCommand::with_name("rm")
+          SubCommand::with_name("remove")
             .about("Remove a bucket")
-            .alias("remove")
+            .alias("rm")
             .arg(
               Arg::with_name("name")
                 .help("The bucket name")
@@ -83,7 +84,15 @@ pub fn build_app() -> App<'static, 'static> {
         .setting(AppSettings::ArgRequiredElseHelp)
         .arg(
           Arg::with_name("app")
-            .help("The app to be cleaned up")
+            .help("Given app name to be cleaned up")
+            .conflicts_with("all")
+        )
+        .arg(
+          Arg::with_name("all")
+            .help("Cleanup all apps")
+            .short("a")
+            .long("all")
+            .conflicts_with("app")
         )
         .arg(
           Arg::with_name("cache")
