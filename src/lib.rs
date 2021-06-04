@@ -19,7 +19,7 @@ pub mod update;
 
 use std::path::PathBuf;
 
-use apps::AppsManager;
+use apps::AppManager;
 use bucket::BucketManager;
 use cache::CacheManager;
 use config::Config;
@@ -27,27 +27,34 @@ use git::GitTool;
 use http::Client;
 
 #[derive(Debug)]
-pub struct Scoop {
-  pub config: Config,
-  pub http: Client,
-  pub apps_manager: AppsManager,
+pub struct Scoop<'a> {
+  pub config: &'a mut Config,
+
+  pub app_manager: AppManager,
   pub bucket_manager: BucketManager,
-  pub cacher: CacheManager,
+  pub cache_manager: CacheManager,
+
   pub git: GitTool,
+  pub http: Client,
 }
 
-impl Scoop {
-  pub fn new(config: Config) -> Scoop {
-    let http = Client::new(&config).unwrap();
-    let apps_manager = AppsManager::new(&config);
-    let bucket_manager = BucketManager::new(&config);
-    let cacher = CacheManager::new(&config);
+impl<'a> Scoop<'a> {
+  pub fn new(config: &'a mut Config) -> Scoop<'a> {
+    let apps_dir = config.root_path.join("apps");
+    let buckets_dir = config.root_path.join("buckets");
+    let cache_dir = config.cache_path.to_path_buf();
+
+    let app_manager = AppManager::new(apps_dir);
+    let bucket_manager = BucketManager::new(buckets_dir);
+    let cache_manager= CacheManager::new(cache_dir);
+
     let git = GitTool::new(&config);
-    Scoop { config, http, apps_manager, bucket_manager, cacher, git }
+    let http = Client::new(&config).unwrap();
+
+    Scoop { config, app_manager, bucket_manager, cache_manager, git, http, }
   }
 
   pub fn dir<S: AsRef<str>>(&self, dir: S) -> PathBuf {
-    self.config.get("root_path").unwrap()
-      .as_str().map(PathBuf::from).unwrap().join(dir.as_ref())
+    self.config.root_path.join(dir.as_ref())
   }
 }

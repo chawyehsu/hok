@@ -136,6 +136,15 @@ pub fn build_app() -> App<'static, 'static> {
         )
     )
     .subcommand(
+      SubCommand::with_name("hold")
+        .about("Hold an app to disable updates")
+        .arg(
+          Arg::with_name("app")
+            .help("The app name")
+            .required(true)
+        )
+    )
+    .subcommand(
       SubCommand::with_name("home")
         .about("Opens the app homepage")
         .arg(

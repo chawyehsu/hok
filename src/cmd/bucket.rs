@@ -8,7 +8,7 @@ pub fn cmd_bucket(matches: &ArgMatches, scoop: &mut Scoop) {
     ("add", Some(matches)) => {
       let bucket_name = matches.value_of("name").unwrap();
 
-      if scoop.bucket_manager.is_local_bucket(bucket_name).unwrap() {
+      if scoop.bucket_manager.contains(bucket_name) {
         println!("The '{}' already exists.", bucket_name);
         std::process::exit(1);
       }
@@ -29,7 +29,7 @@ pub fn cmd_bucket(matches: &ArgMatches, scoop: &mut Scoop) {
       }
     },
     ("list", Some(_)) => {
-      for b in scoop.bucket_manager.local_buckets().unwrap() {
+      for b in scoop.bucket_manager.get_buckets() {
         println!("{}", b.0.as_str());
       }
     },
@@ -41,7 +41,7 @@ pub fn cmd_bucket(matches: &ArgMatches, scoop: &mut Scoop) {
     ("rm", Some(matches)) => {
       let bucket_name = matches.value_of("name").unwrap();
 
-      if scoop.bucket_manager.is_local_bucket(bucket_name).unwrap() {
+      if scoop.bucket_manager.contains(bucket_name) {
         let bucket_dir = scoop.dir("buckets").join(bucket_name);
         if bucket_dir.exists() {
           match remove_dir_all::remove_dir_all(bucket_dir) {

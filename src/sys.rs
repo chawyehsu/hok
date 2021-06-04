@@ -12,7 +12,7 @@ impl SysTool {
 
   pub fn running_apps(&mut self, scoop: &Scoop) -> HashMap<&usize, &Process> {
     // Find all running processes of installed Scoop apps.
-    let root_path = scoop.config.get("root_path").unwrap().as_str().unwrap();
+    let root_path = scoop.config.root_path.as_path();
     self.0.refresh_processes();
     let processes = self.0.get_processes()
       .iter()

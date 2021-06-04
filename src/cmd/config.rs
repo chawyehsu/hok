@@ -6,17 +6,18 @@ pub fn cmd_config(matches: &ArgMatches, scoop: &mut Scoop) {
   if matches.is_present("edit") {
     unimplemented!();
   } else if matches.is_present("list") {
-    for (key, value) in scoop.config.get_all().as_object().unwrap() {
-      println!("{}={}", key, value);
-    }
+    println!("{}", scoop.config);
   } else if matches.is_present("set") {
     let vals: Vec<&str> = matches.values_of("set").unwrap().collect();
-    scoop.config.set(vals[0], vals[1]).save();
+    match scoop.config.set(vals[0], vals[1]) {
+      Ok(cfg) => cfg.save(),
+      Err(err) => eprintln!("{}", err),
+    }
   } else if matches.is_present("unset") {
     let key = matches.value_of("unset").unwrap();
-    scoop.config.remove(key).save();
-    for (key, value) in scoop.config.get_all().as_object().unwrap() {
-      println!("{}={}", key, value);
+    match scoop.config.unset(key) {
+      Ok(cfg) => cfg.save(),
+      Err(err) => eprintln!("{}", err),
     }
   }
 }

@@ -1,200 +1,235 @@
+use std::fmt;
 use std::fs::{File, OpenOptions};
-use std::path::{Path, PathBuf};
+use std::io;
+use std::path::PathBuf;
+use std::result::Result;
 
-use log::{warn, trace, error};
-use once_cell::sync::Lazy;
+use log::{error, trace, warn};
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
 
-// config file of the original scoop
-static OLD_CONFIG_PATH: Lazy<PathBuf> = Lazy::new(|| {
-  dirs::home_dir().map(|p|
-    p.join(".config\\scoop\\config.json")).unwrap()
-});
-// config file of scoop-rs
-static RS_CONFIG_PATH: Lazy<PathBuf> = Lazy::new(|| {
-  dirs::home_dir().map(|p|
-    p.join(".config\\scoop\\rs.config.json")).unwrap()
-});
-// default paths of scoop
-static ROOT_PATH: Lazy<PathBuf> = Lazy::new(|| {
-  dirs::home_dir().map(|p| p.join("scoop")).unwrap()
-});
-static CACHE_PATH: Lazy<PathBuf> = Lazy::new(|| {
-  dirs::home_dir().map(|p| p.join("scoop\\cache")).unwrap()
-});
-static GLOBAL_PATH: Lazy<PathBuf> = Lazy::new(|| {
-  std::env::var_os("ProgramData").map(PathBuf::from)
-    .map(|p| p.join("scoop")).unwrap()
-});
-static ALLOWED_CONFIG_KEYS: &[&str] = &[
-  "proxy", "root_path", "cache_path", "global_path"
-];
-
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Config {
-  inner: Value,
+  #[serde(skip)]
+  #[serde(default = "default_config::config_path")]
+  config_path: PathBuf,
+  #[serde(rename = "7zipextract_use_external")]
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub szipextract_use_external: Option<bool>,
+  #[serde(rename = "aria2-enabled")]
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub aria2_enabled: Option<bool>,
+  #[serde(rename = "cachePath")]
+  #[serde(default = "default_config::cache_path")]
+  #[serde(skip_serializing_if = "default_config::is_default_cache_path")]
+  pub cache_path: PathBuf,
+  #[serde(rename = "globalPath")]
+  #[serde(default = "default_config::global_path")]
+  #[serde(skip_serializing_if = "default_config::is_default_global_path")]
+  pub global_path: PathBuf,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub lastupdate: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub msiextract_use_lessmsi: Option<bool>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub proxy: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub scoop_branch: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub scoop_repo: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub shim: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub show_update_log: Option<bool>,
+  #[serde(rename = "rootPath")]
+  #[serde(default = "default_config::root_path")]
+  #[serde(skip_serializing_if = "default_config::is_default_root_path")]
+  pub root_path: PathBuf,
 }
 
-impl Default for Config {
-  fn default() -> Self {
-    // @deprecated, scoop-rs
-    let root_path = std::env::var_os("SCOOP")
-      .map(PathBuf::from)
-      .filter(|p| p.is_absolute())
-      .unwrap_or(ROOT_PATH.to_path_buf())
-      .to_str().unwrap().to_string();
-    // @deprecated, scoop-rs
-    let cache_path = std::env::var_os("SCOOP_CACHE")
-      .map(PathBuf::from)
-      .filter(|p| p.is_absolute())
-      .unwrap_or(CACHE_PATH.to_path_buf())
-      .to_str().unwrap().to_string();
-    // @deprecated, scoop-rs
-    let global_path = std::env::var_os("SCOOP_GLOBAL")
-      .map(PathBuf::from)
-      .filter(|p| p.is_absolute())
-      .unwrap_or(GLOBAL_PATH.to_owned())
-      .to_str().unwrap().to_string();
+mod default_config {
+  use std::path::{Path, PathBuf};
+  use once_cell::sync::Lazy;
 
-    let mut default: Map<String, Value> = Map::new();
-    default.insert("proxy".to_string(), Value::Null);
-    default.insert("root_path".to_string(), Value::String(root_path));
-    default.insert("cache_path".to_string(), Value::String(cache_path));
-    default.insert("global_path".to_string(), Value::String(global_path));
+  pub(super) fn config_path() -> PathBuf {
+    static CONFIG_PATH: Lazy<PathBuf> = Lazy::new(|| {
+      dirs::home_dir().map(|p|
+        p.join(".config\\scoop\\config.json")).unwrap()
+    });
+    CONFIG_PATH.to_path_buf()
+  }
 
-    Config { inner: Value::Object(default) }
+  pub(super) fn root_path() -> PathBuf {
+    static ROOT_PATH: Lazy<PathBuf> = Lazy::new(|| {
+      dirs::home_dir().map(|p| p.join("scoop")).unwrap()
+    });
+    ROOT_PATH.to_path_buf()
+  }
+
+  pub(super) fn is_default_root_path<T: AsRef<Path>>(t: &T) -> bool {
+    root_path().to_str().unwrap() == t.as_ref().to_str().unwrap()
+  }
+
+  pub(super) fn cache_path() -> PathBuf {
+    static CACHE_PATH: Lazy<PathBuf> = Lazy::new(|| {
+      dirs::home_dir().map(|p| p.join("scoop\\cache")).unwrap()
+    });
+    CACHE_PATH.to_path_buf()
+  }
+
+  pub(super) fn is_default_cache_path<T: AsRef<Path>>(t: &T) -> bool {
+    cache_path().to_str().unwrap() == t.as_ref().to_str().unwrap()
+  }
+
+  pub(super) fn global_path() -> PathBuf {
+    static GLOBAL_PATH: Lazy<PathBuf> = Lazy::new(|| {
+      std::env::var_os("ProgramData").map(PathBuf::from)
+        .map(|p| p.join("scoop")).unwrap()
+    });
+    GLOBAL_PATH.to_path_buf()
+  }
+
+  pub(super) fn is_default_global_path<T: AsRef<Path>>(t: &T) -> bool {
+    global_path().to_str().unwrap() == t.as_ref().to_str().unwrap()
   }
 }
 
 impl Config {
+
   pub fn new() -> Config {
-    if !RS_CONFIG_PATH.exists() {
-      return Self::from_old();
+    let default = default_config::config_path();
+    match File::open(default.as_path()) {
+      Ok(file) => serde_json::from_reader(file).unwrap(),
+      Err(err) => {
+        if err.kind() == io::ErrorKind::NotFound {
+          warn!(
+            "Default Scoop config file {} not found, {}",
+            default.display(), "trying to init new one."
+          );
+        } else {
+          error!(
+            "Failed read default config file {} (err: {}), {}",
+            default.display(), err, "fallback to init new one."
+          );
+        }
+        serde_json::from_str("{}").unwrap()
+      },
     }
-
-    Self::from_path_or_default(RS_CONFIG_PATH.as_path())
   }
 
-  fn from_old() -> Config {
-    Self::from_path_or_default(OLD_CONFIG_PATH.as_path())
-  }
-
-  fn from_path_or_default<P: AsRef<Path>>(path: P) -> Config {
-    let path_str = path.as_ref().to_str().unwrap();
-    let file = File::open(path.as_ref());
-    let mut config = Self::default();
-
-    if file.is_err() {
-      warn!("could not read file {}", path_str);
-      return config;
-    }
-
-    match serde_json::from_reader(file.unwrap()) {
-      Ok(data) => {
-        let data = match data {
-          Value::Object(value) => {
-            value.into_iter()
-              .map(|(k, v)| (k.to_ascii_lowercase(), v))
-              .filter(|(k, _)| Self::validate(k))
-              .collect::<Map<String, Value>>()
-          },
-          _ => {
-            error!("invalid format of config file {}", path_str);
-            Map::new()
-          }
-        };
-
-        for (k, v) in data {
-          config.set(k, v.as_str().unwrap().to_string());
+  pub fn set<S>(&mut self, key: S, value: S) -> Result<&Config, &'static str>
+  where
+    S: AsRef<str>,
+  {
+    let value = value.as_ref();
+    match key.as_ref() {
+      "7zipextract_use_external" => {
+        match value.parse::<bool>() {
+          Ok(value) => self.szipextract_use_external = Some(value),
+          Err(_) => return Err("invalid config value."),
         }
       },
-      Err(_) => {
-        error!("failed to parse config file {}", path_str);
-      }
+      "aria2_enabled" => {
+        match value.parse::<bool>() {
+          Ok(value) => self.aria2_enabled = Some(value),
+          Err(_) => return Err("invalid config value."),
+        }
+      },
+      "msiextract_use_lessmsi" => {
+        match value.parse::<bool>() {
+          Ok(value) => self.msiextract_use_lessmsi = Some(value),
+          Err(_) => return Err("invalid config value."),
+        }
+      },
+      "proxy" => {
+        match value {
+          "none" | "null" => self.proxy = None,
+          _ => self.proxy = Some(value.to_string()),
+        }
+      },
+      _ => return Err("invalid config key name."),
     }
 
-    return config;
+    Ok(self)
   }
 
-  fn validate<S: AsRef<str>>(key: S) -> bool {
-    ALLOWED_CONFIG_KEYS.contains(&key.as_ref())
-  }
-
-  pub fn get<S: AsRef<str>>(&self, key: S) -> Option<&Value> {
-    self.inner.get(key.as_ref())
-  }
-
-  pub fn get_all(&self) -> &Value {
-    &self.inner
-  }
-
-  pub fn set<S: AsRef<str>>(&mut self, key: S, value: S) -> &Config {
-    if Self::validate(key.as_ref()) {
-      let value = match value.as_ref() {
-        v if v == "true" || v == "false" => Value::Bool(v.parse::<bool>().unwrap()),
-        v if v == "null" || v == "none" => Value::Null,
-        v => Value::String(v.to_string()),
-      };
-
-      self.inner.as_object_mut().unwrap().insert(
-        key.as_ref().to_string(), value
-      );
-    } else {
-      error!("invalid config key name '{}'", key.as_ref());
-      std::process::exit(1);
+  pub fn unset<S: AsRef<str>>(&mut self, key: S) -> Result<&Config, &'static str> {
+    match key.as_ref() {
+      "7zipextract_use_external" => self.szipextract_use_external = None,
+      "aria2_enabled" => self.aria2_enabled = None,
+      "msiextract_use_lessmsi" => self.msiextract_use_lessmsi = None,
+      "proxy" => self.proxy = None,
+      _ => return Err("invalid config key name."),
     }
 
-    self
-  }
-
-  pub fn remove<S: AsRef<str>>(&mut self, key: S) -> &Config {
-    self.set(key.as_ref(), "null");
-    self
+    Ok(self)
   }
 
   pub fn save(&self) {
     // Ensure config directory exists
-    crate::fs::ensure_dir(RS_CONFIG_PATH.parent().unwrap()).unwrap();
+    crate::fs::ensure_dir(self.config_path.parent().unwrap()).unwrap();
     // Then read or create the config file
     let file = OpenOptions::new()
-      .write(true).create(true).truncate(true).open(RS_CONFIG_PATH.as_path());
+      .write(true).create(true).truncate(true).open(self.config_path.as_path())
+      .unwrap();
 
-    match file {
-      Ok(file) => {
-        let mut data = self.inner.clone();
-
-        if data["proxy"].is_null() {
-          data.as_object_mut().unwrap().remove("proxy");
-        }
-
-        if data["root_path"].is_string() {
-          let val = data["root_path"].as_str().unwrap();
-          if val == ROOT_PATH.to_str().unwrap().to_string() {
-            data.as_object_mut().unwrap().remove("root_path");
-          }
-        }
-
-        if data["cache_path"].is_string() {
-          let val = data["cache_path"].as_str().unwrap();
-          if val == CACHE_PATH.to_str().unwrap().to_string() {
-            data.as_object_mut().unwrap().remove("cache_path");
-          }
-        }
-
-        if data["global_path"].is_string() {
-          let val = data["global_path"].as_str().unwrap();
-          if val == GLOBAL_PATH.to_str().unwrap().to_string() {
-            data.as_object_mut().unwrap().remove("global_path");
-          }
-        }
-
-        match serde_json::to_writer_pretty(file, &data) {
-          Ok(_) => trace!("successfully update config to {}", data),
-          Err(e) => error!("failed to update config. (error {})", e)
-        };
-      },
-      Err(_) => error!("failed to open config file {}", RS_CONFIG_PATH.to_string_lossy())
+    match serde_json::to_writer_pretty(file, self) {
+      Ok(_) => trace!("successfully update config to {:?}", self),
+      Err(e) => error!("failed to update config. (error {})", e),
     }
+  }
+}
+
+impl fmt::Display for Config {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    // szipextract_use_external
+    if self.szipextract_use_external.is_some() {
+      writeln!(f, "7zipextract_use_external = {}", self.szipextract_use_external.unwrap())?;
+    }
+    // aria2_enabled
+    if self.aria2_enabled.is_some() {
+      writeln!(f, "aria2-enabled = {}", self.aria2_enabled.unwrap())?;
+    }
+    // cache_path
+    if !default_config::is_default_cache_path(&self.cache_path) {
+      writeln!(f, "cachePath = {}", self.cache_path.display())?;
+    }
+    // global_path
+    if !default_config::is_default_global_path(&self.global_path) {
+      writeln!(f, "globalPath = {}", self.global_path.display())?;
+    }
+    // lastupdate
+    if self.lastupdate.is_some() {
+      writeln!(f, "lastupdate = {}", self.lastupdate.as_ref().unwrap())?;
+    }
+    // msiextract_use_lessmsi
+    if self.msiextract_use_lessmsi.is_some() {
+      writeln!(f, "msiextract_use_lessmsi = {}", self.msiextract_use_lessmsi.unwrap())?;
+    }
+    // proxy
+    if self.proxy.is_some() {
+      writeln!(f, "proxy = {}", self.proxy.as_ref().unwrap())?;
+    }
+    // scoop_branch
+    if self.scoop_branch.is_some() {
+      writeln!(f, "scoop_branch = {}", self.scoop_branch.as_ref().unwrap())?;
+    }
+    // scoop_repo
+    if self.scoop_repo.is_some() {
+      writeln!(f, "scoop_repo = {}", self.scoop_repo.as_ref().unwrap())?;
+    }
+    // shim
+    if self.shim.is_some() {
+      writeln!(f, "shim = {}", self.shim.as_ref().unwrap())?;
+    }
+    // show_update_log
+    if self.show_update_log.is_some() {
+      writeln!(f, "show_update_log = {}", self.show_update_log.unwrap())?;
+    }
+    // root_path
+    if !default_config::is_default_root_path(&self.root_path) {
+      writeln!(f, "rootPath = {}", self.root_path.display())?;
+    }
+
+    Ok(())
   }
 }

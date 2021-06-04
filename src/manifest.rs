@@ -6,10 +6,13 @@ use serde_json::Value;
 
 use crate::{Scoop, fs, spdx};
 
+#[derive(Debug)]
 pub enum ManifestKind {
   Local(PathBuf),
   Remote(String)
 }
+
+#[derive(Debug)]
 pub struct Manifest {
   pub app: String,
   pub bucket: Option<String>,
@@ -20,7 +23,8 @@ pub struct Manifest {
 }
 
 impl Manifest {
-  pub fn from_path<P: AsRef<Path>>(path: P, bucket: Option<String>) -> Result<Self> {
+  /// Create an [`Manifest`] from the given [`PathBuf`].
+  pub fn from_path<P: AsRef<Path> + ?Sized>(path: &P, bucket: Option<String>) -> Result<Manifest> {
     let file = File::open(path.as_ref())?;
 
     match serde_json::from_reader(file) {
@@ -50,7 +54,7 @@ impl Manifest {
     }
   }
 
-  pub fn from_url<T: AsRef<str>>(_url: T) -> Result<Self> {
+  pub fn from_url<T: AsRef<str>>(_url: T) -> Result<Manifest> {
     todo!()
   }
 
@@ -102,7 +106,7 @@ impl Manifest {
 }
 
 
-impl Scoop {
+impl<'a> Scoop<'a> {
   /// Find and return local manifest represented as [`ScoopAppManifest`],
   /// using given `pattern`.
   ///
@@ -125,24 +129,24 @@ impl Scoop {
 
     match bucket_name {
       Some(bucket_name) => {
-        let bucket = self.bucket_manager.local_bucket(bucket_name)?.unwrap();
-        let manifest_path = bucket.root()
+        let bucket = self.bucket_manager.get_bucket(bucket_name).unwrap();
+        let manifest_path = bucket.manifest_dir()
           .join(format!("{}.json", app_name));
         match manifest_path.exists() {
           true => Ok(Some(
             Manifest::from_path(
-              manifest_path, Some(bucket.name.to_string()))?)),
+              &manifest_path, Some(bucket.name.to_string()))?)),
           false => Ok(None)
         }
       },
       None => {
-        for bucket in self.bucket_manager.local_buckets()? {
-          let manifest_path = bucket.1.root()
+        for bucket in self.bucket_manager.get_buckets() {
+          let manifest_path = bucket.1.manifest_dir()
             .join(format!("{}.json", app_name));
           match manifest_path.exists() {
             true => return Ok(Some(
               Manifest::from_path(
-                manifest_path, Some(bucket.1.name.to_string()))?)),
+                &manifest_path, Some(bucket.1.name.to_string()))?)),
             false => {}
           }
         }

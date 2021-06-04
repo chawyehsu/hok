@@ -8,9 +8,7 @@ pub struct PersistManager {
 
 impl PersistManager {
   pub fn new(config: &Config) -> PersistManager {
-    let working_dir = PathBuf::from(
-      config.get("root_path").unwrap().as_str().unwrap()
-    ).join("apps");
+    let working_dir = config.root_path.join("apps");
 
     PersistManager { working_dir }
   }

@@ -4,7 +4,7 @@ use anyhow::Result;
 use futures::{executor::block_on, future::join_all};
 use serde_json::Value;
 use regex::RegexBuilder;
-use crate::{Scoop, manifest::Manifest};
+use crate::{Scoop, fs::leaf_base, manifest::Manifest};
 
 struct SearchMatch {
   name: String,
@@ -17,7 +17,7 @@ struct Matches {
   collected: Vec<SearchMatch>
 }
 
-impl Scoop {
+impl<'a> Scoop<'a> {
   async fn walk_manifests<F>(
     &self,
     bucket_name: String,
@@ -25,15 +25,15 @@ impl Scoop {
     match_helper: F
   ) -> Result<Matches> where F: Fn(String) -> bool {
     let mut search_matches: Vec<SearchMatch> = Vec::new();
-    let apps = self.bucket_manager.apps_in_local_bucket(&bucket_name)?;
+    let apps = self.bucket_manager
+      .get_bucket(bucket_name.as_str()).unwrap().available_manifests()?;
 
     for app in apps.iter() {
-      let app_name = app.file_name();
-      let app_name = app_name.to_str().unwrap().trim_end_matches(".json");
+      let app_name = leaf_base(app);
 
       if match_helper(app_name.to_owned()) {
         let manifest =
-          Manifest::from_path(app.path(), Some(bucket_name.to_string()));
+          Manifest::from_path(app, Some(bucket_name.to_string()));
         if manifest.is_err() { continue; }
         let manifest = manifest?;
         let version = manifest.version;
@@ -53,7 +53,7 @@ impl Scoop {
         if !with_binary { continue; }
 
         let manifest =
-          Manifest::from_path(app.path(), Some(bucket_name.to_string()));
+          Manifest::from_path(app, Some(bucket_name.to_string()));
         if manifest.is_err() { continue; }
         let manifest = manifest?;
         let bin = manifest.json.get("bin");
@@ -161,7 +161,7 @@ impl Scoop {
   }
 
   pub fn search(&self, query: &str, fuzzy: bool, with_binary: bool) -> Result<()> {
-    let buckets = self.bucket_manager.local_buckets()?;
+    let buckets = self.bucket_manager.get_buckets();
     let re = RegexBuilder::new(query)
       .case_insensitive(true).build()?;
     let match_helper = |input: String| -> bool {

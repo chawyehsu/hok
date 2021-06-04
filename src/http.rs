@@ -9,21 +9,14 @@ pub struct Client {
   inner: ReqwestClient,
 }
 
-impl Default for Client {
-  fn default() -> Self {
-      Self::new(&Config::default()).unwrap()
-  }
-}
-
 impl Client {
   pub fn new(config: &Config) -> Result<Self> {
-    let proxy = config.get("proxy");
+    let proxy = config.proxy.clone();
     let mut builder = ReqwestClient::builder()
       .user_agent(SCOOP_USER_AGENT);
     // Add proxy
     if proxy.is_some() {
-      let proxy = proxy.unwrap().as_str().unwrap();
-      builder = builder.proxy(Proxy::all(proxy)?)
+      builder = builder.proxy(Proxy::all(proxy.unwrap().as_str())?)
     }
 
     Ok(Client {

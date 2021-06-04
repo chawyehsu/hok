@@ -2,7 +2,6 @@ use anyhow::Result;
 use std::fs::DirEntry;
 use std::path::PathBuf;
 use serde::Deserialize;
-use crate::config::Config;
 use crate::fs;
 use crate::utils::compare_versions;
 
@@ -13,7 +12,7 @@ pub struct App {
 }
 
 #[derive(Debug)]
-pub struct AppsManager {
+pub struct AppManager {
   working_dir: PathBuf
 }
 
@@ -88,13 +87,10 @@ impl App {
   }
 }
 
-impl AppsManager {
-  pub fn new(config: &Config) -> AppsManager {
-    let working_dir = PathBuf::from(
-      config.get("root_path").unwrap().as_str().unwrap()
-    ).join("apps");
-
-    AppsManager { working_dir }
+impl AppManager {
+  /// Create an [`AppsManager`] from the given Scoop [`Config`]
+  pub fn new(working_dir: PathBuf) -> AppManager {
+    AppManager { working_dir }
   }
 
   /// Create an [`AppsManager`] and set its working directory to the given
@@ -109,12 +105,13 @@ impl AppsManager {
   ///
   /// ```
   /// let working_dir = PathBuf::from(r"C:\Scoop\apps");
-  /// let am = AppsManager::from(working_dir);
+  /// let am = AppManager::from(working_dir);
   /// ```
-  pub fn from(working_dir: PathBuf) -> AppsManager {
-    AppsManager { working_dir }
+  pub fn from(working_dir: PathBuf) -> AppManager {
+    AppManager { working_dir }
   }
 
+  /// Check if app of the given name is installed.
   pub fn is_app_installed<S: AsRef<str>>(&self, name: S) -> bool {
     // transform
     //   `app_name.json`, or
@@ -127,6 +124,12 @@ impl AppsManager {
     // Here we simply consider the app is installed by checking the app dir
     // exists.
     self.working_dir.as_path().join(name).exists()
+  }
+
+  pub fn get_app<S: AsRef<str>>(&self, name: S) -> App {
+    let path = self.working_dir.as_path().join(name.as_ref());
+    let name = fs::leaf(path.as_path());
+    App { path, name, }
   }
 
   pub fn installed_apps(&self) -> Vec<App> {

@@ -5,7 +5,10 @@ fn main() -> Result<()> {
   create_logger();
   let app = cli::build_app();
   let matches = app.get_matches();
-  let mut scoop = Scoop::new(Config::new());
+  // Init global config
+  let mut config = Config::new();
+  // Create scoop instance via global config
+  let mut scoop = Scoop::new(&mut config);
 
   match matches.subcommand() {
     ("bucket", Some(matches)) => cmd::cmd_bucket(matches, &mut scoop),

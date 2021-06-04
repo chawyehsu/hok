@@ -1,12 +1,12 @@
 use crate::Scoop;
 use anyhow::Result;
 
-impl Scoop {
+impl<'a> Scoop<'a> {
   pub fn update_buckets(&mut self) -> Result<()> {
-    for bucket in self.bucket_manager.local_buckets()? {
-      print!("Updating '{}' bucket...", bucket.0.as_str());
+    for (bucket_name, bucket) in self.bucket_manager.get_buckets() {
+      print!("Updating '{}' bucket...", bucket_name);
 
-      match self.git.reset_head(bucket.1.path()) {
+      match self.git.reset_head(bucket.path.as_path()) {
         Ok(()) => {},
         Err(e) => {
           print!(" failed. ({})", e);

@@ -10,10 +10,8 @@ pub struct GitTool {
 
 impl GitTool {
   pub fn new(config: &Config) -> GitTool {
-    match config.get("proxy") {
-      Some(proxy) => {
-        let mut proxy = proxy.as_str().unwrap().to_string();
-
+    match config.proxy.clone() {
+      Some(mut proxy) => {
         if !proxy.starts_with("http") {
           proxy.insert_str(0, "http://");
         }

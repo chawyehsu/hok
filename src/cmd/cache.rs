@@ -5,7 +5,7 @@ use crate::{Scoop, utils};
 pub fn cmd_cache(matches: &ArgMatches, scoop: &mut Scoop) {
   if let Some(sub_m2) = matches.subcommand_matches("rm") {
     if let Some(app_name) = sub_m2.value_of("app") {
-      match scoop.cacher.remove(app_name) {
+      match scoop.cache_manager.remove(app_name) {
         Ok(()) => {
           println!("All caches that match '{}' were removed.", app_name);
           std::process::exit(0);
@@ -16,7 +16,7 @@ pub fn cmd_cache(matches: &ArgMatches, scoop: &mut Scoop) {
         }
       }
     } else if sub_m2.is_present("all") {
-      match scoop.cacher.clean() {
+      match scoop.cache_manager.clean() {
         Ok(()) => {
           println!("All download caches were removed.");
           std::process::exit(0);
@@ -28,7 +28,7 @@ pub fn cmd_cache(matches: &ArgMatches, scoop: &mut Scoop) {
       }
     }
   } else {
-    let cache_items = scoop.cacher.get_all().unwrap();
+    let cache_items = scoop.cache_manager.get_all().unwrap();
     let mut total_size: u64 = 0;
     let total_count = cache_items.len();
 

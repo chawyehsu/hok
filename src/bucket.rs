@@ -1,11 +1,11 @@
-use std::{io, path::PathBuf};
-use std::fs::DirEntry;
+use std::path::Path;
+use std::path::PathBuf;
 
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
+use regex::{Regex, RegexBuilder};
 use anyhow::Result;
-use crate::config::Config;
-use crate::fs;
+use crate::fs::{leaf, leaf_base, read_dir_json};
 
 static KNOWN_BUCKETS: Lazy<Vec<(&str, &str)>> = Lazy::new(|| {
   vec![
@@ -23,9 +23,12 @@ static KNOWN_BUCKETS: Lazy<Vec<(&str, &str)>> = Lazy::new(|| {
   ]
 });
 
+/// Scoop local bucket representation.
+#[derive(Debug)]
 pub struct Bucket {
   pub name: String,
-  pub entry: DirEntry,
+  pub path: PathBuf,
+  toplevel_manifest: bool,
 }
 
 /// ordered hash table for O(1) searching perf.
@@ -33,7 +36,8 @@ pub type Buckets = IndexMap<String, Bucket>;
 
 #[derive(Debug)]
 pub struct BucketManager {
-  bucket_dir: PathBuf
+  working_dir: PathBuf,
+  buckets: IndexMap<String, Bucket>
 }
 
 /// Collect known buckets
@@ -60,103 +64,113 @@ pub fn is_known_bucket(bucket_name: &str) -> bool {
 }
 
 impl Bucket {
-  pub fn new(name: String, entry: DirEntry) -> Bucket {
-    Bucket { name, entry }
+  /// Create a new local bucket instance with the given path, which's parent
+  /// should be `buckets`. For example:
+  ///
+  /// ```
+  /// let path = PathBuf::from(r"C:\Scoop\buckets\my_own_bucket");
+  /// let bucket = Bucket::new(path);
+  /// ```
+  ///
+  /// The bucket name, `my_own_bucket` in above example, should only contain
+  /// `a-zA-Z0-9-_` chars. Will fail if the path is invalid.
+  pub fn new(path: PathBuf) -> Bucket {
+    static REGEX_BUCKET_NAME: Lazy<Regex> = Lazy::new(|| {
+      RegexBuilder::new(
+        r".*?[\\/]buckets[\\/](?P<bucket_name>[a-zA-Z0-9-_]+)[\\/]+.*"
+      ).build().unwrap()
+    });
+    let caps = REGEX_BUCKET_NAME.captures(path.to_str().unwrap())
+      .unwrap();
+    let name = caps.name("bucket_name").unwrap().as_str().to_string();
+    let toplevel_manifest = !path.join("bucket").exists();
+
+    Bucket { name, path, toplevel_manifest }
   }
 
-  /// Return bucket's path
-  pub fn path(&self) -> PathBuf {
-    self.entry.path()
-  }
-
-  /// Return the root path that the bucket's json files are stored in.
-  pub fn root(&self) -> PathBuf {
-    let p = self.path();
-    match p.join("bucket").exists() {
-      true => p.join("bucket"),
-      false => p
+  /// Return the directory [`PathBuf`] of the bucket's json manifest files.
+  pub fn manifest_dir(&self) -> PathBuf {
+    if !self.toplevel_manifest {
+      return self.path.join("bucket");
     }
+
+    self.path.to_path_buf()
   }
 
-  /// Return all JSON manifest entries of the bucket
-  pub fn json_entries(&self) -> Result<Vec<DirEntry>> {
-    let entries = crate::fs::read_dir_json(self.root())?;
-    Ok(entries)
+  /// Get all available apps' name in this bucket.
+  pub fn available_apps(&self) -> Result<Vec<String>> {
+    Ok(
+      read_dir_json(&self.manifest_dir())?.into_iter().map(|path| {
+        leaf_base(path.as_path())
+      }).collect::<Vec<_>>()
+    )
   }
 
-  /// Check if the bucket is a known bucket
+  /// Get all available apps' manifest [`PathBuf`] in this bucket.
+  pub fn available_manifests(&self) -> Result<Vec<PathBuf>> {
+    Ok(read_dir_json(&self.manifest_dir())?)
+  }
+
+  /// Check if this bucket is a known bucket.
   pub fn is_known(&self) -> bool {
     is_known_bucket(self.name.as_ref())
+  }
+
+  /// Check if this bucket is a git repo bucket.
+  pub fn is_git_repo(&self) -> bool {
+    self.path.join(".git").exists()
   }
 }
 
 impl BucketManager {
-  pub fn new(config: &Config) -> BucketManager {
-    let bucket_dir = PathBuf::from(
-      config.get("root_path").unwrap().as_str().unwrap()
-    ).join("buckets");
+  /// Create a new [`BucketManager`] from the given Scoop [`Config`]
+  pub fn new(working_dir: PathBuf) -> BucketManager {
+    let buckets = Self::collect_buckets(&working_dir);
 
-    BucketManager { bucket_dir }
+    BucketManager { working_dir, buckets }
   }
 
-  /// Collect local buckets
-  pub fn local_buckets(&self) -> Result<&Buckets, io::Error> {
-    // let mut sbs = IndexMap::new(); // Can we cache the initialized map?
-    static mut LOCAL_BUCKETS: Lazy<Buckets> = Lazy::new(|| {
-      IndexMap::new()
-    });
+  fn collect_buckets(working_dir: &Path) -> Buckets {
+    let mut buckets: Buckets = IndexMap::new();
 
-    unsafe {
-      if LOCAL_BUCKETS.len() > 0 {
-        return Ok(&LOCAL_BUCKETS)
-      }
-    }
-
-    let ref buckets_dir = self.bucket_dir;
     // Ensure `buckets` dir
-    crate::fs::ensure_dir(buckets_dir)?;
+    crate::fs::ensure_dir(working_dir).unwrap();
 
-    let buckets: Vec<DirEntry> = std::fs::read_dir(buckets_dir)?
-      .filter_map(Result::ok)
+    let entries = working_dir.read_dir()
+      .unwrap().filter_map(Result::ok)
       .filter(|de| de.file_type().unwrap().is_dir())
-      .collect();
+      .map(|de| {
+        let path = de.path();
+        let name = leaf(path.as_path());
+        let toplevel_manifest = !path.join("bucket").exists();
+        (name.clone(), Bucket { name, path, toplevel_manifest })
+      }).collect::<Vec<_>>();
 
-    for entry in buckets {
-      let name = fs::leaf_base(entry.path());
-
-      unsafe {
-        if !LOCAL_BUCKETS.contains_key(name.as_str()) {
-          LOCAL_BUCKETS.insert(
-            name.clone(),
-            Bucket { name, entry }
-          );
-        }
-      }
+    for entry in entries {
+      buckets.insert(entry.0, entry.1);
     }
 
-    unsafe {
-      Ok(&LOCAL_BUCKETS)
-    }
+    buckets
   }
 
-  /// Return local bucket of given `bucket_name` represented as [`ScoopBucket`]
-  pub fn local_bucket<T: AsRef<str>>(&self, bucket_name: T)
-    -> Result<Option<&Bucket>, io::Error> {
-      Ok(self.local_buckets()?.get(bucket_name.as_ref()))
+  /// Get all local buckets.
+  pub fn get_buckets(&self) -> &Buckets {
+    &self.buckets
   }
 
-  /// Test given `bucket_name` is a local bucket or not.
-  pub fn is_local_bucket<T: AsRef<str>>(&self, bucket_name: T)
-    -> Result<bool, io::Error> {
-    Ok(self.local_buckets()?.contains_key(bucket_name.as_ref()))
+  /// Find local bucket with the given name.
+  pub fn get_bucket<S: AsRef<str>>(&self, name: S) -> Option<&Bucket> {
+    self.buckets.get(name.as_ref())
   }
 
-  /// Collect apps located in given `bucket_name` bucket.
-  pub fn apps_in_local_bucket<T: AsRef<str>>(&self, bucket_name: T)
-    -> Result<Vec<DirEntry>> {
-    let bucket = self.local_bucket(bucket_name.as_ref())?.unwrap();
-    let apps = crate::fs::read_dir_json(bucket.root())?;
+  /// Check if the bucket with the given name is a local bucket.
+  pub fn contains<S: AsRef<str>>(&self, name: S) -> bool {
+    self.buckets.contains_key(name.as_ref())
+  }
 
-    Ok(apps)
+  #[allow(dead_code)]
+  /// Update working_dir of this [`BucketManager`].
+  fn update_working_dir(&mut self, working_dir: PathBuf) {
+    self.working_dir = working_dir;
   }
 }

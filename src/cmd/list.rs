@@ -5,7 +5,7 @@ use crate::Scoop;
 pub fn cmd_list(_matches: &ArgMatches, scoop: &mut Scoop) {
   let brew_list_mode = false;
 
-  let apps = scoop.apps_manager.installed_apps();
+  let apps = scoop.app_manager.installed_apps();
   if apps.len() > 0 {
     if brew_list_mode {
       todo!();

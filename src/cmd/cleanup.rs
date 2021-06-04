@@ -21,7 +21,7 @@ pub fn cmd_cleanup(matches: &ArgMatches, scoop: &mut Scoop) {
   running_apps.dedup();
 
   if matches.is_present("all") {
-    let outdated_apps = scoop.apps_manager.outdated_apps();
+    let outdated_apps = scoop.app_manager.outdated_apps();
     for out in outdated_apps.into_iter() {
       if out.1.len() > 0 {
         let name = out.0;
@@ -33,7 +33,7 @@ pub fn cmd_cleanup(matches: &ArgMatches, scoop: &mut Scoop) {
         print!("Removed {}", name);
         for path in out.1 {
           remove_dir_all(path.as_path()).expect("failed to remove");
-          print!(" {}", fs::leaf(path));
+          print!(" {}", fs::leaf(path.as_path()));
         }
         println!("");
       }
@@ -41,10 +41,10 @@ pub fn cmd_cleanup(matches: &ArgMatches, scoop: &mut Scoop) {
     println!("Everything is shiny now!");
   } else if matches.value_of("app").is_some() {
     let name = matches.value_of("app").unwrap();
-    if !scoop.apps_manager.is_app_installed(name) {
+    if !scoop.app_manager.is_app_installed(name) {
       eprintln!("{} is not installed, skipping cleanup.", name);
     } else {
-      let outdated = scoop.apps_manager.outdated_app(name);
+      let outdated = scoop.app_manager.outdated_app(name);
       match outdated {
         None => println!("{} is already clean.", name),
         Some(outdated) => {
@@ -56,7 +56,7 @@ pub fn cmd_cleanup(matches: &ArgMatches, scoop: &mut Scoop) {
               for path in outdated {
                 // TODO: Add clean logic
                 remove_dir_all(path.as_path()).expect("failed to remove");
-                print!(" {}", fs::leaf(path));
+                print!(" {}", fs::leaf(path.as_path()));
               }
               println!("");
               println!("Everything is shiny now!");
