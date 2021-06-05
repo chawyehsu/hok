@@ -1009,6 +1009,7 @@ name = "scoop-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "once_cell",
  "regex",
@@ -1023,7 +1024,6 @@ name = "scoop-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "chrono",
  "dirs",
  "env_logger",
  "futures",

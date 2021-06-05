@@ -12,7 +12,6 @@ pub mod persist;
 pub mod search;
 pub mod spdx;
 pub mod sys;
-pub mod update;
 pub mod utils;
 
 use std::path::PathBuf;

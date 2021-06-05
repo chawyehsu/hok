@@ -136,6 +136,7 @@ impl Config {
                 Ok(value) => self.aria2_enabled = Some(value),
                 Err(_) => return Err("invalid config value."),
             },
+            "lastupdate" => self.lastupdate = Some(value.into()),
             "msiextract_use_lessmsi" => match value.parse::<bool>() {
                 Ok(value) => self.msiextract_use_lessmsi = Some(value),
                 Err(_) => return Err("invalid config value."),
