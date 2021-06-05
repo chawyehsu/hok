@@ -1011,6 +1011,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "env_logger",
  "once_cell",
  "regex",
  "remove_dir_all 0.7.0",
@@ -1025,7 +1026,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "dirs",
- "env_logger",
  "futures",
  "git2",
  "glob",

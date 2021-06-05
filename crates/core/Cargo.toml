@@ -10,7 +10,6 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.40"
 dirs = "3.0.1"
-env_logger = "0.8.3"
 futures = "0.3.14"
 git2 = "0.13.17"
 glob = "0.3.0"

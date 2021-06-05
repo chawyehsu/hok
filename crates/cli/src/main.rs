@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::{crate_description, crate_name, crate_version, App, AppSettings, Arg, SubCommand};
-use scoop_core::{config::Config, log::create_logger, Scoop};
+use env_logger::Env;
+use scoop_core::{config::Config, Scoop};
 
 mod cmd;
 
@@ -25,7 +26,7 @@ fn main() -> Result<()> {
         ("list", Some(matches)) => cmd::cmd_list(matches, &mut scoop),
         ("search", Some(matches)) => cmd::cmd_search(matches, &mut scoop),
         ("status", Some(_matches)) => unimplemented!(),
-        ("unhold", Some(_matches)) => unimplemented!(),
+        ("unhold", Some(matches)) => cmd::cmd_unhold(matches, &mut scoop),
         ("uninstall", Some(_matches)) => unimplemented!(),
         ("update", Some(matches)) => cmd::cmd_update(matches, &mut scoop),
         ("which", Some(_matches)) => unimplemented!(),
@@ -35,7 +36,15 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-pub fn build_app() -> App<'static, 'static> {
+fn create_logger() {
+    let env = Env::default()
+        .filter_or("SCOOP_LOG_LEVEL", "trace")
+        .write_style("never");
+
+    env_logger::init_from_env(env);
+}
+
+fn build_app() -> App<'static, 'static> {
     let app = App::new(crate_name!())
         .version(crate_version!())
         .about(crate_description!())

@@ -6,7 +6,6 @@ pub mod error;
 pub mod fs;
 pub mod git;
 pub mod http;
-pub mod log;
 pub mod manifest;
 pub mod persist;
 pub mod search;

@@ -7,6 +7,7 @@ mod home;
 mod info;
 mod list;
 mod search;
+mod unhold;
 mod update;
 
 pub use bucket::cmd_bucket;
@@ -18,4 +19,5 @@ pub use home::cmd_home;
 pub use info::cmd_info;
 pub use list::cmd_list;
 pub use search::cmd_search;
+pub use unhold::cmd_unhold;
 pub use update::cmd_update;
