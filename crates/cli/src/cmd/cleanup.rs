@@ -1,8 +1,8 @@
-use scoop_core::{fs, Scoop};
 use clap::ArgMatches;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
 use remove_dir_all::remove_dir_all;
+use scoop_core::{fs, Scoop};
 use sysinfo::ProcessExt;
 
 pub fn cmd_cleanup(matches: &ArgMatches, scoop: &mut Scoop) {

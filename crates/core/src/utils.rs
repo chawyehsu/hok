@@ -1,3 +1,8 @@
+use std::path::Path;
+
+use once_cell::sync::Lazy;
+use regex::{Regex, RegexBuilder};
+
 pub fn filesize(length: u64, with_unit: bool) -> String {
     let gb: f64 = 2.0_f64.powf(30_f64);
     let mb: f64 = 2.0_f64.powf(20_f64);
@@ -90,4 +95,17 @@ pub fn compare_versions(ver_a: &String, ver_b: &String) -> std::cmp::Ordering {
     }
 
     std::cmp::Ordering::Equal
+}
+
+pub fn extract_bucket_from<P: AsRef<Path> + ?Sized>(path: &P) -> Option<String> {
+    static REGEX_BUCKET_NAME: Lazy<Regex> = Lazy::new(|| {
+        RegexBuilder::new(r".*?[\\/]buckets[\\/](?P<bucket_name>[a-zA-Z0-9-_]+)[\\/]+.*")
+            .build()
+            .unwrap()
+    });
+
+    match REGEX_BUCKET_NAME.captures(path.as_ref().to_str().unwrap()) {
+        Some(caps) => caps.name("bucket_name").map(|m| m.as_str().to_string()),
+        None => None,
+    }
 }

@@ -1,10 +1,13 @@
-use std::path::Path;
-
 use anyhow::Result;
 use futures::{executor::block_on, future::join_all};
+use log::trace;
 // use log::trace;
-use crate::{bucket::Bucket, fs::leaf_base, manifest::Manifest, Scoop};
-use serde_json::Value;
+use crate::{
+    bucket::Bucket,
+    fs::leaf_base,
+    manifest::{BinType, Manifest, StringOrStringArray},
+    Scoop,
+};
 
 struct SearchMatch {
     name: String,
@@ -29,21 +32,20 @@ async fn walk_manifests(
         // trace!("Searching manifest {}", app.display());
 
         let app_name = leaf_base(app);
-
         // substring check on app_name
         if app_name.contains(query) {
-            let manifest = Manifest::from_path(app, Some(bucket_name.to_string()));
+            let manifest = Manifest::from_path(app);
             if manifest.is_err() {
+                trace!("{:?}", manifest.err());
                 continue;
             }
-            let manifest = manifest?;
-            let version = manifest.version;
-            let name = app_name.to_string();
-            let bin: Option<String> = None;
 
-            let sm = SearchMatch { name, version, bin };
-
-            search_matches.push(sm);
+            let version = manifest.unwrap().data.version;
+            search_matches.push(SearchMatch {
+                name: app_name,
+                version,
+                bin: None,
+            });
         } else {
             // Searching binaries requires a very-high overhead (reading all json files),
             // will not do binary search without the option.
@@ -51,97 +53,60 @@ async fn walk_manifests(
                 continue;
             }
 
-            let manifest = Manifest::from_path(app, Some(bucket_name.to_string()));
+            let manifest = Manifest::from_path(app);
             if manifest.is_err() {
-                continue;
-            }
-            let manifest = manifest?;
-            let bin = manifest.json.get("bin");
-
-            // filter manifest doesn't contain `bin`
-            if bin.is_none() {
+                trace!("{:?}", manifest.err());
                 continue;
             }
 
-            let bin = bin.unwrap();
-            let match_bin: Option<Vec<String>> = match bin {
-                Value::String(bin) => {
-                    let bin = Path::new(bin).file_name().unwrap().to_str().unwrap();
+            let Manifest {
+                name,
+                path: _,
+                bucket: _,
+                data,
+            } = manifest.unwrap();
 
-                    if bin.contains(query) {
-                        Some(vec![format!("'{}'", bin.to_string())])
-                    } else {
-                        None
-                    }
-                }
-                Value::Array(bins) => {
-                    let mut bin_matches = Vec::new();
-
-                    for bin in bins {
-                        match bin {
-                            Value::String(bin) => {
-                                let bin = Path::new(bin).file_name().unwrap().to_str().unwrap();
-
-                                if bin.contains(query) {
-                                    bin_matches.push(format!("'{}'", bin.to_string()));
-                                    continue;
-                                }
-                            }
-                            Value::Array(bin_pair) => {
-                                // test bin
-                                let bin = bin_pair.get(0).unwrap();
-                                match bin {
-                                    Value::String(bin) => {
-                                        let bin =
-                                            Path::new(bin).file_name().unwrap().to_str().unwrap();
-
-                                        if bin.contains(query) {
-                                            bin_matches.push(format!("'{}'", bin.to_string()));
-                                            continue;
-                                        }
-                                    }
-                                    _ => {}
-                                }
-
-                                // test alias
-                                let bin = bin_pair.get(1).unwrap();
-                                match bin {
-                                    Value::String(bin) => {
-                                        if bin.contains(query) {
-                                            bin_matches.push(format!("'{}'", bin.to_string()));
-                                            continue;
-                                        }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                            _ => {}
+            let mut bin_matches = Vec::new();
+            match data.bin {
+                None => continue,
+                Some(bintype) => match bintype {
+                    BinType::Single(bin) => {
+                        if bin.contains(query) {
+                            bin_matches.push(bin);
                         }
                     }
-
-                    if bin_matches.len() > 0 {
-                        Some(bin_matches)
-                    } else {
-                        None
+                    BinType::Multiple(bins) => {
+                        bins.into_iter().for_each(|bin| {
+                            if bin.contains(query) {
+                                bin_matches.push(bin);
+                            }
+                        });
                     }
-                }
-                _ => None,
-            };
+                    BinType::Complex(complex) => {
+                        complex.into_iter().for_each(|item| match item {
+                            StringOrStringArray::String(bin) => {
+                                if bin.contains(query) {
+                                    bin_matches.push(bin);
+                                }
+                            }
+                            StringOrStringArray::Array(pair) => {
+                                if pair[1].contains(query) {
+                                    bin_matches.push(pair[1].to_string());
+                                }
+                            }
+                        });
+                    }
+                },
+            }
 
-            match match_bin {
-                Some(bins) => {
-                    let version = manifest.json.get("version");
-                    let name = app_name.to_string();
-                    let version = version.unwrap().as_str().unwrap().to_owned();
-                    let bin: Option<String> = Some(bins.get(0).unwrap().to_owned());
-
-                    let sm = SearchMatch { name, version, bin };
-
-                    search_matches.push(sm);
-                }
-                None => {
-                    continue;
-                }
+            if bin_matches.len() > 0 {
+                let version = data.version;
+                let bin = format!("'{}'", bin_matches[0].to_string());
+                search_matches.push(SearchMatch {
+                    name,
+                    version,
+                    bin: Some(bin),
+                });
             }
         }
     }

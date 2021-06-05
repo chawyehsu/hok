@@ -1,11 +1,13 @@
 use std::path::PathBuf;
 
-use crate::fs::{leaf, leaf_base, read_dir_json};
+use crate::{
+    fs::{leaf, leaf_base, read_dir_json},
+    utils,
+};
 use anyhow::Result;
 use indexmap::IndexMap;
 use log::trace;
 use once_cell::sync::Lazy;
-use regex::{Regex, RegexBuilder};
 
 static KNOWN_BUCKETS: Lazy<Vec<(&str, &str)>> = Lazy::new(|| {
     vec![
@@ -43,7 +45,7 @@ pub type Buckets = IndexMap<String, Bucket>;
 #[derive(Debug)]
 pub struct BucketManager {
     working_dir: PathBuf,
-    buckets: IndexMap<String, Bucket>,
+    buckets: Buckets,
 }
 
 /// Collect known buckets
@@ -80,13 +82,7 @@ impl Bucket {
     /// The bucket name, `my_own_bucket` in above example, should only contain
     /// `a-zA-Z0-9-_` chars. Will fail if the path is invalid.
     pub fn new(path: PathBuf) -> Bucket {
-        static REGEX_BUCKET_NAME: Lazy<Regex> = Lazy::new(|| {
-            RegexBuilder::new(r".*?[\\/]buckets[\\/](?P<bucket_name>[a-zA-Z0-9-_]+)[\\/]+.*")
-                .build()
-                .unwrap()
-        });
-        let caps = REGEX_BUCKET_NAME.captures(path.to_str().unwrap()).unwrap();
-        let name = caps.name("bucket_name").unwrap().as_str().to_string();
+        let name = utils::extract_bucket_from(path.as_path()).unwrap();
         let toplevel_manifest = !path.join("bucket").exists();
 
         Bucket {

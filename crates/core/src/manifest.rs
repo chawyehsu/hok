@@ -1,121 +1,254 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use std::fs::File;
-use std::io::BufReader;
-use std::path::{Path, PathBuf};
+use std::io::Read;
+use std::path::Path;
+use std::path::PathBuf;
 
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{fs, spdx, Scoop};
+use crate::fs;
+use crate::utils;
+use crate::Scoop;
 
-#[derive(Debug)]
-pub enum ManifestKind {
-    Local(PathBuf),
-    Remote(String),
+////////////////////////////////////////////////////////////////////////////////
+//  Manifest Custom Types
+////////////////////////////////////////////////////////////////////////////////
+type Hash = String;
+type LicenseIdentifier = String;
+type PersistType = BinType;
+type Url = StringOrStringArray;
+////////////////////////////////////////////////////////////////////////////////
+//  Manifest Custom Enums
+////////////////////////////////////////////////////////////////////////////////
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum StringOrStringArray {
+    String(String),
+    Array(Vec<String>),
 }
 
-#[derive(Debug)]
-pub struct Manifest {
-    pub app: String,
-    pub bucket: Option<String>,
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum HashType {
+    Single(Hash),
+    Multiple(Vec<Hash>),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum BinType {
+    Single(String),
+    Multiple(Vec<String>),
+    Complex(Vec<StringOrStringArray>),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum CheckverType {
+    Simple(String),
+    Complex(ComplexCheckver),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum License {
+    Simple(LicenseIdentifier),
+    Complex(LicensePair),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum ShortcutsType {
+    TwoElement([String; 2]),
+    ThreeElement([String; 3]),
+    FourElement([String; 4]),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum HashExtractionMode {
+    #[serde(rename = "download")]
+    Download,
+    #[serde(rename = "extract")]
+    Extract,
+    #[serde(rename = "json")]
+    Json,
+    #[serde(rename = "xpath")]
+    Xpath,
+    #[serde(rename = "rdf")]
+    Rdf,
+    #[serde(rename = "metalink")]
+    Metalink,
+    #[serde(rename = "fosshub")]
+    Fosshub,
+    #[serde(rename = "sourceforge")]
+    Sourceforge,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//  Manifest Custom Structs
+////////////////////////////////////////////////////////////////////////////////
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct LicensePair {
+    pub identifier: LicenseIdentifier,
+    pub url: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Installer {
+    pub args: Option<StringOrStringArray>,
+    pub file: Option<String>,
+    pub script: Option<StringOrStringArray>,
+    pub keep: Option<bool>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Uninstaller {
+    pub args: Option<StringOrStringArray>,
+    pub file: Option<String>,
+    pub script: Option<StringOrStringArray>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ArchitectureInner {
+    pub bin: Option<BinType>,
+    pub checkver: Option<CheckverType>,
+    pub env_add_path: Option<StringOrStringArray>,
+    pub env_set: Option<Value>,
+    pub extract_dir: Option<StringOrStringArray>,
+    pub hash: Option<HashType>,
+    pub installer: Option<Installer>,
+    pub post_install: Option<StringOrStringArray>,
+    pub pre_install: Option<StringOrStringArray>,
+    pub shortcuts: Option<Vec<ShortcutsType>>,
+    pub uninstaller: Option<Uninstaller>,
+    pub url: Option<Url>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Architecture {
+    #[serde(rename = "32bit")]
+    arch_32: Option<ArchitectureInner>,
+    #[serde(rename = "64bit")]
+    arch_64: Option<ArchitectureInner>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ComplexCheckver {
+    pub github: Option<String>,
+    pub re: Option<String>,
+    pub regex: Option<String>,
+    pub url: Option<String>,
+    pub jp: Option<String>,
+    pub jsonpath: Option<String>,
+    pub xpath: Option<String>,
+    pub reverse: Option<bool>,
+    pub replace: Option<String>,
+    pub useragent: Option<String>,
+    pub script: Option<StringOrStringArray>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct HashExtraction {
+    pub find: Option<String>,
+    pub regex: Option<String>,
+    pub jp: Option<String>,
+    pub jsonpath: Option<String>,
+    pub xpath: Option<String>,
+    pub mode: Option<HashExtractionMode>,
+    pub url: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct AutoupdateArchitectureInner {
+    pub extract_dir: Option<StringOrStringArray>,
+    pub url: Option<Url>,
+    pub hash: Option<HashExtraction>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct AutoupdateArchitecture {
+    #[serde(rename = "32bit")]
+    arch_32: Option<AutoupdateArchitectureInner>,
+    #[serde(rename = "64bit")]
+    arch_64: Option<AutoupdateArchitectureInner>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Autoupdate {
+    pub architecture: Option<AutoupdateArchitecture>,
+    pub extract_dir: Option<StringOrStringArray>,
+    pub hash: Option<HashExtraction>,
+    pub note: Option<StringOrStringArray>,
+    pub url: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Psmodule {
+    pub name: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ManifestRaw {
+    pub architecture: Option<Architecture>,
+    pub autoupdate: Option<Autoupdate>,
+    pub bin: Option<BinType>,
+    pub persist: Option<PersistType>,
+    pub checkver: Option<CheckverType>,
+    pub cookie: Option<Value>,
+    pub depends: Option<StringOrStringArray>,
+    pub description: Option<String>,
+    pub env_add_path: Option<StringOrStringArray>,
+    pub env_set: Option<Value>,
+    pub extract_dir: Option<StringOrStringArray>,
+    pub extract_to: Option<StringOrStringArray>,
+    pub hash: Option<HashType>,
+    pub homepage: Option<String>,
+    pub innosetup: Option<bool>,
+    pub installer: Option<Installer>,
+    pub license: Option<License>,
+    pub notes: Option<StringOrStringArray>,
+    pub post_install: Option<StringOrStringArray>,
+    pub pre_install: Option<StringOrStringArray>,
+    pub psmodule: Option<Psmodule>,
+    pub shortcuts: Option<Vec<ShortcutsType>>,
+    pub suggest: Option<Value>,
+    pub uninstaller: Option<Uninstaller>,
+    pub url: Option<Url>,
     pub version: String,
-    pub license: Option<Vec<(String, Option<String>)>>,
-    pub json: Value,
-    pub kind: ManifestKind,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Manifest {
+    pub name: String,
+    pub path: PathBuf,
+    pub bucket: Option<String>,
+    pub data: ManifestRaw,
 }
 
 impl Manifest {
     /// Create an [`Manifest`] from the given [`PathBuf`].
-    pub fn from_path<P: AsRef<Path> + ?Sized>(
-        path: &P,
-        bucket: Option<String>,
-    ) -> Result<Manifest> {
-        let buf = BufReader::new(File::open(path.as_ref())?);
+    pub fn from_path<P: AsRef<Path> + ?Sized>(path: &P) -> Result<Manifest> {
+        // We read the entire manifest json file into memory first and then
+        // deserialize it, as this is *a lot* faster than reading via the
+        // `serde_json::from_reader`. See https://github.com/serde-rs/json/issues/160
+        let mut s = String::new();
+        File::open(path)?.read_to_string(&mut s)?;
+        let data = serde_json::from_str(&s)?;
+        let name = fs::leaf_base(path);
+        let bucket = utils::extract_bucket_from(path);
+        let path = path.as_ref().to_path_buf();
 
-        match serde_json::from_reader(buf) {
-            Ok(v) => {
-                let json: Value = v;
-                let version = json.get("version");
-                if version.is_none() {
-                    let msg = format!(
-                        "Failed to read version from manifest '{}'",
-                        path.as_ref().to_str().unwrap()
-                    );
-                    return Err(anyhow!(msg));
-                }
-
-                return Ok(Manifest {
-                    app: fs::leaf_base(path.as_ref()).to_string(),
-                    bucket,
-                    version: version.unwrap().as_str().unwrap().to_string(),
-                    license: Self::license(json.get("license")),
-                    json,
-                    kind: ManifestKind::Local(path.as_ref().to_path_buf()),
-                });
-            }
-            Err(_e) => {
-                let msg = format!(
-                    "Failed to parse manifest '{}'",
-                    path.as_ref().to_str().unwrap()
-                );
-                return Err(anyhow!(msg));
-            }
-        }
+        Ok(Manifest {
+            name,
+            path,
+            bucket,
+            data,
+        })
     }
 
     pub fn from_url<T: AsRef<str>>(_url: T) -> Result<Manifest> {
         todo!()
-    }
-
-    /// Extract license pair from the JSON `license` field
-    fn license(val: Option<&Value>) -> Option<Vec<(String, Option<String>)>> {
-        let generator = |license| -> (String, Option<String>) {
-            let url = match license {
-                "Freeware" => Some("https://en.wikipedia.org/wiki/Freeware".to_string()),
-                "Public Domain" => {
-                    Some("https://en.wikipedia.org/wiki/Public_domain_software".to_string())
-                }
-                "Shareware" => Some("https://en.wikipedia.org/wiki/Shareware".to_string()),
-                "Proprietary" => {
-                    Some("https://en.wikipedia.org/wiki/Proprietary_software".to_string())
-                }
-                "Unknown" => None,
-                license => match spdx::SPDX.contains(license) {
-                    true => Some(format!("https://spdx.org/licenses/{}.html", license)),
-                    false => None,
-                },
-            };
-            (license.to_string(), url)
-        };
-
-        match val {
-            Some(Value::String(str)) => {
-                let mut license_pair: Vec<(String, Option<String>)> = vec![];
-                if str.contains("|") {
-                    str.split("|")
-                        .filter(|s| !(*s).eq("..."))
-                        .for_each(|s| license_pair.push(generator(s)));
-                } else if str.contains(",") {
-                    str.split(",")
-                        .filter(|s| !(*s).eq("..."))
-                        .for_each(|s| license_pair.push(generator(s)));
-                } else {
-                    license_pair.push(generator(str));
-                }
-                return Some(license_pair);
-            }
-            Some(Value::Object(pair)) => {
-                if pair.get("identifier").is_none() {
-                    return None;
-                }
-                let license = pair.get("identifier").unwrap().to_string();
-                let url = match pair.get("url") {
-                    Some(url) => Some(url.to_string()),
-                    None => None,
-                };
-                return Some(vec![(license, url)]);
-            }
-            _ => None,
-        }
     }
 }
 
@@ -142,10 +275,7 @@ impl<'a> Scoop<'a> {
                 let bucket = self.bucket_manager.get_bucket(bucket_name).unwrap();
                 let manifest_path = bucket.manifest_dir().join(format!("{}.json", app_name));
                 match manifest_path.exists() {
-                    true => Ok(Some(Manifest::from_path(
-                        &manifest_path,
-                        Some(bucket.name.to_string()),
-                    )?)),
+                    true => Ok(Some(Manifest::from_path(&manifest_path)?)),
                     false => Ok(None),
                 }
             }
@@ -153,12 +283,7 @@ impl<'a> Scoop<'a> {
                 for bucket in self.bucket_manager.get_buckets() {
                     let manifest_path = bucket.1.manifest_dir().join(format!("{}.json", app_name));
                     match manifest_path.exists() {
-                        true => {
-                            return Ok(Some(Manifest::from_path(
-                                &manifest_path,
-                                Some(bucket.1.name.to_string()),
-                            )?))
-                        }
+                        true => return Ok(Some(Manifest::from_path(&manifest_path)?)),
                         false => {}
                     }
                 }

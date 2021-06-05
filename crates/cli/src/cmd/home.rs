@@ -8,8 +8,8 @@ pub fn cmd_home(matches: &ArgMatches, scoop: &mut Scoop) {
         // find local manifest and parse it
         match scoop.find_local_manifest(app_name).unwrap() {
             Some(manifest) => {
-                if let Some(url) = manifest.json.get("homepage") {
-                    let url = std::ffi::OsStr::new(url.as_str().unwrap());
+                if let Some(url) = manifest.data.homepage {
+                    let url = std::ffi::OsStr::new(url.as_str());
                     Command::new("cmd")
                         .arg("/C")
                         .arg("start")

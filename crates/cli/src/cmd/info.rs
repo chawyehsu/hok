@@ -1,75 +1,75 @@
-use scoop_core::{manifest, Scoop};
 use clap::ArgMatches;
-use serde_json::Value;
+use scoop_core::{
+    manifest::{BinType, License, Manifest, StringOrStringArray},
+    Scoop,
+};
 
 pub fn cmd_info(matches: &ArgMatches, scoop: &mut Scoop) {
     let app = matches.value_of("app").unwrap();
     match scoop.find_local_manifest(app) {
         Ok(Some(manifest)) => {
+            let Manifest {
+                name,
+                path,
+                bucket,
+                data,
+            } = manifest;
+
             // Name
-            println!("Name: {}", manifest.app);
+            println!("Name: {}", name);
             // Bucket
-            if manifest.bucket.is_some() {
-                println!("Bucket: {}", manifest.bucket.unwrap());
+            if bucket.is_some() {
+                println!("Bucket: {}", bucket.unwrap());
             }
             // Description
-            if manifest.json.get("description").is_some() {
-                println!(
-                    "Description: {}",
-                    manifest.json.get("description").unwrap().as_str().unwrap()
-                );
+            if data.description.is_some() {
+                println!("Description: {}", data.description.unwrap());
             }
             // Version
-            println!("Version: {}", manifest.version);
+            println!("Version: {}", data.version);
             // Homepage
-            if manifest.json.get("homepage").is_some() {
-                println!(
-                    "Website: {}",
-                    manifest.json.get("homepage").unwrap().as_str().unwrap()
-                );
+            if data.homepage.is_some() {
+                println!("Website: {}", data.homepage.unwrap());
             }
             // License
-            if manifest.license.is_some() {
-                let licenses = manifest.license.unwrap();
+            if data.license.is_some() {
+                let licenses = data.license.unwrap();
 
-                if licenses.len() == 1 {
-                    print!("License:");
-                    let pair = licenses.first().unwrap();
-                    match pair.1.as_ref() {
-                        Some(url) => print!(" {} ({})\n", pair.0, url),
-                        None => print!(" {}\n", pair.0),
-                    }
-                } else {
-                    println!("License:");
-                    for pair in licenses {
-                        match pair.1 {
-                            Some(url) => println!("  {} ({})", pair.0, url),
-                            None => println!("  {}", pair.0),
+                match licenses {
+                    License::Simple(str) => println!("License: {}", str),
+                    License::Complex(pair) => {
+                        println!("License:");
+                        match pair.url {
+                            Some(url) => println!("  {} ({})", pair.identifier, url),
+                            None => println!("  {}", pair.identifier),
                         }
                     }
                 }
             }
             // Manifest
-            match manifest.kind {
-                manifest::ManifestKind::Local(path) => {
-                    println!("Manifest: \n  {}", path.to_str().unwrap());
-                }
-                manifest::ManifestKind::Remote(_url) => {} // FIXME
-            }
+            println!("Manifest:\n  {}", path.display());
+
             // Binaries
-            match manifest.json.get("bin") {
-                Some(Value::String(single)) => {
-                    println!("Binaries: \n  {}", single);
-                }
-                Some(Value::Array(_multiple)) => {
-                    println!("Binaries:");
-                    // for s in multiple {
-                    //   match s {
-                    //     Value::String(s) =>
-                    //   }
-                    // }
-                }
-                _ => {} // no-op
+            match data.bin {
+                Some(bintype) => match bintype {
+                    BinType::Single(bin) => println!("Binary: {}", bin),
+                    BinType::Multiple(bins) => println!("Binary:\n  {}", bins.join(" ")),
+                    BinType::Complex(complex) => {
+                        println!("Binaries:");
+
+                        let mut bins = Vec::new();
+
+                        for item in complex.into_iter() {
+                            match item {
+                                StringOrStringArray::String(bin) => bins.push(bin),
+                                StringOrStringArray::Array(pair) => bins.push(pair[1].to_string()),
+                            }
+                        }
+
+                        println!("  {}", bins.join(" "));
+                    }
+                },
+                None => {}
             }
 
             std::process::exit(0);

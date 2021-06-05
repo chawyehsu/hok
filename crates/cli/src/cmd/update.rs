@@ -17,5 +17,9 @@ pub fn cmd_update(_: &clap::ArgMatches, scoop: &mut Scoop) {
 
     // update lastupdate
     let time = Utc::now().to_rfc3339_opts(SecondsFormat::Micros, false);
-    scoop.config.set("lastupdate", time.as_str()).unwrap().save();
+    scoop
+        .config
+        .set("lastupdate", time.as_str())
+        .unwrap()
+        .save();
 }
