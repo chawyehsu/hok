@@ -12,45 +12,47 @@ use anyhow::Result;
 use rayon::prelude::*;
 
 #[derive(Clone, Debug)]
-struct SearchMatch {
-    name: String,
-    version: String,
-    bin: Option<String>,
+pub struct SearchMatch {
+    pub name: String,
+    pub version: String,
+    pub bin: Option<String>,
 }
 
-struct Matches {
-    bucket: String,
-    collected: Vec<SearchMatch>,
+#[derive(Clone, Debug)]
+pub struct Matches {
+    pub bucket: String,
+    pub collected: Vec<SearchMatch>,
 }
 
-fn try_match_bin(query: &str, input: Option<BinType>) -> Vec<String> {
-    let mut bin_matches = Vec::new();
+fn try_match_bin(query: &str, input: Option<BinType>) -> Option<String> {
     match input {
-        None => {}
+        None => {},
         Some(bintype) => match bintype {
             BinType::String(bin) => {
                 if bin.contains(query) {
-                    bin_matches.push(bin);
+                    return Some(bin);
                 }
-            }
+            },
             BinType::Array(arr) => {
-                arr.into_iter().for_each(|item| match item {
-                    StringOrStringArray::String(bin) => {
-                        if bin.contains(query) {
-                            bin_matches.push(bin);
-                        }
+                for item in arr.into_iter() {
+                    match item {
+                        StringOrStringArray::String(bin) => {
+                            if bin.contains(query) {
+                                return Some(bin);
+                            }
+                        },
+                        StringOrStringArray::Array(pair) => {
+                            if pair[1].contains(query) {
+                                return Some(pair[1].to_string());
+                            }
+                        },
                     }
-                    StringOrStringArray::Array(pair) => {
-                        if pair[1].contains(query) {
-                            bin_matches.push(pair[1].to_string());
-                        }
-                    }
-                });
-            }
-        },
+                }
+            },
+        }
     }
 
-    bin_matches
+    None
 }
 
 fn travel_manifest(
@@ -88,10 +90,10 @@ fn travel_manifest(
                     data,
                 } = manifest;
 
-                let bin_matches = try_match_bin(query, data.bin);
-                if bin_matches.len() > 0 {
+                let bin_match = try_match_bin(query, data.bin);
+                if bin_match.is_some() {
                     let version = data.version;
-                    let bin = format!("'{}'", bin_matches[0].to_string());
+                    let bin = format!("'{}'", bin_match.unwrap());
                     Ok(Some(SearchMatch {
                         name,
                         version,
@@ -107,7 +109,7 @@ fn travel_manifest(
 }
 
 impl<'a> Scoop<'a> {
-    pub fn search(&mut self, query: &str, search_bin: bool) -> Result<()> {
+    pub fn search(&mut self, query: &str, search_bin: bool) -> Result<Vec<Matches>> {
         // Load all local buckets
         let buckets = self.bucket_manager.get_buckets();
 
@@ -135,25 +137,6 @@ impl<'a> Scoop<'a> {
 
         matches.sort_by_key(|k| k.bucket.to_string());
 
-        for m in matches {
-            if m.collected.len() > 0 {
-                println!("'{}' bucket:", m.bucket);
-                for sm in m.collected {
-                    if sm.bin.is_none() {
-                        println!("  {} ({})", sm.name, sm.version);
-                    } else {
-                        println!(
-                            "  {} ({}) --> includes {}",
-                            sm.name,
-                            sm.version,
-                            sm.bin.unwrap()
-                        );
-                    }
-                }
-                println!("");
-            }
-        }
-
-        Ok(())
+        Ok(matches)
     }
 }
