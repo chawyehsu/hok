@@ -1,6 +1,5 @@
-use reqwest::{Client as ReqwestClient, IntoUrl, Method, Proxy, RequestBuilder, Result};
-
 use crate::config::Config;
+use reqwest::{Client as ReqwestClient, IntoUrl, Method, Proxy, RequestBuilder, Result};
 
 static SCOOP_USER_AGENT: &str = "Scoop/0.1.0 (Rust)";
 

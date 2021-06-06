@@ -1,13 +1,11 @@
-use std::path::PathBuf;
-
 use crate::{
     fs::{leaf, leaf_base, read_dir_json},
     utils,
 };
 use anyhow::Result;
 use indexmap::IndexMap;
-use log::trace;
 use once_cell::sync::Lazy;
+use std::path::PathBuf;
 
 static KNOWN_BUCKETS: Lazy<Vec<(&str, &str)>> = Lazy::new(|| {
     vec![

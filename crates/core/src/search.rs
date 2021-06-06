@@ -1,7 +1,5 @@
 use anyhow::Result;
 use futures::{executor::block_on, future::join_all};
-use log::trace;
-// use log::trace;
 use crate::{
     bucket::Bucket,
     fs::leaf_base,

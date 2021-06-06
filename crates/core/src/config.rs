@@ -4,9 +4,6 @@ use std::io;
 use std::path::PathBuf;
 use std::result::Result;
 
-use log::{error, trace, warn};
-use serde::{Deserialize, Serialize};
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Config {
     #[serde(skip)]

@@ -1,7 +1,6 @@
-use std::path::Path;
-
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
+use std::path::Path;
 
 pub fn filesize(length: u64, with_unit: bool) -> String {
     let gb: f64 = 2.0_f64.powf(30_f64);

@@ -4,7 +4,6 @@ use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::fs;
