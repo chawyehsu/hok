@@ -127,9 +127,9 @@ pub struct ArchitectureInner {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Architecture {
     #[serde(rename = "32bit")]
-    arch_32: Option<ArchitectureInner>,
+    i386: Option<ArchitectureInner>,
     #[serde(rename = "64bit")]
-    arch_64: Option<ArchitectureInner>,
+    amd64: Option<ArchitectureInner>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -168,9 +168,9 @@ pub struct AutoupdateArchitectureInner {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AutoupdateArchitecture {
     #[serde(rename = "32bit")]
-    arch_32: Option<AutoupdateArchitectureInner>,
+    i386: Option<AutoupdateArchitectureInner>,
     #[serde(rename = "64bit")]
-    arch_64: Option<AutoupdateArchitectureInner>,
+    amd64: Option<AutoupdateArchitectureInner>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
