@@ -1,11 +1,11 @@
-use anyhow::Result;
-use futures::{executor::block_on, future::join_all};
 use crate::{
     bucket::Bucket,
     fs::leaf_base,
     manifest::{BinType, Manifest, StringOrStringArray},
     Scoop,
 };
+use anyhow::Result;
+use futures::{executor::block_on, future::join_all};
 
 struct SearchMatch {
     name: String,
@@ -34,7 +34,6 @@ async fn walk_manifests(
         if app_name.contains(query) {
             let manifest = Manifest::from_path(app);
             if manifest.is_err() {
-                trace!("{:?}", manifest.err());
                 continue;
             }
 
@@ -53,7 +52,7 @@ async fn walk_manifests(
 
             let manifest = Manifest::from_path(app);
             if manifest.is_err() {
-                trace!("{:?}", manifest.err());
+                // trace!("{:?}", manifest.err());
                 continue;
             }
 
@@ -68,20 +67,13 @@ async fn walk_manifests(
             match data.bin {
                 None => continue,
                 Some(bintype) => match bintype {
-                    BinType::Single(bin) => {
+                    BinType::String(bin) => {
                         if bin.contains(query) {
                             bin_matches.push(bin);
                         }
                     }
-                    BinType::Multiple(bins) => {
-                        bins.into_iter().for_each(|bin| {
-                            if bin.contains(query) {
-                                bin_matches.push(bin);
-                            }
-                        });
-                    }
-                    BinType::Complex(complex) => {
-                        complex.into_iter().for_each(|item| match item {
+                    BinType::Array(arr) => {
+                        arr.into_iter().for_each(|item| match item {
                             StringOrStringArray::String(bin) => {
                                 if bin.contains(query) {
                                     bin_matches.push(bin);

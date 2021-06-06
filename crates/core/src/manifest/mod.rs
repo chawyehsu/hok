@@ -1,4 +1,6 @@
-use anyhow::Result;
+mod hashstring;
+
+use anyhow::{anyhow, Result};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -9,11 +11,11 @@ use serde_json::Value;
 use crate::fs;
 use crate::utils;
 use crate::Scoop;
+pub use hashstring::{deserialize_option_hash, Hash};
 
 ////////////////////////////////////////////////////////////////////////////////
 //  Manifest Custom Types
 ////////////////////////////////////////////////////////////////////////////////
-type Hash = String;
 type LicenseIdentifier = String;
 type PersistType = BinType;
 type Url = StringOrStringArray;
@@ -27,19 +29,18 @@ pub enum StringOrStringArray {
     Array(Vec<String>),
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(untagged)]
-pub enum HashType {
-    Single(Hash),
-    Multiple(Vec<Hash>),
-}
+// #[derive(Clone, Debug, Deserialize, Serialize)]
+// // #[serde(untagged)]
+// pub enum Hash {
+//     String(HashString),
+//     Array(Vec<HashString>),
+// }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum BinType {
-    Single(String),
-    Multiple(Vec<String>),
-    Complex(Vec<StringOrStringArray>),
+    String(String),
+    Array(Vec<StringOrStringArray>),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -115,7 +116,8 @@ pub struct ArchitectureInner {
     pub env_add_path: Option<StringOrStringArray>,
     pub env_set: Option<Value>,
     pub extract_dir: Option<StringOrStringArray>,
-    pub hash: Option<HashType>,
+    #[serde(default, deserialize_with = "deserialize_option_hash")]
+    pub hash: Option<Hash>,
     pub installer: Option<Installer>,
     pub post_install: Option<StringOrStringArray>,
     pub pre_install: Option<StringOrStringArray>,
@@ -201,7 +203,8 @@ pub struct ManifestRaw {
     pub env_set: Option<Value>,
     pub extract_dir: Option<StringOrStringArray>,
     pub extract_to: Option<StringOrStringArray>,
-    pub hash: Option<HashType>,
+    #[serde(default, deserialize_with = "deserialize_option_hash")]
+    pub hash: Option<Hash>,
     pub homepage: Option<String>,
     pub innosetup: Option<bool>,
     pub installer: Option<Installer>,
@@ -225,6 +228,10 @@ pub struct Manifest {
     pub data: ManifestRaw,
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//  Manifest impls
+////////////////////////////////////////////////////////////////////////////////
+
 impl Manifest {
     /// Create an [`Manifest`] from the given [`PathBuf`].
     pub fn from_path<P: AsRef<Path> + ?Sized>(path: &P) -> Result<Manifest> {
@@ -233,7 +240,19 @@ impl Manifest {
         // `serde_json::from_reader`. See https://github.com/serde-rs/json/issues/160
         let mut s = String::new();
         File::open(path)?.read_to_string(&mut s)?;
-        let data = serde_json::from_str(&s)?;
+        let data = serde_json::from_str(&s);
+
+        // trace!("parsing manifest {}", path.as_ref().display());
+        if data.is_err() {
+            let err = data.unwrap_err();
+            trace!("err {} (path: {})", err, path.as_ref().display());
+            return Err(anyhow!(err));
+        }
+
+
+        let data = data.unwrap();
+        // debug!("loaded {:?}", data);
+
         let name = fs::leaf_base(path);
         let bucket = utils::extract_bucket_from(path);
         let path = path.as_ref().to_path_buf();
@@ -291,33 +310,4 @@ impl<'a> Scoop<'a> {
             }
         }
     }
-
-    // Deprecated, will be replaced by ScoopAppManifest::from_url()
-    // #[deprecated]
-    // pub fn manifest_from_url(&self, manifest_url: &str) -> Result<Value> {
-    //   // Use proxy from Scoop's config
-    //   let agent = match self.config["proxy"].clone() {
-    //     Value::String(mut proxy) => {
-    //       if !proxy.starts_with("http") {
-    //         proxy.insert_str(0, "http://");
-    //       }
-
-    //       let proxy = ureq::Proxy::new(proxy)?;
-
-    //       ureq::AgentBuilder::new()
-    //         .proxy(proxy)
-    //         .build()
-    //     },
-    //     _ => {
-    //       ureq::AgentBuilder::new()
-    //         .build()
-    //     }
-    //   };
-
-    //   let body: serde_json::Value = agent.get(manifest_url)
-    //     .call()?
-    //     .into_json()?;
-
-    //   Ok(body)
-    // }
 }

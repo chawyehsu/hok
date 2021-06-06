@@ -52,9 +52,8 @@ pub fn cmd_info(matches: &ArgMatches, scoop: &mut Scoop) {
             // Binaries
             match data.bin {
                 Some(bintype) => match bintype {
-                    BinType::Single(bin) => println!("Binary: {}", bin),
-                    BinType::Multiple(bins) => println!("Binary:\n  {}", bins.join(" ")),
-                    BinType::Complex(complex) => {
+                    BinType::String(bin) => println!("Binary: {}", bin),
+                    BinType::Array(complex) => {
                         println!("Binaries:");
 
                         let mut bins = Vec::new();
