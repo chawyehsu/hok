@@ -1,4 +1,7 @@
 # scoop-rs
+
+![[Telegram Group](https://t.me/scoop_rs)](https://img.shields.io/badge/Telegram-Group-0067B8.svg?style=flat-square&logo=telegram&color=0088cc&labelColor=282c34&longCache=true)
+
 The Scoop Windows command line installer rewritten in Rust
 
 🚧 **Under heavy development, things may change without notice. Do NOT use it for production. Take care of your data!**
