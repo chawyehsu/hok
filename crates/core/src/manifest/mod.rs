@@ -1,4 +1,5 @@
 mod hashstring;
+mod license;
 
 use anyhow::{anyhow, Result};
 use std::fs::File;
@@ -11,7 +12,7 @@ use serde_json::Value;
 use crate::fs;
 use crate::utils;
 use crate::Scoop;
-pub use hashstring::{deserialize_option_hash, Hash};
+use hashstring::{deserialize_option_hash, Hash};
 
 ////////////////////////////////////////////////////////////////////////////////
 //  Manifest Custom Types
@@ -28,13 +29,6 @@ pub enum StringOrStringArray {
     String(String),
     Array(Vec<String>),
 }
-
-// #[derive(Clone, Debug, Deserialize, Serialize)]
-// // #[serde(untagged)]
-// pub enum Hash {
-//     String(HashString),
-//     Array(Vec<HashString>),
-// }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
@@ -240,18 +234,19 @@ impl Manifest {
         // `serde_json::from_reader`. See https://github.com/serde-rs/json/issues/160
         let mut s = String::new();
         File::open(path)?.read_to_string(&mut s)?;
-        let data = serde_json::from_str(&s);
+        let manifest = serde_json::from_str(&s);
 
         // trace!("parsing manifest {}", path.as_ref().display());
-        if data.is_err() {
-            let err = data.unwrap_err();
+        if manifest.is_err() {
+            let err = manifest.unwrap_err();
             trace!("err {} (path: {})", err, path.as_ref().display());
             return Err(anyhow!(err));
         }
 
-
-        let data = data.unwrap();
+        let data: ManifestRaw = manifest.unwrap();
         // debug!("loaded {:?}", data);
+
+        // debug!("path: {}, hash: {:?}", path.as_ref().display(), data.hash.clone());
 
         let name = fs::leaf_base(path);
         let bucket = utils::extract_bucket_from(path);

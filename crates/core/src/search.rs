@@ -1,12 +1,17 @@
+use std::{
+    path::Path,
+    sync::{Arc, Mutex},
+};
+
 use crate::{
-    bucket::Bucket,
     fs::leaf_base,
     manifest::{BinType, Manifest, StringOrStringArray},
     Scoop,
 };
 use anyhow::Result;
-use futures::{executor::block_on, future::join_all};
+use rayon::prelude::*;
 
+#[derive(Clone, Debug)]
 struct SearchMatch {
     name: String,
     version: String,
@@ -18,112 +23,114 @@ struct Matches {
     collected: Vec<SearchMatch>,
 }
 
-async fn walk_manifests(
-    bucket_name: &str,
-    bucket: &Bucket,
-    query: &str,
-    with_binary: bool,
-) -> Result<Matches> {
-    let mut search_matches: Vec<SearchMatch> = Vec::new();
-
-    for app in bucket.available_manifests()?.iter() {
-        // trace!("Searching manifest {}", app.display());
-
-        let app_name = leaf_base(app);
-        // substring check on app_name
-        if app_name.contains(query) {
-            let manifest = Manifest::from_path(app);
-            if manifest.is_err() {
-                continue;
+fn try_match_bin(query: &str, input: Option<BinType>) -> Vec<String> {
+    let mut bin_matches = Vec::new();
+    match input {
+        None => {}
+        Some(bintype) => match bintype {
+            BinType::String(bin) => {
+                if bin.contains(query) {
+                    bin_matches.push(bin);
+                }
             }
-
-            let version = manifest.unwrap().data.version;
-            search_matches.push(SearchMatch {
-                name: app_name,
-                version,
-                bin: None,
-            });
-        } else {
-            // Searching binaries requires a very-high overhead (reading all json files),
-            // will not do binary search without the option.
-            if !with_binary {
-                continue;
-            }
-
-            let manifest = Manifest::from_path(app);
-            if manifest.is_err() {
-                // trace!("{:?}", manifest.err());
-                continue;
-            }
-
-            let Manifest {
-                name,
-                path: _,
-                bucket: _,
-                data,
-            } = manifest.unwrap();
-
-            let mut bin_matches = Vec::new();
-            match data.bin {
-                None => continue,
-                Some(bintype) => match bintype {
-                    BinType::String(bin) => {
+            BinType::Array(arr) => {
+                arr.into_iter().for_each(|item| match item {
+                    StringOrStringArray::String(bin) => {
                         if bin.contains(query) {
                             bin_matches.push(bin);
                         }
                     }
-                    BinType::Array(arr) => {
-                        arr.into_iter().for_each(|item| match item {
-                            StringOrStringArray::String(bin) => {
-                                if bin.contains(query) {
-                                    bin_matches.push(bin);
-                                }
-                            }
-                            StringOrStringArray::Array(pair) => {
-                                if pair[1].contains(query) {
-                                    bin_matches.push(pair[1].to_string());
-                                }
-                            }
-                        });
+                    StringOrStringArray::Array(pair) => {
+                        if pair[1].contains(query) {
+                            bin_matches.push(pair[1].to_string());
+                        }
                     }
-                },
-            }
-
-            if bin_matches.len() > 0 {
-                let version = data.version;
-                let bin = format!("'{}'", bin_matches[0].to_string());
-                search_matches.push(SearchMatch {
-                    name,
-                    version,
-                    bin: Some(bin),
                 });
             }
-        }
+        },
     }
 
-    Ok(Matches {
-        bucket: bucket_name.to_string(),
-        collected: search_matches,
-    })
+    bin_matches
+}
+
+fn travel_manifest(
+    query: &str,
+    search_bin: bool,
+    manifest_path: &Path,
+) -> Result<Option<SearchMatch>> {
+    let name = leaf_base(manifest_path);
+    // substring check on app_name
+    if name.contains(query) {
+        match Manifest::from_path(manifest_path) {
+            Ok(manifest) => {
+                let version = manifest.data.version;
+                Ok(Some(SearchMatch {
+                    name,
+                    version,
+                    bin: None,
+                }))
+            }
+            Err(e) => Err(e),
+        }
+    } else {
+        // Searching binaries requires a very-high overhead (reading all json files),
+        // will not do binary search without the option.
+        if !search_bin {
+            return Ok(None);
+        }
+
+        match Manifest::from_path(manifest_path) {
+            Ok(manifest) => {
+                let Manifest {
+                    name,
+                    path: _,
+                    bucket: _,
+                    data,
+                } = manifest;
+
+                let bin_matches = try_match_bin(query, data.bin);
+                if bin_matches.len() > 0 {
+                    let version = data.version;
+                    let bin = format!("'{}'", bin_matches[0].to_string());
+                    Ok(Some(SearchMatch {
+                        name,
+                        version,
+                        bin: Some(bin),
+                    }))
+                } else {
+                    Ok(None)
+                }
+            }
+            Err(e) => Err(e),
+        }
+    }
 }
 
 impl<'a> Scoop<'a> {
-    pub fn search(&mut self, query: &str, with_binary: bool) -> Result<()> {
+    pub fn search(&mut self, query: &str, search_bin: bool) -> Result<()> {
         // Load all local buckets
         let buckets = self.bucket_manager.get_buckets();
 
         let mut matches: Vec<Matches> = Vec::new();
-        let mut futures = Vec::new();
 
-        for (bucket_name, bucket) in buckets {
-            futures.push(walk_manifests(bucket_name, bucket, query, with_binary));
-        }
+        buckets.iter().for_each(|(bucket_name, bucket)| {
+            let manifests = bucket.available_manifests().unwrap();
+            let search_matches = Arc::new(Mutex::new(Vec::new()));
 
-        block_on(async {
-            let all_matches = join_all(futures).await;
-            for m in all_matches {
-                matches.push(m.unwrap());
-            }
+            manifests.par_iter().for_each(|manifest_path| {
+                match travel_manifest(query, search_bin, manifest_path).unwrap() {
+                    Some(sm) => search_matches.lock().unwrap().push(sm),
+                    None => {}
+                }
+            });
+
+            let mut collected = search_matches.lock().unwrap().to_vec();
+            collected.sort_by_key(|s| s.name.to_string());
+
+            matches.push(Matches {
+                bucket: bucket_name.to_string(),
+                collected,
+            });
         });
 
         matches.sort_by_key(|k| k.bucket.to_string());

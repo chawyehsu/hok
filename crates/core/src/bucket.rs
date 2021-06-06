@@ -161,7 +161,7 @@ impl BucketManager {
             .collect::<Vec<_>>();
 
         for entry in entries {
-            trace!("Loaded local bucket {} to BucketManger", entry.0);
+            // trace!("Loaded local bucket {} to BucketManger", entry.0);
             self.buckets.insert(entry.0, entry.1);
         }
     }
