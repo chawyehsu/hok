@@ -12,10 +12,10 @@ pub fn cmd_search(matches: &ArgMatches, scoop: &mut Scoop) {
                 println!("'{}' bucket:", m.bucket);
                 for sm in m.collected {
                     if sm.bin.is_none() {
-                        println!("  {} ({})", sm.name, sm.version);
+                        println!("    {} ({})", sm.name, sm.version);
                     } else {
                         println!(
-                            "  {} ({}) --> includes {}",
+                            "    {} ({}) --> includes {}",
                             sm.name,
                             sm.version,
                             sm.bin.unwrap()

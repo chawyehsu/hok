@@ -2,6 +2,7 @@ mod hashstring;
 mod license;
 
 use anyhow::{anyhow, Result};
+use serde_json::Map;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -108,7 +109,7 @@ pub struct ArchitectureInner {
     pub bin: Option<BinType>,
     pub checkver: Option<CheckverType>,
     pub env_add_path: Option<StringOrStringArray>,
-    pub env_set: Option<Value>,
+    pub env_set: Option<Map<String, Value>>,
     pub extract_dir: Option<StringOrStringArray>,
     #[serde(default, deserialize_with = "deserialize_option_hash")]
     pub hash: Option<Hash>,
@@ -194,7 +195,7 @@ pub struct ManifestRaw {
     pub depends: Option<StringOrStringArray>,
     pub description: Option<String>,
     pub env_add_path: Option<StringOrStringArray>,
-    pub env_set: Option<Value>,
+    pub env_set: Option<Map<String, Value>>,
     pub extract_dir: Option<StringOrStringArray>,
     pub extract_to: Option<StringOrStringArray>,
     #[serde(default, deserialize_with = "deserialize_option_hash")]
@@ -227,14 +228,19 @@ pub struct Manifest {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Manifest {
-    /// Create an [`Manifest`] from the given [`PathBuf`].
     pub fn from_path<P: AsRef<Path> + ?Sized>(path: &P) -> Result<Manifest> {
         // We read the entire manifest json file into memory first and then
         // deserialize it, as this is *a lot* faster than reading via the
         // `serde_json::from_reader`. See https://github.com/serde-rs/json/issues/160
-        let mut s = String::new();
-        File::open(path)?.read_to_string(&mut s)?;
-        let manifest = serde_json::from_str(&s);
+        //
+        // Reading manifest json file is a bottleneck of the whole scoop-rs
+        // project. We use `serde_json` because it's well documented and easy
+        // to integrate. But I believe there should be an alternative to
+        // `serde_json` which can parse json file much *faster*, perhaps
+        // `simd_json` can be. See https://github.com/serde-rs/json-benchmark
+        let mut bytes = Vec::new();
+        File::open(path)?.read_to_end(&mut bytes)?;
+        let manifest = serde_json::from_slice(&bytes);
 
         // trace!("parsing manifest {}", path.as_ref().display());
         if manifest.is_err() {
@@ -244,8 +250,6 @@ impl Manifest {
         }
 
         let data: ManifestRaw = manifest.unwrap();
-        // debug!("loaded {:?}", data);
-
         // debug!("path: {}, hash: {:?}", path.as_ref().display(), data.hash.clone());
 
         let name = fs::leaf_base(path);
