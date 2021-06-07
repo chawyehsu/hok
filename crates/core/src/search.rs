@@ -94,6 +94,7 @@ fn travel_manifest(
 
                 let bin_match = try_match_bin(query, data.bin);
                 if bin_match.is_some() {
+                    let name = name;
                     let version = data.version;
                     let bin = format!("'{}'", bin_match.unwrap());
                     Ok(Some(SearchMatch {

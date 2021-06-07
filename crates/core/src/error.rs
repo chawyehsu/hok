@@ -13,6 +13,7 @@ pub struct Error(ErrorKind);
 pub enum ErrorKind {
     Io(io::Error),
     SerdeJson(serde_json::Error),
+    Reqwest(reqwest::Error),
     /// Hints that destructuring should not be exhaustive.
     ///
     /// This enum may grow additional variants, so this makes sure clients
@@ -39,5 +40,11 @@ impl From<io::Error> for Error {
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {
         Error(ErrorKind::SerdeJson(err))
+    }
+}
+
+impl From<reqwest::Error> for Error {
+    fn from(err: reqwest::Error) -> Self {
+        Error(ErrorKind::Reqwest(err))
     }
 }

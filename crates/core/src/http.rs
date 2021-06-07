@@ -1,24 +1,27 @@
 use crate::config::Config;
-use reqwest::{Client as ReqwestClient, IntoUrl, Method, Proxy, RequestBuilder, Result};
+use reqwest::{
+    blocking::{Client as ReqwestBlockingClient, RequestBuilder},
+    IntoUrl, Method, Proxy, Result,
+};
 
 static SCOOP_USER_AGENT: &str = "Scoop/0.1.0 (Rust)";
 
 #[derive(Debug)]
 pub struct Client {
-    inner: ReqwestClient,
+    inner: ReqwestBlockingClient,
 }
 
 impl Client {
     pub fn new(config: &Config) -> Result<Self> {
         let proxy = config.proxy.clone();
-        let mut builder = ReqwestClient::builder().user_agent(SCOOP_USER_AGENT);
+        let mut blocking_client = ReqwestBlockingClient::builder().user_agent(SCOOP_USER_AGENT);
         // Add proxy
         if proxy.is_some() {
-            builder = builder.proxy(Proxy::all(proxy.unwrap().as_str())?)
+            blocking_client = blocking_client.proxy(Proxy::all(proxy.unwrap().as_str())?)
         }
 
         Ok(Client {
-            inner: builder.build()?,
+            inner: blocking_client.build()?,
         })
     }
 

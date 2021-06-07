@@ -5,7 +5,8 @@ use crate::{
 use anyhow::Result;
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::result;
 
 static KNOWN_BUCKETS: Lazy<Vec<(&str, &str)>> = Lazy::new(|| {
     vec![
@@ -126,63 +127,54 @@ impl Bucket {
 impl BucketManager {
     /// Create a new [`BucketManager`] from the given Scoop [`Config`]
     pub fn new(working_dir: PathBuf) -> BucketManager {
-        let buckets = IndexMap::new();
-
+        let buckets = Self::travel_buckets(working_dir.as_path());
         BucketManager {
             working_dir,
             buckets,
         }
     }
 
-    fn refresh_buckets(&mut self) {
-        // Empty old buckets
-        self.buckets = IndexMap::new();
-        // Ensure `buckets` dir
-        crate::fs::ensure_dir(&self.working_dir).unwrap();
-
-        let entries = (&self.working_dir)
-            .read_dir()
-            .unwrap()
-            .filter_map(Result::ok)
-            .filter(|de| de.file_type().unwrap().is_dir())
-            .map(|de| {
-                let path = de.path();
-                let name = leaf(path.as_path());
-                let toplevel_manifest = !path.join("bucket").exists();
-                (
-                    name.clone(),
-                    Bucket {
-                        name,
-                        path,
-                        toplevel_manifest,
-                    },
-                )
-            })
-            .collect::<Vec<_>>();
-
-        for entry in entries {
-            // trace!("Loaded local bucket {} to BucketManger", entry.0);
-            self.buckets.insert(entry.0, entry.1);
+    fn travel_buckets(working_dir: &Path) -> Buckets {
+        let mut buckets = IndexMap::new();
+        if working_dir.exists() {
+            working_dir
+                .read_dir()
+                .unwrap()
+                .filter_map(result::Result::ok)
+                .filter(|entry| entry.file_type().unwrap().is_dir())
+                .for_each(|de| {
+                    let path = de.path();
+                    let name = leaf(path.as_path());
+                    let toplevel_manifest = !path.join("bucket").exists();
+                    buckets.insert(
+                        name.clone(),
+                        Bucket {
+                            name,
+                            path,
+                            toplevel_manifest,
+                        },
+                    );
+                });
         }
+        buckets
+    }
+
+    pub fn refresh_buckets(&mut self) {
+        self.buckets = Self::travel_buckets(self.working_dir.as_path());
     }
 
     /// Get all local buckets.
-    pub fn get_buckets(&mut self) -> &Buckets {
-        // Trigger buckets collection for first access.
-        if 0 == self.buckets.len() {
-            self.refresh_buckets();
-        }
-
+    pub fn get_buckets(&self) -> &Buckets {
         &self.buckets
     }
 
     /// Find local bucket with the given name.
-    pub fn get_bucket<S: AsRef<str>>(&mut self, name: S) -> Option<&Bucket> {
+    pub fn get_bucket<S: AsRef<str>>(&self, name: S) -> Option<&Bucket> {
         self.get_buckets().get(name.as_ref())
     }
 
     /// Check if the bucket with the given name is a local bucket.
-    pub fn contains<S: AsRef<str>>(&mut self, name: S) -> bool {
+    pub fn contains<S: AsRef<str>>(&self, name: S) -> bool {
         self.get_buckets().contains_key(name.as_ref())
     }
 

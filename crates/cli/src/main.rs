@@ -25,10 +25,11 @@ fn main() -> Result<()> {
         ("install", Some(_matches)) => unimplemented!(),
         ("list", Some(matches)) => cmd::cmd_list(matches, &mut scoop),
         ("search", Some(matches)) => cmd::cmd_search(matches, &mut scoop),
-        ("status", Some(_matches)) => unimplemented!(),
+        ("status", Some(matches)) => cmd::cmd_status(matches, &mut scoop),
         ("unhold", Some(matches)) => cmd::cmd_unhold(matches, &mut scoop),
         ("uninstall", Some(_matches)) => unimplemented!(),
         ("update", Some(matches)) => cmd::cmd_update(matches, &mut scoop),
+        ("upgrade", Some(_matches)) => unimplemented!(),
         ("which", Some(_matches)) => unimplemented!(),
         _ => unreachable!(),
     }
@@ -180,21 +181,6 @@ fn build_app() -> App<'static, 'static> {
                 .about("Opens the app homepage")
                 .arg(Arg::with_name("app").help("The app name").required(true)),
         )
-        .subcommand(
-            SubCommand::with_name("search")
-                .about("Searches for apps that are available to install")
-                .arg(
-                    Arg::with_name("query")
-                        .help("The query string, precision searching by default")
-                        .required(true),
-                )
-                .arg(
-                    Arg::with_name("binary")
-                        .help("Enable search on manifest 'bin' property")
-                        .short("b")
-                        .long("with-binary"),
-                ),
-        )
         .subcommand(SubCommand::with_name("update").about("Fetch and update all buckets"))
         .subcommand(
             SubCommand::with_name("info")
@@ -217,12 +203,6 @@ fn build_app() -> App<'static, 'static> {
                         .multiple(true),
                 )
                 .arg(
-                    Arg::with_name("global")
-                        .help("Install the app globally")
-                        .short("g")
-                        .long("global"),
-                )
-                .arg(
                     Arg::with_name("nocache")
                         .help("Don't use the download cache")
                         .short("k")
@@ -236,6 +216,24 @@ fn build_app() -> App<'static, 'static> {
                 ),
         )
         .subcommand(SubCommand::with_name("list").about("List installed apps"))
+        .subcommand(
+            SubCommand::with_name("search")
+                .about("Searches for apps that are available to install")
+                .arg(
+                    Arg::with_name("query")
+                        .help("The query string, precision searching by default")
+                        .required(true),
+                )
+                .arg(
+                    Arg::with_name("binary")
+                        .help("Enable search on manifest 'bin' property")
+                        .short("b")
+                        .long("with-binary"),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("status").about("Show status and check for new app versions"),
+        )
         .subcommand(
             SubCommand::with_name("unhold")
                 .about("Unhold an app to enable updates")

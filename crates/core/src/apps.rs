@@ -119,19 +119,19 @@ impl App {
         serde_json::to_writer_pretty(file, data).unwrap();
     }
 
+    /// Get all installed versions of this app.
     fn installed_versions(&self) -> Vec<String> {
-        let err = format!(
-            "failed to read directory '{}'",
-            self.path.as_path().display()
-        );
-        let entries = self.path.as_path().read_dir().expect(err.as_str());
-
-        let mut versions: Vec<String> = entries
-            .map(|x| x.unwrap())
-            .filter(|x| {
-                x.metadata().unwrap().is_dir() && x.file_name().to_str().unwrap() != "current"
+        let mut versions: Vec<String> = self
+            .path
+            .as_path()
+            .read_dir()
+            .unwrap()
+            .map(|i| i.unwrap())
+            .filter(|entry| {
+                entry.file_type().unwrap().is_dir()
+                    && entry.file_name().to_str().unwrap() != "current"
             })
-            .map(|y| y.file_name().into_string().unwrap())
+            .map(|entry| entry.file_name().into_string().unwrap())
             .collect();
 
         if versions.len() > 1 {

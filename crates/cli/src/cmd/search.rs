@@ -1,8 +1,6 @@
 use clap::ArgMatches;
 
-use crate::Scoop;
-
-pub fn cmd_search(matches: &ArgMatches, scoop: &mut Scoop) {
+pub fn cmd_search(matches: &ArgMatches, scoop: &mut scoop_core::Scoop) {
     if let Some(query) = matches.value_of("query") {
         let search_bin = matches.is_present("binary");
         let matches = scoop.search(query, search_bin).unwrap();

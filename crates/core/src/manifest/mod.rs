@@ -1,7 +1,7 @@
 mod hashstring;
 mod license;
 
-use anyhow::Result;
+use reqwest::IntoUrl;
 use serde_json::Map;
 use std::fs::File;
 use std::io::Read;
@@ -10,8 +10,8 @@ use std::path::PathBuf;
 
 use serde_json::Value;
 
-use crate::error;
-use crate::fs;
+use crate::error::{self, Result};
+use crate::fs::leaf_base;
 use crate::utils;
 use crate::Scoop;
 use hashstring::{deserialize_option_hash, Hash};
@@ -229,7 +229,7 @@ pub struct Manifest {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Manifest {
-    pub fn from_path<P: AsRef<Path> + ?Sized>(path: &P) -> error::Result<Manifest> {
+    pub fn from_path<P: AsRef<Path> + ?Sized>(path: &P) -> Result<Manifest> {
         // We read the entire manifest json file into memory first and then
         // deserialize it, as this is *a lot* faster than reading via the
         // `serde_json::from_reader`. See https://github.com/serde-rs/json/issues/160
@@ -245,7 +245,7 @@ impl Manifest {
 
         let data: ManifestRaw = manifest?;
 
-        let name = fs::leaf_base(path);
+        let name = leaf_base(path);
         let bucket = utils::extract_bucket_from(path);
         let path = path.as_ref().to_path_buf();
 
@@ -257,20 +257,34 @@ impl Manifest {
         })
     }
 
-    pub fn from_url<T: AsRef<str>>(_url: T) -> Result<Manifest> {
-        todo!()
+    pub fn from_url<U: IntoUrl>(url: U, scoop: &Scoop) -> Result<Manifest> {
+        let resp = scoop.http.get(url.as_str()).send();
+        match resp {
+            Ok(res) => {
+                let path = PathBuf::from(url.as_str());
+                let name = leaf_base(path.as_path());
+                let raw = res.json().unwrap();
+                Ok(Manifest {
+                    name,
+                    bucket: None,
+                    path,
+                    data: raw,
+                })
+            }
+            Err(e) => Err(error::Error::from(e)),
+        }
     }
 }
 
 impl<'a> Scoop<'a> {
-    /// Find and return local manifest represented as [`ScoopAppManifest`],
-    /// using given `pattern`.
+    /// Find and return local manifest represented as [`Manifest`], using given
+    /// `pattern`.
     ///
     /// bucket name prefix is support, for example:
     /// ```
-    /// find_local_manifest("main/gcc")
+    /// let manifest = find_local_manifest("main/gcc");
     /// ```
-    pub fn find_local_manifest<T: AsRef<str>>(&mut self, pattern: T) -> Result<Option<Manifest>> {
+    pub fn find_local_manifest<T: AsRef<str>>(&self, pattern: T) -> Result<Option<Manifest>> {
         // Detect given pattern whether having bucket name prefix
         let (bucket_name, app_name) = match pattern.as_ref().contains("/") {
             true => {
@@ -290,11 +304,10 @@ impl<'a> Scoop<'a> {
                 }
             }
             None => {
-                for bucket in self.bucket_manager.get_buckets() {
-                    let manifest_path = bucket.1.manifest_dir().join(format!("{}.json", app_name));
-                    match manifest_path.exists() {
-                        true => return Ok(Some(Manifest::from_path(&manifest_path)?)),
-                        false => {}
+                for (_, bucket) in self.bucket_manager.get_buckets() {
+                    let manifest_path = bucket.manifest_dir().join(format!("{}.json", app_name));
+                    if manifest_path.exists() {
+                        return Ok(Some(Manifest::from_path(&manifest_path)?));
                     }
                 }
 
