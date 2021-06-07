@@ -17,10 +17,10 @@ The Scoop Windows command line installer rewritten in Rust
 - [x] config management (config)
 - [x] manifest manipulation (home/info)
 - [x] search functionality (search)
-- [ ] app management (list/install/uninstall/update/cleanup/reset/hold/unhold)
 - [x] status subcommand (status)
+- [ ] app management (list/install/uninstall/update/upgrade/cleanup/hold/unhold)
 - [ ] shimming feature
-- [ ] other subcommands (checkup/prefix/which/virustotal/etc.)
+- [ ] other subcommands (checkup/prefix/reset/which/virustotal/etc.)
 
 ## Development
 
