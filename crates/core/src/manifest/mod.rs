@@ -1,7 +1,7 @@
 mod hashstring;
 mod license;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use serde_json::Map;
 use std::fs::File;
 use std::io::Read;
@@ -10,6 +10,7 @@ use std::path::PathBuf;
 
 use serde_json::Value;
 
+use crate::error;
 use crate::fs;
 use crate::utils;
 use crate::Scoop;
@@ -228,7 +229,7 @@ pub struct Manifest {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Manifest {
-    pub fn from_path<P: AsRef<Path> + ?Sized>(path: &P) -> Result<Manifest> {
+    pub fn from_path<P: AsRef<Path> + ?Sized>(path: &P) -> error::Result<Manifest> {
         // We read the entire manifest json file into memory first and then
         // deserialize it, as this is *a lot* faster than reading via the
         // `serde_json::from_reader`. See https://github.com/serde-rs/json/issues/160
@@ -242,15 +243,7 @@ impl Manifest {
         File::open(path)?.read_to_end(&mut bytes)?;
         let manifest = serde_json::from_slice(&bytes);
 
-        // trace!("parsing manifest {}", path.as_ref().display());
-        if manifest.is_err() {
-            let err = manifest.unwrap_err();
-            trace!("err {} (path: {})", err, path.as_ref().display());
-            return Err(anyhow!(err));
-        }
-
-        let data: ManifestRaw = manifest.unwrap();
-        // debug!("path: {}, hash: {:?}", path.as_ref().display(), data.hash.clone());
+        let data: ManifestRaw = manifest?;
 
         let name = fs::leaf_base(path);
         let bucket = utils::extract_bucket_from(path);

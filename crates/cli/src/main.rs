@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{crate_description, crate_name, crate_version, App, AppSettings, Arg, SubCommand};
 use env_logger::Env;
-use scoop_core::{config::Config, Scoop};
+use scoop_core::{Config, Scoop};
 
 mod cmd;
 

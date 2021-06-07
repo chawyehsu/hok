@@ -3,18 +3,18 @@ extern crate log;
 #[macro_use]
 extern crate serde;
 
-pub mod apps;
+mod apps;
 pub mod bucket;
-pub mod cache;
-pub mod config;
-pub mod error;
+mod cache;
+mod config;
+mod error;
 pub mod fs;
-pub mod git;
-pub mod http;
+mod git;
+mod http;
 pub mod manifest;
-pub mod persist;
-pub mod search;
-pub mod spdx;
+mod persist;
+mod search;
+mod spdx;
 pub mod sys;
 pub mod utils;
 
@@ -23,7 +23,8 @@ use std::path::PathBuf;
 use apps::AppManager;
 use bucket::BucketManager;
 use cache::CacheManager;
-use config::Config;
+pub use config::Config;
+pub use error::{Error, Result};
 use git::GitTool;
 use http::Client;
 

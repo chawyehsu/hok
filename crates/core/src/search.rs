@@ -1,7 +1,13 @@
-use std::{path::{Path, PathBuf}, sync::{Arc, Mutex}};
+use std::{
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+};
 
-use crate::{Scoop, fs::{leaf, leaf_base}, manifest::{BinType, Manifest, StringOrStringArray}};
-use anyhow::Result;
+use crate::{
+    fs::{leaf, leaf_base},
+    manifest::{BinType, Manifest, StringOrStringArray},
+    Result, Scoop,
+};
 use rayon::prelude::*;
 
 #[derive(Clone, Debug)]
@@ -19,14 +25,14 @@ pub struct Matches {
 
 fn try_match_bin(query: &str, input: Option<BinType>) -> Option<String> {
     match input {
-        None => {},
+        None => {}
         Some(bintype) => match bintype {
             BinType::String(bin) => {
                 let bin = leaf(PathBuf::from(bin).as_path());
                 if bin.contains(query) {
                     return Some(bin);
                 }
-            },
+            }
             BinType::Array(arr) => {
                 for item in arr.into_iter() {
                     match item {
@@ -35,17 +41,17 @@ fn try_match_bin(query: &str, input: Option<BinType>) -> Option<String> {
                             if bin.contains(query) {
                                 return Some(bin);
                             }
-                        },
+                        }
                         StringOrStringArray::Array(pair) => {
                             let bin = leaf(PathBuf::from(pair[1].to_string()).as_path());
                             if bin.contains(query) {
                                 return Some(bin);
                             }
-                        },
+                        }
                     }
                 }
-            },
-        }
+            }
+        },
     }
 
     None
