@@ -1,8 +1,11 @@
-use crate::fs;
+use crate::fs::leaf;
 use crate::utils::compare_versions;
-use anyhow::Result;
+use crate::Result;
 use serde::Deserialize;
-use std::fs::DirEntry;
+use std::fs::OpenOptions;
+use std::fs::{DirEntry, File};
+use std::io::Read;
+use std::path::Path;
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -16,17 +19,36 @@ pub struct AppManager {
     working_dir: PathBuf,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct InstallInfo {
     pub architecture: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bucket: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
-    pub hold: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hold: Option<bool>,
+}
+
+impl InstallInfo {
+    pub fn hold(&mut self) -> &Self {
+        self.hold = Some(true);
+        self
+    }
+
+    pub fn unhold(&mut self) -> &Self {
+        self.hold = None;
+        self
+    }
+
+    pub fn is_hold(&self) -> bool {
+        self.hold == Some(true)
+    }
 }
 
 impl App {
     pub fn new(path: PathBuf) -> App {
-        let name = fs::leaf(path.as_path()).to_string();
+        let name = leaf(path.as_path()).to_string();
         App { name, path }
     }
 
@@ -54,16 +76,47 @@ impl App {
     }
 
     pub fn current_install_info(&self) -> Result<InstallInfo> {
-        let file =
-            std::fs::File::open(self.path.join(self.current_version()).join("install.json"))?;
-
-        Ok(serde_json::from_reader(file)?)
+        self.install_info_of(self.current_version())
     }
 
     pub fn install_info_of<S: AsRef<str>>(&self, version: S) -> Result<InstallInfo> {
-        let file = std::fs::File::open(self.path.join(version.as_ref()).join("install.json"))?;
+        let path = self.path.join(version.as_ref()).join("install.json");
 
-        Ok(serde_json::from_reader(file)?)
+        let mut bytes = Vec::new();
+        File::open(path)?.read_to_end(&mut bytes)?;
+        Ok(serde_json::from_slice(&bytes)?)
+    }
+
+    pub fn hold(&self) -> Result<()> {
+        let version = self.current_version();
+        let path = self.path.join(version.as_str()).join("install.json");
+        let mut cur_info = self.install_info_of(version.as_str())?;
+        cur_info.hold();
+        self.update_install_info(&path, &cur_info);
+        Ok(())
+    }
+
+    pub fn unhold(&self) -> Result<()> {
+        let version = self.current_version();
+        let path = self.path.join(version.as_str()).join("install.json");
+        let mut cur_info = self.install_info_of(version.as_str())?;
+        cur_info.unhold();
+        self.update_install_info(&path, &cur_info);
+        Ok(())
+    }
+
+    fn update_install_info<P>(&self, path: &P, data: &InstallInfo)
+    where
+        P: AsRef<Path> + ?Sized,
+    {
+        let file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)
+            .unwrap();
+
+        serde_json::to_writer_pretty(file, data).unwrap();
     }
 
     fn installed_versions(&self) -> Vec<String> {
@@ -74,7 +127,7 @@ impl App {
         let entries = self.path.as_path().read_dir().expect(err.as_str());
 
         let mut versions: Vec<String> = entries
-            .filter_map(Result::ok)
+            .map(|x| x.unwrap())
             .filter(|x| {
                 x.metadata().unwrap().is_dir() && x.file_name().to_str().unwrap() != "current"
             })
@@ -134,7 +187,7 @@ impl AppManager {
 
     pub fn get_app<S: AsRef<str>>(&self, name: S) -> App {
         let path = self.working_dir.as_path().join(name.as_ref());
-        let name = fs::leaf(path.as_path());
+        let name = leaf(path.as_path());
         App { path, name }
     }
 
@@ -143,7 +196,7 @@ impl AppManager {
             .into_iter()
             .map(|entry| {
                 let path = entry.path();
-                let name = fs::leaf(path.as_path());
+                let name = leaf(path.as_path());
                 App { path, name }
             })
             .collect::<Vec<_>>()
@@ -152,7 +205,7 @@ impl AppManager {
     pub fn outdated_app<S: AsRef<str>>(&self, name: S) -> Option<Vec<PathBuf>> {
         if self.is_app_installed(name.as_ref()) {
             let path = self.working_dir.as_path().join(name.as_ref());
-            let name = fs::leaf(path.as_path());
+            let name = leaf(path.as_path());
             let app = App { path, name };
             return Some(app.outdated_versions());
         }
@@ -174,17 +227,18 @@ impl AppManager {
     // }
 
     fn entries(&self) -> Vec<DirEntry> {
-        let err = format!(
-            "failed to read directory '{}'",
-            self.working_dir.as_path().display()
-        );
-        let entries = self.working_dir.as_path().read_dir().expect(err.as_str());
-
-        entries
-            .filter_map(Result::ok)
-            .filter(|x| {
-                x.metadata().unwrap().is_dir() && x.file_name().to_str().unwrap() != "scoop"
-            })
-            .collect::<Vec<_>>()
+        match self.working_dir.as_path().exists() {
+            false => vec![], // Return empty vec if `working_dir` is not created.
+            true => self
+                .working_dir
+                .as_path()
+                .read_dir()
+                .unwrap()
+                .map(|x| x.unwrap())
+                .filter(|de| {
+                    de.file_type().unwrap().is_dir() && de.file_name().to_str().unwrap() != "scoop"
+                })
+                .collect::<Vec<_>>(),
+        }
     }
 }

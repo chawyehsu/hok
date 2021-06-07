@@ -27,7 +27,7 @@ pub fn cmd_list(_matches: &ArgMatches, scoop: &mut Scoop) {
                 }
                 // hold
                 let install_info = install_info.unwrap();
-                if install_info.hold.is_some() {
+                if install_info.is_hold() {
                     print!(" *hold*");
                 }
                 // bucket

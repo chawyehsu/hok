@@ -19,14 +19,14 @@ pub fn empty_dir<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
 }
 
 /// Read all JSON files in given `path` directory.
-pub fn read_dir_json<P>(path: &P) -> io::Result<Vec<PathBuf>>
+pub fn walk_dir_json<P>(path: &P) -> io::Result<Vec<PathBuf>>
 where
     P: AsRef<Path> + ?Sized,
 {
     Ok(path
         .as_ref()
         .read_dir()?
-        .filter_map(Result::ok)
+        .filter_map(io::Result::ok)
         .filter(|entry| {
             let path = entry.path();
             let name = path.file_name().unwrap().to_str().unwrap();

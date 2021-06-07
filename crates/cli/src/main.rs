@@ -38,7 +38,7 @@ fn main() -> Result<()> {
 
 fn create_logger() {
     let env = Env::default()
-        .filter_or("SCOOP_LOG_LEVEL", "trace")
+        .filter_or("SCOOP_LOG_LEVEL", "error")
         .write_style("never");
 
     env_logger::init_from_env(env);
@@ -235,7 +235,12 @@ fn build_app() -> App<'static, 'static> {
                         .long("skip"),
                 ),
         )
-        .subcommand(SubCommand::with_name("list").about("List installed apps"));
+        .subcommand(SubCommand::with_name("list").about("List installed apps"))
+        .subcommand(
+            SubCommand::with_name("unhold")
+                .about("Unhold an app to enable updates")
+                .arg(Arg::with_name("app").help("The app name").required(true)),
+        );
 
     app
 }

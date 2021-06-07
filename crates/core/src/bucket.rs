@@ -1,5 +1,5 @@
 use crate::{
-    fs::{leaf, leaf_base, read_dir_json},
+    fs::{leaf, leaf_base, walk_dir_json},
     utils,
 };
 use anyhow::Result;
@@ -101,7 +101,7 @@ impl Bucket {
 
     /// Get all available apps' name in this bucket.
     pub fn available_apps(&self) -> Result<Vec<String>> {
-        Ok(read_dir_json(&self.manifest_dir())?
+        Ok(walk_dir_json(&self.manifest_dir())?
             .into_iter()
             .map(|path| leaf_base(path.as_path()))
             .collect::<Vec<_>>())
@@ -109,7 +109,7 @@ impl Bucket {
 
     /// Get all available apps' manifest [`PathBuf`] in this bucket.
     pub fn available_manifests(&self) -> Result<Vec<PathBuf>> {
-        Ok(read_dir_json(&self.manifest_dir())?)
+        Ok(walk_dir_json(&self.manifest_dir())?)
     }
 
     /// Check if this bucket is a known bucket.

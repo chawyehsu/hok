@@ -102,13 +102,13 @@ impl Config {
             Err(err) => {
                 if err.kind() == io::ErrorKind::NotFound {
                     warn!(
-                        "Default Scoop config file {} not found, {}",
+                        "default Scoop config file {} not found, {}",
                         default.display(),
                         "trying to init new one."
                     );
                 } else {
                     error!(
-                        "Failed read default config file {} (err: {}), {}",
+                        "failed read default config file {} (err: {}), {}",
                         default.display(),
                         err,
                         "fallback to init new one."

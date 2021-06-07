@@ -20,13 +20,15 @@ pub mod utils;
 
 use std::path::PathBuf;
 
-use apps::AppManager;
-use bucket::BucketManager;
-use cache::CacheManager;
+pub use apps::AppManager;
+pub use bucket::BucketManager;
+pub use cache::CacheManager;
 pub use config::Config;
 pub use error::{Error, Result};
 use git::GitTool;
 use http::Client;
+pub use persist::PersistManager;
+pub use spdx::SPDX;
 
 #[derive(Debug)]
 pub struct Scoop<'a> {
