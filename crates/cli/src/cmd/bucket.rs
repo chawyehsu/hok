@@ -1,7 +1,5 @@
 use clap::ArgMatches;
-
-use scoop_core::bucket;
-use scoop_core::Scoop;
+use scoop_core::{is_known_bucket, known_bucket_url, known_buckets, Scoop};
 
 pub fn cmd_bucket(matches: &ArgMatches, scoop: &mut Scoop) {
     match matches.subcommand() {
@@ -13,8 +11,8 @@ pub fn cmd_bucket(matches: &ArgMatches, scoop: &mut Scoop) {
                 std::process::exit(1);
             }
 
-            if bucket::is_known_bucket(bucket_name) {
-                let bucket_url = bucket::known_bucket_url(bucket_name).unwrap();
+            if is_known_bucket(bucket_name) {
+                let bucket_url = known_bucket_url(bucket_name).unwrap();
                 scoop.git.clone(bucket_name, bucket_url).unwrap();
             } else {
                 match matches.value_of("repo") {
@@ -34,7 +32,7 @@ pub fn cmd_bucket(matches: &ArgMatches, scoop: &mut Scoop) {
             }
         }
         ("known", Some(_)) => {
-            for b in bucket::known_buckets() {
+            for b in known_buckets() {
                 println!("{}", b);
             }
         }
@@ -42,7 +40,7 @@ pub fn cmd_bucket(matches: &ArgMatches, scoop: &mut Scoop) {
             let bucket_name = matches.value_of("name").unwrap();
 
             if scoop.bucket_manager.contains(bucket_name) {
-                let bucket_dir = scoop.dir("buckets").join(bucket_name);
+                let bucket_dir = scoop.config.root_path.join("buckets").join(bucket_name);
                 if bucket_dir.exists() {
                     match remove_dir_all::remove_dir_all(bucket_dir) {
                         Ok(()) => {}

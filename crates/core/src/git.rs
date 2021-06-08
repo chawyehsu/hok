@@ -1,4 +1,7 @@
-use crate::{config::Config, error::{Error, ErrorKind, Result}};
+use crate::{
+    config::Config,
+    error::{Error, ErrorKind, Result},
+};
 use git2::{ProxyOptions, Repository};
 use std::{io::Write, path::Path, result};
 
@@ -81,7 +84,7 @@ impl GitTool {
             }
             Err(_e) => {
                 let msg = format!("Failed to clone repo {} as bucket.", remote_url.as_ref());
-                return Err(Error(ErrorKind::Custom(msg)))
+                return Err(Error(ErrorKind::Custom(msg)));
             }
         }
     }

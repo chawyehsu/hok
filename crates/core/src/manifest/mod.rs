@@ -1,5 +1,6 @@
 mod hashstring;
 mod license;
+mod url;
 
 use reqwest::IntoUrl;
 use serde_json::Map;
@@ -272,47 +273,6 @@ impl Manifest {
                 })
             }
             Err(e) => Err(error::Error::from(e)),
-        }
-    }
-}
-
-impl<'a> Scoop<'a> {
-    /// Find and return local manifest represented as [`Manifest`], using given
-    /// `pattern`.
-    ///
-    /// bucket name prefix is support, for example:
-    /// ```
-    /// let manifest = find_local_manifest("main/gcc");
-    /// ```
-    pub fn find_local_manifest<T: AsRef<str>>(&self, pattern: T) -> Result<Option<Manifest>> {
-        // Detect given pattern whether having bucket name prefix
-        let (bucket_name, app_name) = match pattern.as_ref().contains("/") {
-            true => {
-                let (a, b) = pattern.as_ref().split_once("/").unwrap();
-                (Some(a), b)
-            }
-            false => (None, pattern.as_ref()),
-        };
-
-        match bucket_name {
-            Some(bucket_name) => {
-                let bucket = self.bucket_manager.get_bucket(bucket_name).unwrap();
-                let manifest_path = bucket.manifest_dir().join(format!("{}.json", app_name));
-                match manifest_path.exists() {
-                    true => Ok(Some(Manifest::from_path(&manifest_path)?)),
-                    false => Ok(None),
-                }
-            }
-            None => {
-                for (_, bucket) in self.bucket_manager.get_buckets() {
-                    let manifest_path = bucket.manifest_dir().join(format!("{}.json", app_name));
-                    if manifest_path.exists() {
-                        return Ok(Some(Manifest::from_path(&manifest_path)?));
-                    }
-                }
-
-                Ok(None)
-            }
         }
     }
 }

@@ -1,14 +1,10 @@
-use std::{
-    path::{Path, PathBuf},
-    sync::{Arc, Mutex},
-};
+use std::path::{Path, PathBuf};
 
 use crate::{
     fs::{leaf, leaf_base},
     manifest::{BinType, Manifest, StringOrStringArray},
-    Result, Scoop,
+    Result,
 };
-use rayon::prelude::*;
 
 #[derive(Clone, Debug)]
 pub struct SearchMatch {
@@ -57,7 +53,7 @@ fn try_match_bin(query: &str, input: Option<BinType>) -> Option<String> {
     None
 }
 
-fn travel_manifest(
+pub(crate) fn travel_manifest(
     query: &str,
     search_bin: bool,
     manifest_path: &Path,
@@ -108,38 +104,5 @@ fn travel_manifest(
             }
             Err(e) => Err(e),
         }
-    }
-}
-
-impl<'a> Scoop<'a> {
-    pub fn search(&mut self, query: &str, search_bin: bool) -> Result<Vec<Matches>> {
-        // Load all local buckets
-        let buckets = self.bucket_manager.get_buckets();
-
-        let mut matches: Vec<Matches> = Vec::new();
-
-        buckets.iter().for_each(|(bucket_name, bucket)| {
-            let manifests = bucket.available_manifests().unwrap();
-            let search_matches = Arc::new(Mutex::new(Vec::new()));
-
-            manifests.par_iter().for_each(|manifest_path| {
-                match travel_manifest(query, search_bin, manifest_path).unwrap() {
-                    Some(sm) => search_matches.lock().unwrap().push(sm),
-                    None => {}
-                }
-            });
-
-            let mut collected = search_matches.lock().unwrap().to_vec();
-            collected.sort_by_key(|s| s.name.to_string());
-
-            matches.push(Matches {
-                bucket: bucket_name.to_string(),
-                collected,
-            });
-        });
-
-        matches.sort_by_key(|k| k.bucket.to_string());
-
-        Ok(matches)
     }
 }
