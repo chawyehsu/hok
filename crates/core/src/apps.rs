@@ -100,8 +100,12 @@ impl App {
         let version = self.current_version();
         let path = self.path.join(version.as_str()).join("install.json");
         let mut cur_info = self.install_info_of(version.as_str())?;
-        cur_info.unhold();
-        self.update_install_info(&path, &cur_info);
+
+        if cur_info.is_hold() {
+            cur_info.unhold();
+            self.update_install_info(&path, &cur_info);
+        }
+
         Ok(())
     }
 
