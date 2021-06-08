@@ -7,11 +7,13 @@ use std::result;
 pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
-pub struct Error(ErrorKind);
+pub struct Error(pub(crate) ErrorKind);
 
 #[derive(Debug)]
 pub enum ErrorKind {
+    Custom(String),
     Io(io::Error),
+    Git(git2::Error),
     SerdeJson(serde_json::Error),
     Reqwest(reqwest::Error),
     /// Hints that destructuring should not be exhaustive.
@@ -34,6 +36,12 @@ impl std::error::Error for Error {}
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
         Error(ErrorKind::Io(err))
+    }
+}
+
+impl From<git2::Error> for Error {
+    fn from(err: git2::Error) -> Self {
+        Error(ErrorKind::Git(err))
     }
 }
 

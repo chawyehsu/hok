@@ -1,7 +1,6 @@
-use crate::config::Config;
-use anyhow::{anyhow, Result};
+use crate::{config::Config, error::{Error, ErrorKind, Result}};
 use git2::{ProxyOptions, Repository};
-use std::{io::Write, path::Path};
+use std::{io::Write, path::Path, result};
 
 #[derive(Debug)]
 pub struct GitTool {
@@ -27,7 +26,7 @@ impl GitTool {
         let mut cb = git2::RemoteCallbacks::new();
 
         cb.credentials(
-            move |url, username, cred| -> Result<git2::Cred, git2::Error> {
+            move |url, username, cred| -> result::Result<git2::Cred, git2::Error> {
                 // println!("{:?} {:?} {:?}", url, username, cred);
                 let user = username.unwrap_or("git");
                 let ref cfg = git2::Config::open_default()?;
@@ -81,10 +80,8 @@ impl GitTool {
                 return Ok(());
             }
             Err(_e) => {
-                return Err(anyhow!(
-                    "Failed to clone repo {} as bucket.",
-                    remote_url.as_ref()
-                ))
+                let msg = format!("Failed to clone repo {} as bucket.", remote_url.as_ref());
+                return Err(Error(ErrorKind::Custom(msg)))
             }
         }
     }

@@ -1,8 +1,8 @@
 use crate::{
     fs::{leaf, leaf_base, walk_dir_json},
     utils,
+    error::Result,
 };
-use anyhow::Result;
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use std::path::{Path, PathBuf};

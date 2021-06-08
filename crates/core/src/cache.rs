@@ -1,7 +1,7 @@
-use anyhow::Result;
+use crate::error::Result;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
-use std::{fs::DirEntry, path::PathBuf};
+use std::{fs::DirEntry, path::PathBuf, result};
 
 /// A struct represents a downloaded cache item of scoop.
 #[derive(Debug)]
@@ -71,7 +71,7 @@ impl CacheManager {
         let entries = self
             .working_dir
             .read_dir()?
-            .filter_map(Result::ok)
+            .filter_map(result::Result::ok)
             .filter(|de| RE.is_match(de.file_name().to_str().unwrap()))
             .map(|entry| CacheEntry::new(entry))
             .collect();
@@ -101,8 +101,8 @@ impl CacheManager {
     }
 
     /// Remove all Scoop cache files
-    pub fn clean(&self) -> Result<(), std::io::Error> {
-        crate::fs::empty_dir(&self.working_dir)
+    pub fn clean(&self) -> Result<()> {
+        Ok(crate::fs::empty_dir(&self.working_dir)?)
     }
 
     /// Remove `app_name` related cache files, `*` wildcard pattern is support.
