@@ -955,6 +955,7 @@ dependencies = [
  "chrono",
  "clap",
  "env_logger",
+ "log",
  "once_cell",
  "regex",
  "remove_dir_all 0.7.0",
