@@ -101,14 +101,14 @@ impl CacheManager {
     }
 
     /// Remove all Scoop cache files
-    pub fn clean(&self) -> Result<()> {
+    pub fn clean_all(&self) -> Result<()> {
         Ok(crate::fs::empty_dir(&self.working_dir)?)
     }
 
     /// Remove `app_name` related cache files, `*` wildcard pattern is support.
-    pub fn remove<T: AsRef<str>>(&self, app_name: T) -> Result<()> {
+    pub fn clean<T: AsRef<str>>(&self, app_name: T) -> Result<()> {
         match app_name.as_ref() {
-            "*" => self.clean()?,
+            "*" => self.clean_all()?,
             _ => {
                 let cache_items = self.get(app_name.as_ref())?;
                 for item in cache_items {
@@ -118,5 +118,22 @@ impl CacheManager {
         }
 
         Ok(())
+    }
+
+    pub fn create<S: AsRef<str>>(&self, filename: S) -> PathBuf {
+        let path = self.working_dir.join(filename.as_ref());
+        let mut tmp_path = path.clone().into_os_string();
+        tmp_path.push(".download");
+        let tmp_path = PathBuf::from(tmp_path);
+
+        if path.exists() {
+            std::fs::remove_file(path.as_path()).unwrap();
+        }
+
+        if tmp_path.exists() {
+            std::fs::remove_file(tmp_path.as_path()).unwrap();
+        }
+
+        path
     }
 }

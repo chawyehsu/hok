@@ -2,7 +2,6 @@ mod hashstring;
 mod license;
 mod url;
 
-use reqwest::IntoUrl;
 use serde_json::Map;
 use std::fs::File;
 use std::io::Read;
@@ -11,18 +10,17 @@ use std::path::PathBuf;
 
 use serde_json::Value;
 
-use crate::error::{self, Result};
+use crate::error::Result;
 use crate::fs::leaf_base;
 use crate::utils;
-use crate::Scoop;
 use hashstring::{deserialize_option_hash, Hash};
+use url::{deserialize_option_url, deserialize_url, Url};
 
 ////////////////////////////////////////////////////////////////////////////////
 //  Manifest Custom Types
 ////////////////////////////////////////////////////////////////////////////////
 type LicenseIdentifier = String;
 type PersistType = BinType;
-type Url = StringOrStringArray;
 ////////////////////////////////////////////////////////////////////////////////
 //  Manifest Custom Enums
 ////////////////////////////////////////////////////////////////////////////////
@@ -120,7 +118,8 @@ pub struct ArchitectureInner {
     pub pre_install: Option<StringOrStringArray>,
     pub shortcuts: Option<Vec<ShortcutsType>>,
     pub uninstaller: Option<Uninstaller>,
-    pub url: Option<Url>,
+    #[serde(deserialize_with = "deserialize_url")]
+    pub url: Url,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -160,7 +159,7 @@ pub struct HashExtraction {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AutoupdateArchitectureInner {
     pub extract_dir: Option<StringOrStringArray>,
-    pub url: Option<Url>,
+    pub url: Option<StringOrStringArray>,
     pub hash: Option<HashExtraction>,
 }
 
@@ -213,6 +212,7 @@ pub struct ManifestRaw {
     pub shortcuts: Option<Vec<ShortcutsType>>,
     pub suggest: Option<Value>,
     pub uninstaller: Option<Uninstaller>,
+    #[serde(default, deserialize_with = "deserialize_option_url")]
     pub url: Option<Url>,
     pub version: String,
 }
@@ -258,21 +258,59 @@ impl Manifest {
         })
     }
 
-    pub fn from_url<U: IntoUrl>(url: U, scoop: &Scoop) -> Result<Manifest> {
-        let resp = scoop.http.get(url.as_str()).send();
-        match resp {
-            Ok(res) => {
-                let path = PathBuf::from(url.as_str());
-                let name = leaf_base(path.as_path());
-                let raw = res.json().unwrap();
-                Ok(Manifest {
-                    name,
-                    bucket: None,
-                    path,
-                    data: raw,
-                })
+    // pub fn from_url<U: IntoUrl>(url: U, scoop: &Scoop) -> Result<Manifest> {
+    //     let resp = scoop.http.get(url.as_str()).send();
+    //     match resp {
+    //         Ok(res) => {
+    //             let path = PathBuf::from(url.as_str());
+    //             let name = leaf_base(path.as_path());
+    //             let raw = res.json().unwrap();
+    //             Ok(Manifest {
+    //                 name,
+    //                 bucket: None,
+    //                 path,
+    //                 data: raw,
+    //             })
+    //         }
+    //         Err(e) => Err(error::Error::from(e)),
+    //     }
+    // }
+
+    pub fn get_download_urls(&self) -> Option<Url> {
+        let manifest = &self.data;
+
+        if manifest.architecture.is_some() {
+            let arch = manifest.architecture.clone().unwrap();
+            if arch.amd64.is_some() && utils::os_is_arch64() {
+                Some(arch.amd64.clone().unwrap().url)
+            } else if arch.i386.is_some() {
+                Some(arch.i386.clone().unwrap().url)
+            } else {
+                None
             }
-            Err(e) => Err(error::Error::from(e)),
+        } else if manifest.url.is_some() {
+            Some(manifest.url.clone().unwrap())
+        } else {
+            None
+        }
+    }
+
+    pub fn get_hashes(&self) -> Option<Hash> {
+        let manifest = &self.data;
+
+        if manifest.architecture.is_some() {
+            let arch = manifest.architecture.clone().unwrap();
+            if arch.amd64.is_some() && utils::os_is_arch64() {
+                arch.amd64.clone().unwrap().hash
+            } else if arch.i386.is_some() {
+                arch.i386.clone().unwrap().hash
+            } else {
+                None
+            }
+        } else if manifest.hash.is_some() {
+            manifest.hash.clone()
+        } else {
+            None
         }
     }
 }

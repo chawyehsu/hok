@@ -5,7 +5,7 @@ use scoop_core::{utils, Scoop};
 pub fn cmd_cache(matches: &ArgMatches, scoop: &mut Scoop) {
     if let Some(sub_m2) = matches.subcommand_matches("rm") {
         if let Some(app_name) = sub_m2.value_of("app") {
-            match scoop.cache_manager.remove(app_name) {
+            match scoop.cache_manager.clean(app_name) {
                 Ok(()) => {
                     println!("All caches that match '{}' were removed.", app_name);
                     std::process::exit(0);
@@ -16,7 +16,7 @@ pub fn cmd_cache(matches: &ArgMatches, scoop: &mut Scoop) {
                 }
             }
         } else if sub_m2.is_present("all") {
-            match scoop.cache_manager.clean() {
+            match scoop.cache_manager.clean_all() {
                 Ok(()) => {
                     println!("All download caches were removed.");
                     std::process::exit(0);

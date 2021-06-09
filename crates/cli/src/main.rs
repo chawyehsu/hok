@@ -1,9 +1,11 @@
 use anyhow::Result;
 use clap::{crate_description, crate_name, crate_version, App, AppSettings, Arg, SubCommand};
 use env_logger::Env;
-use scoop_core::{Config, Scoop};
+use scoop_core::{utils, Config, Scoop};
 
 mod cmd;
+mod indicator;
+mod tokio_util;
 
 fn main() -> Result<()> {
     create_logger();
@@ -22,7 +24,7 @@ fn main() -> Result<()> {
         ("hold", Some(matches)) => cmd::cmd_hold(matches, &mut scoop),
         ("home", Some(matches)) => cmd::cmd_home(matches, &mut scoop),
         ("info", Some(matches)) => cmd::cmd_info(matches, &mut scoop),
-        ("install", Some(_matches)) => unimplemented!(),
+        ("install", Some(matches)) => cmd::cmd_install(matches, &mut scoop),
         ("list", Some(matches)) => cmd::cmd_list(matches, &mut scoop),
         ("search", Some(matches)) => cmd::cmd_search(matches, &mut scoop),
         ("status", Some(matches)) => cmd::cmd_status(matches, &mut scoop),
@@ -39,7 +41,7 @@ fn main() -> Result<()> {
 
 fn create_logger() {
     let env = Env::default()
-        .filter_or("SCOOP_LOG_LEVEL", "error")
+        .filter_or("SCOOP_LOG_LEVEL", "debug")
         .write_style("never");
 
     env_logger::init_from_env(env);

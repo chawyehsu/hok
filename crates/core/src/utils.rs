@@ -2,6 +2,22 @@ use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
 use std::path::Path;
 
+pub fn os_is_arch64() -> bool {
+    match std::mem::size_of::<&char>() {
+        4 => false,
+        8 => true,
+        _ => panic!("unexpected os arch"),
+    }
+}
+
+pub fn escape_filename<S: AsRef<str>>(filename: S) -> String {
+    static REGEX_REPLACE: Lazy<Regex> =
+        Lazy::new(|| RegexBuilder::new(r"[^\w\.\-]+").build().unwrap());
+    REGEX_REPLACE
+        .replace_all(filename.as_ref(), "_")
+        .into_owned()
+}
+
 pub fn filesize(length: u64, with_unit: bool) -> String {
     let gb: f64 = 2.0_f64.powf(30_f64);
     let mb: f64 = 2.0_f64.powf(20_f64);
