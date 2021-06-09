@@ -1,8 +1,8 @@
 use crate::indicator::pb_download;
 use crate::tokio_util::{block_on, StreamExt};
 use clap::ArgMatches;
-use scoop_core::Scoop;
 use scoop_core::fs::leaf;
+use scoop_core::Scoop;
 use std::cmp::min;
 use std::fs::File;
 use std::io::Write;
@@ -31,7 +31,6 @@ async fn download_file<'a>(scoop: &Scoop<'a>, app: &str, version: &str, url: &st
     let mut cache_file = File::create(tmp_file.as_path()).unwrap();
     let mut downloaded = 0u64;
     let mut stream = resp.bytes_stream();
-
 
     while let Some(item) = stream.next().await {
         let chunk = item.unwrap();

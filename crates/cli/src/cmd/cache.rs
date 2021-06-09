@@ -7,7 +7,10 @@ pub fn cmd_cache(matches: &ArgMatches, scoop: &mut Scoop) {
         if let Some(app_name) = sub_m2.value_of("app") {
             match scoop.cache_manager.clean(app_name) {
                 Ok(()) => {
-                    println!("All caches that match '{}' were removed.", app_name);
+                    match app_name == "*" {
+                        true => println!("All download caches were removed."),
+                        false => println!("All caches that match '{}' were removed.", app_name),
+                    }
                     std::process::exit(0);
                 }
                 Err(_e) => {
