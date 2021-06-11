@@ -14,7 +14,7 @@ use crate::error::Result;
 use crate::fs::leaf_base;
 use crate::utils;
 use hashstring::{deserialize_option_hash, Hash};
-use url::{deserialize_option_url, deserialize_url, Url};
+use url::{deserialize_option_url, Url};
 
 ////////////////////////////////////////////////////////////////////////////////
 //  Manifest Custom Types
@@ -118,8 +118,8 @@ pub struct ArchitectureInner {
     pub pre_install: Option<StringOrStringArray>,
     pub shortcuts: Option<Vec<ShortcutsType>>,
     pub uninstaller: Option<Uninstaller>,
-    #[serde(deserialize_with = "deserialize_url")]
-    pub url: Url,
+    #[serde(default, deserialize_with = "deserialize_option_url")]
+    pub url: Option<Url>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -276,23 +276,38 @@ impl Manifest {
     //     }
     // }
 
+    /// Extract download urls from this manifest, in following order:
+    ///
+    /// 1. if "64bit" urls are available, return;
+    /// 2. then if "32bit" urls are available, return;
+    /// 3. fallback to return common urls.
     pub fn get_download_urls(&self) -> Option<Url> {
         let manifest = &self.data;
+        let fallback_url = manifest.url.clone();
 
-        if manifest.architecture.is_some() {
-            let arch = manifest.architecture.clone().unwrap();
-            if arch.amd64.is_some() && utils::os_is_arch64() {
-                Some(arch.amd64.clone().unwrap().url)
-            } else if arch.i386.is_some() {
-                Some(arch.i386.clone().unwrap().url)
-            } else {
-                None
-            }
-        } else if manifest.url.is_some() {
-            Some(manifest.url.clone().unwrap())
-        } else {
-            None
+        match manifest.architecture.clone() {
+            Some(arch) => {
+                // Find amd64 urls first
+                if arch.amd64.is_some() && utils::os_is_arch64() {
+                    match arch.amd64.unwrap().url {
+                        Some(url) => return Some(url),
+                        None => {},
+                    }
+                }
+
+                // Find i386 urls if amd64 is not available
+                if arch.i386.is_some() {
+                    match arch.i386.unwrap().url {
+                        Some(url) => return Some(url),
+                        None => {},
+                    }
+                }
+            },
+            None => {}
         }
+
+        // Final, fallback to common urls
+        fallback_url
     }
 
     pub fn get_hashes(&self) -> Option<Hash> {

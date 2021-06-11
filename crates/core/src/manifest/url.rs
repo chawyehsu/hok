@@ -58,6 +58,7 @@ impl<'de> Visitor<'de> for UrlVisitor {
     }
 }
 
+#[allow(unused)]
 pub fn deserialize_url<'de, D>(deserializer: D) -> Result<Url, D::Error>
 where
     D: Deserializer<'de>,
