@@ -125,7 +125,7 @@ pub struct ArchitectureInner {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Architecture {
     #[serde(rename = "32bit")]
-    i386: Option<ArchitectureInner>,
+    ia32: Option<ArchitectureInner>,
     #[serde(rename = "64bit")]
     amd64: Option<ArchitectureInner>,
 }
@@ -166,7 +166,7 @@ pub struct AutoupdateArchitectureInner {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AutoupdateArchitecture {
     #[serde(rename = "32bit")]
-    i386: Option<AutoupdateArchitectureInner>,
+    ia32: Option<AutoupdateArchitectureInner>,
     #[serde(rename = "64bit")]
     amd64: Option<AutoupdateArchitectureInner>,
 }
@@ -295,9 +295,9 @@ impl Manifest {
                     }
                 }
 
-                // Find i386 urls if amd64 is not available
-                if arch.i386.is_some() {
-                    match arch.i386.unwrap().url {
+                // Find ia32 urls if amd64 is not available
+                if arch.ia32.is_some() {
+                    match arch.ia32.unwrap().url {
                         Some(url) => return Some(url),
                         None => {},
                     }
@@ -317,8 +317,8 @@ impl Manifest {
             let arch = manifest.architecture.clone().unwrap();
             if arch.amd64.is_some() && utils::os_is_arch64() {
                 arch.amd64.clone().unwrap().hash
-            } else if arch.i386.is_some() {
-                arch.i386.clone().unwrap().hash
+            } else if arch.ia32.is_some() {
+                arch.ia32.clone().unwrap().hash
             } else {
                 None
             }
