@@ -1,0 +1,13 @@
+[package]
+name = "scoop-hash"
+version = "0.1.0"
+authors = ["Chawye Hsu <chawyehsu@hotmail.com>"]
+edition = "2018"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "bench"
+path = "benches/bench.rs"
+# harness = false

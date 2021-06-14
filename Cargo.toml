@@ -3,6 +3,7 @@ members = [
     "crates/archive",
     "crates/cli",
     "crates/core",
+    "crates/hash",
 ]
 
 [profile.release]
