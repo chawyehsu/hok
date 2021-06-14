@@ -1,16 +1,5 @@
 use std::{cmp::min, convert::TryInto};
 
-// static ROUND_TABLE: [u32; 64] = [
-//     0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
-//     0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be, 0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
-//     0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
-//     0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
-//     0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c, 0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
-//     0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
-//     0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
-//     0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
-// ];
-
 // Padding table
 const PADDING: [u8; 63] = [0x00; 63];
 
@@ -42,8 +31,8 @@ impl Md5 {
     }
 
     /// Consume the last buffer data, finalize the calculation and return
-    /// the digest as a `String` format.
-    pub fn result(&mut self) -> String {
+    /// the digest as a `[u8; 16]` array format.
+    pub fn result(&mut self) -> [u8; 16] {
         let len_mod = self.total_length % 64;
         let pad_idx = if 55 < len_mod {
             55 + 64 - len_mod
@@ -67,12 +56,19 @@ impl Md5 {
             .map(|i| i.to_le_bytes())
             .collect::<Vec<_>>()
             .concat()
-            .into_iter()
+            .try_into()
+            .unwrap()
+    }
+
+    /// Consume the last buffer data, finalize the calculation and return
+    /// the digest as a `String` format.
+    pub fn result_string(&mut self) -> String {
+        self.result()
+            .iter()
             .map(|byte| format!("{:02x}", byte))
             .collect::<Vec<_>>()
             .join("")
     }
-
 
     /// Consume the input data, but not finalize the calculation. This
     /// method returns `&self` to make itself chainable, so that callers
@@ -99,8 +95,7 @@ impl Md5 {
             // here we use `[self.buflen..self.buflen + copied_len]` to narrow
             // down the length of slice `self.buffer`, and use `copied_len` to
             // narrow down the length of slice `data`.
-            self.buffer[self.buflen..self.buflen + copied_len]
-                .copy_from_slice(&data[..copied_len]);
+            self.buffer[self.buflen..self.buflen + copied_len].copy_from_slice(&data[..copied_len]);
             self.buflen += copied_len;
 
             if self.buflen == 64 {
@@ -261,7 +256,7 @@ mod tests {
         ];
 
         for (input, &output) in inputs.iter().zip(outputs.iter()) {
-            let computed = Md5::new().consume(input.as_bytes()).result();
+            let computed = Md5::new().consume(input.as_bytes()).result_string();
             assert_eq!(output, computed);
         }
     }
@@ -270,7 +265,7 @@ mod tests {
     fn chaining_comsume() {
         let data1 = "hello".as_bytes();
         let data2 = "world".as_bytes();
-        let hex_str = Md5::new().consume(data1).consume(data2).result();
+        let hex_str = Md5::new().consume(data1).consume(data2).result_string();
         // equal to `helloworld`
         assert_eq!(hex_str, "fc5e038d38a57032085441e7fe7010b0");
     }
