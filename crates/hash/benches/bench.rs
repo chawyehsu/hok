@@ -3,6 +3,14 @@ extern crate test;
 use scoop_hash::md5::Md5;
 
 #[bench]
+fn compute_0000010(bencher: &mut test::Bencher) {
+    compute(10, bencher);
+}
+#[bench]
+fn compute_0000100(bencher: &mut test::Bencher) {
+    compute(100, bencher);
+}
+#[bench]
 fn compute_0001000(bencher: &mut test::Bencher) {
     compute(1000, bencher);
 }
@@ -24,4 +32,5 @@ fn compute(size: usize, bencher: &mut test::Bencher) {
     bencher.iter(|| {
         test::black_box(Md5::new().consume(data).result());
     });
+    bencher.bytes = size as u64;
 }
