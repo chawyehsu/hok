@@ -5,6 +5,7 @@
 
 use core::{cmp::min, convert::TryInto};
 
+static INIT_STATE: [u32; 4] = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476];
 static ROUND_TABLE: [u32; 64] = [
     // round 1
     0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
@@ -34,14 +35,24 @@ pub struct Md5 {
 }
 
 impl Md5 {
+    /// Create a new [`Md5`] instance to consume data and get digest.
     #[inline]
     pub fn new() -> Self {
         Md5 {
-            state: [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476],
+            state: INIT_STATE,
             total_length: 0,
             buffer: [0; 64],
             buflen: 0,
         }
+    }
+
+    /// Reset this [`Md5`] instance's status.
+    #[inline]
+    pub fn reset(&mut self) {
+        self.state = INIT_STATE;
+        self.total_length = 0;
+        self.buffer = [0; 64];
+        self.buflen = 0;
     }
 
     /// Consume the last buffer data, finalize the calculation and return
@@ -75,7 +86,7 @@ impl Md5 {
     }
 
     /// Consume the last buffer data, finalize the calculation and return
-    /// the digest as a `String` format.
+    /// the digest as a [`String`] format.
     #[inline]
     pub fn result_string(&mut self) -> String {
         self.result()
@@ -90,7 +101,7 @@ impl Md5 {
     /// can continuously consume data by chaining function calls. for example:
     ///
     /// ```
-    /// use scoop_hash::md5::Md5;
+    /// use scoop_hash::Md5;
     /// let data1 = "hello".as_bytes();
     /// let data2 = "world".as_bytes();
     /// let hex_str = Md5::new().consume(data1).consume(data2).result_string();
@@ -114,7 +125,7 @@ impl Md5 {
             self.buflen += copied_idx;
 
             if self.buflen == 64 {
-                self.transform(self.buffer);
+                self.compress(self.buffer);
 
                 // clear buffer
                 self.buflen = 0
@@ -128,7 +139,7 @@ impl Md5 {
         if length >= 64 {
             let split_idx = length & !63;
             data[..split_idx].chunks_exact(64).for_each(|block| {
-                self.transform(block.try_into().unwrap());
+                self.compress(block.try_into().unwrap());
             });
 
             // keep the remaining untransformed data
@@ -144,11 +155,14 @@ impl Md5 {
         self
     }
 
-    /// Transform the input 512 bits block, which will be split into 16 `words`,
-    /// and save to state.
+    /// The [`compression function`]: transform a 512 bits input block, which is
+    /// split into 16 `words` (32 bits per word). Then each word is compressed
+    /// into the state.
+    ///
+    /// [`compression function`]: https://en.wikipedia.org/wiki/One-way_compression_function
     #[inline]
-    fn transform(&mut self, block: [u8; 64]) {
-        // Create temp state variables for transformation
+    fn compress(&mut self, block: [u8; 64]) {
+        // Create temp state variables for compression
         let [mut a, mut b, mut c, mut d] = self.state;
 
         let mut words = [0u32; 16];
@@ -315,5 +329,24 @@ mod tests {
         let hex_str = Md5::new().consume(data1).consume(data2).result_string();
         // equal to `helloworld`
         assert_eq!(hex_str, "fc5e038d38a57032085441e7fe7010b0");
+    }
+
+    #[test]
+    fn result() {
+        let hex = Md5::new().consume("".as_bytes()).result();
+        assert_eq!(
+            hex,
+            [212, 29, 140, 217, 143, 0, 178, 4, 233, 128, 9, 152, 236, 248, 66, 126]
+        );
+    }
+
+    #[test]
+    fn reset() {
+        let mut md5 = Md5::new();
+        md5.consume("".as_bytes());
+        md5.reset();
+        let hex_str = md5.consume("a".as_bytes()).result_string();
+        // equal to `a`
+        assert_eq!(hex_str, "0cc175b9c0f1b6a831c399e269772661");
     }
 }
