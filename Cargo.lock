@@ -1052,7 +1052,6 @@ dependencies = [
 name = "scoop-core"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "dirs",
  "git2",
  "glob",
