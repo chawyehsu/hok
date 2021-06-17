@@ -291,7 +291,7 @@ impl Manifest {
                 if arch.amd64.is_some() && utils::os_is_arch64() {
                     match arch.amd64.unwrap().url {
                         Some(url) => return Some(url),
-                        None => {},
+                        None => {}
                     }
                 }
 
@@ -299,10 +299,10 @@ impl Manifest {
                 if arch.ia32.is_some() {
                     match arch.ia32.unwrap().url {
                         Some(url) => return Some(url),
-                        None => {},
+                        None => {}
                     }
                 }
-            },
+            }
             None => {}
         }
 

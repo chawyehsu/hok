@@ -41,7 +41,7 @@ fn main() -> Result<()> {
 
 fn create_logger() {
     let env = Env::default()
-        .filter_or("SCOOP_LOG_LEVEL", "debug")
+        .filter_or("SCOOP_LOG_LEVEL", "info")
         .write_style("never");
 
     env_logger::init_from_env(env);
@@ -205,16 +205,20 @@ fn build_app() -> App<'static, 'static> {
                         .multiple(true),
                 )
                 .arg(
-                    Arg::with_name("nocache")
-                        .help("Don't use the download cache")
-                        .short("k")
-                        .long("no-cache"),
+                    Arg::with_name("independent")
+                        .help("Do not automatically install dependencies")
+                        .short("i")
+                        .long("independent"),
                 )
                 .arg(
-                    Arg::with_name("skip")
+                    Arg::with_name("skip_cache")
+                        .help("Do not use previous download cache")
+                        .long("skip-cache"),
+                )
+                .arg(
+                    Arg::with_name("skip_hash_validation")
                         .help("Skip hash validation (use with caution!)")
-                        .short("s")
-                        .long("skip"),
+                        .long("skip-hash-validation"),
                 ),
         )
         .subcommand(SubCommand::with_name("list").about("List installed apps"))

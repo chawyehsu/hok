@@ -1042,6 +1042,7 @@ dependencies = [
  "remove_dir_all 0.7.0",
  "reqwest",
  "scoop-core",
+ "scoop-hash",
  "serde_json",
  "sysinfo",
  "tokio",

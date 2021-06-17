@@ -19,6 +19,7 @@ pub fn cmd_status(_: &ArgMatches, scoop: &mut scoop_core::Scoop) {
 
                 if info.bucket.is_some() {
                     let pattern = format!("{}/{}", info.bucket.unwrap(), app.name);
+
                     match scoop.find_local_manifest(pattern).unwrap() {
                         None => removed_apps.push(app.name),
                         Some(manifest) => {
