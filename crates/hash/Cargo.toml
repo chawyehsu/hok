@@ -11,3 +11,7 @@ path = "benches/md5.rs"
 [[bench]]
 name = "sha1"
 path = "benches/sha1.rs"
+
+[[bench]]
+name = "sha256"
+path = "benches/sha256.rs"
