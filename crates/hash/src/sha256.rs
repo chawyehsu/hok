@@ -5,8 +5,7 @@
 use core::{cmp::min, convert::TryInto};
 
 static INIT_STATE: [u32; 8] = [
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
 ];
 static K: [u32; 64] = [
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -161,10 +160,7 @@ impl Sha256 {
     #[inline]
     fn compress(&mut self, block: [u8; 64]) {
         // Create temp state variables for compression
-        let [
-            mut a, mut b, mut c, mut d,
-            mut e, mut f, mut g, mut h
-        ] = self.state;
+        let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut h] = self.state;
 
         let mut words = [0u32; 64];
 
@@ -175,17 +171,28 @@ impl Sha256 {
 
         // Extend the first 16 words into the remaining 48 words words[16..63]
         for i in 16..64 {
-            let s0 = words[i - 15].rotate_right(7) ^ words[i - 15].rotate_right(18) ^ (words[i - 15] >> 3);
-            let s1 = words[i - 2].rotate_right(17) ^ words[i - 2].rotate_right(19) ^ (words[i - 2] >> 10);
+            let s0 = words[i - 15].rotate_right(7)
+                ^ words[i - 15].rotate_right(18)
+                ^ (words[i - 15] >> 3);
+            let s1 = words[i - 2].rotate_right(17)
+                ^ words[i - 2].rotate_right(19)
+                ^ (words[i - 2] >> 10);
 
-            words[i] = words[i - 16].wrapping_add(s0).wrapping_add(words[i - 7]).wrapping_add(s1);
+            words[i] = words[i - 16]
+                .wrapping_add(s0)
+                .wrapping_add(words[i - 7])
+                .wrapping_add(s1);
         }
 
         // Compression function main loop
         for i in 0..64 {
             let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
             let ch = (e & f) ^ (!e & g);
-            let temp1 = h.wrapping_add(s1).wrapping_add(ch).wrapping_add(K[i]).wrapping_add(words[i]);
+            let temp1 = h
+                .wrapping_add(s1)
+                .wrapping_add(ch)
+                .wrapping_add(K[i])
+                .wrapping_add(words[i]);
             let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
             let maj = (a & b) ^ (a & c) ^ (b & c);
             let temp2 = s0.wrapping_add(maj);
@@ -232,7 +239,7 @@ mod tests {
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
             "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1",
             "8182cadb21af0e37c06414ece08e19c65bdb22c396d48ba7341012eea9ffdfdd",
-            "cf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1"
+            "cf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1",
         ];
 
         for (input, &output) in inputs.iter().zip(outputs.iter()) {
@@ -247,7 +254,10 @@ mod tests {
         let data2 = "world".as_bytes();
         let hex_str = Sha256::new().consume(data1).consume(data2).result_string();
         // equal to `helloworld`
-        assert_eq!(hex_str, "936a185caaa266bb9cbe981e9e05cb78cd732b0b3280eb944412bb6f8f8f07af");
+        assert_eq!(
+            hex_str,
+            "936a185caaa266bb9cbe981e9e05cb78cd732b0b3280eb944412bb6f8f8f07af"
+        );
     }
 
     #[test]
@@ -255,7 +265,10 @@ mod tests {
         let hex = Sha256::new().consume("".as_bytes()).result();
         assert_eq!(
             hex,
-            [227, 176, 196, 66, 152, 252, 28, 20, 154, 251, 244, 200, 153, 111, 185, 36, 39, 174, 65, 228, 100, 155, 147, 76, 164, 149, 153, 27, 120, 82, 184, 85]
+            [
+                227, 176, 196, 66, 152, 252, 28, 20, 154, 251, 244, 200, 153, 111, 185, 36, 39,
+                174, 65, 228, 100, 155, 147, 76, 164, 149, 153, 27, 120, 82, 184, 85
+            ]
         );
     }
 
@@ -266,6 +279,9 @@ mod tests {
         sha1.reset();
         let hex_str = sha1.consume("abc".as_bytes()).result_string();
         // equal to `abc`
-        assert_eq!(hex_str, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        assert_eq!(
+            hex_str,
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
     }
 }

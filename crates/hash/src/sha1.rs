@@ -159,7 +159,12 @@ impl Sha1 {
 
         for i in 0..16 {
             let f = (b & c) | ((!b) & d);
-            let t = a.rotate_left(5).wrapping_add(f).wrapping_add(e).wrapping_add(words[i & 0xf]).wrapping_add(K[0]);
+            let t = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(words[i & 0xf])
+                .wrapping_add(K[0]);
             e = d;
             d = c;
             c = b.rotate_left(30);
@@ -168,11 +173,19 @@ impl Sha1 {
         }
 
         for i in 16..20 {
-            let tmp = words[(i - 3) & 0xf] ^ words[(i - 8) & 0xf] ^ words[(i - 14) & 0xf] ^ words[i & 0xf];
+            let tmp = words[(i - 3) & 0xf]
+                ^ words[(i - 8) & 0xf]
+                ^ words[(i - 14) & 0xf]
+                ^ words[i & 0xf];
             words[i & 0xf] = tmp << 1 | tmp >> (32 - 1);
 
             let f = (b & c) | ((!b) & d);
-            let t = a.rotate_left(5).wrapping_add(f).wrapping_add(e).wrapping_add(words[i & 0xf]).wrapping_add(K[0]);
+            let t = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(words[i & 0xf])
+                .wrapping_add(K[0]);
             e = d;
             d = c;
             c = b.rotate_left(30);
@@ -181,11 +194,19 @@ impl Sha1 {
         }
 
         for i in 20..40 {
-            let tmp = words[(i - 3) & 0xf] ^ words[(i - 8) & 0xf] ^ words[(i - 14) & 0xf] ^ words[i & 0xf];
+            let tmp = words[(i - 3) & 0xf]
+                ^ words[(i - 8) & 0xf]
+                ^ words[(i - 14) & 0xf]
+                ^ words[i & 0xf];
             words[i & 0xf] = tmp << 1 | tmp >> (32 - 1);
 
             let f = b ^ c ^ d;
-            let t = a.rotate_left(5).wrapping_add(f).wrapping_add(e).wrapping_add(words[i & 0xf]).wrapping_add(K[1]);
+            let t = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(words[i & 0xf])
+                .wrapping_add(K[1]);
             e = d;
             d = c;
             c = b.rotate_left(30);
@@ -194,11 +215,19 @@ impl Sha1 {
         }
 
         for i in 40..60 {
-            let tmp = words[(i - 3) & 0xf] ^ words[(i - 8) & 0xf] ^ words[(i - 14) & 0xf] ^ words[i & 0xf];
+            let tmp = words[(i - 3) & 0xf]
+                ^ words[(i - 8) & 0xf]
+                ^ words[(i - 14) & 0xf]
+                ^ words[i & 0xf];
             words[i & 0xf] = tmp << 1 | tmp >> (32 - 1);
 
             let f = ((b | c) & d) | (b & c);
-            let t = a.rotate_left(5).wrapping_add(f).wrapping_add(e).wrapping_add(words[i & 0xf]).wrapping_add(K[2]);
+            let t = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(words[i & 0xf])
+                .wrapping_add(K[2]);
             e = d;
             d = c;
             c = b.rotate_left(30);
@@ -207,11 +236,19 @@ impl Sha1 {
         }
 
         for i in 60..80 {
-            let tmp = words[(i - 3) & 0xf] ^ words[(i - 8) & 0xf] ^ words[(i - 14) & 0xf] ^ words[i & 0xf];
+            let tmp = words[(i - 3) & 0xf]
+                ^ words[(i - 8) & 0xf]
+                ^ words[(i - 14) & 0xf]
+                ^ words[i & 0xf];
             words[i & 0xf] = tmp << 1 | tmp >> (32 - 1);
 
             let f = b ^ c ^ d;
-            let t = a.rotate_left(5).wrapping_add(f).wrapping_add(e).wrapping_add(words[i & 0xf]).wrapping_add(K[3]);
+            let t = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(words[i & 0xf])
+                .wrapping_add(K[3]);
             e = d;
             d = c;
             c = b.rotate_left(30);
@@ -269,7 +306,10 @@ mod tests {
         let hex = Sha1::new().consume("".as_bytes()).result();
         assert_eq!(
             hex,
-            [218, 57, 163, 238, 94, 107, 75, 13, 50, 85, 191, 239, 149, 96, 24, 144, 175, 216, 7, 9]
+            [
+                218, 57, 163, 238, 94, 107, 75, 13, 50, 85, 191, 239, 149, 96, 24, 144, 175, 216,
+                7, 9
+            ]
         );
     }
 
