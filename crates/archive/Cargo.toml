@@ -1,5 +1,5 @@
 [package]
-name = "archive"
+name = "scoop-archive"
 version = "0.1.0"
 authors = ["Chawye Hsu <chawyehsu@hotmail.com>"]
 edition = "2018"
