@@ -1,6 +1,6 @@
 #![feature(test)]
 extern crate test;
-use scoop_hash::md5::Md5;
+use scoop_hash::Md5;
 
 #[bench]
 fn compute_0000010(bencher: &mut test::Bencher) {

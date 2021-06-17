@@ -5,6 +5,9 @@ authors = ["Chawye Hsu <chawyehsu@hotmail.com>"]
 edition = "2018"
 
 [[bench]]
-name = "bench"
-path = "benches/bench.rs"
-# harness = false
+name = "md5"
+path = "benches/md5.rs"
+
+[[bench]]
+name = "sha1"
+path = "benches/sha1.rs"

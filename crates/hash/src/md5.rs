@@ -165,6 +165,7 @@ impl Md5 {
         // Create temp state variables for compression
         let [mut a, mut b, mut c, mut d] = self.state;
 
+        // Break block into sixteen 32-bit `little-endian` words
         let mut words = [0u32; 16];
         for (o, s) in words.iter_mut().zip(block.chunks_exact(4)) {
             *o = u32::from_le_bytes(s.try_into().unwrap());
