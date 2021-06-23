@@ -108,6 +108,7 @@ pub struct Sha512 {
     // Hold the length of the last part of input data that aren't consumed yet,
     // the `buflen` can only be from 0 to 128
     buflen: usize,
+    finished: bool,
 }
 
 impl Sha512 {
@@ -119,6 +120,7 @@ impl Sha512 {
             total_length: 0,
             buffer: [0; 128],
             buflen: 0,
+            finished: false,
         }
     }
 
@@ -129,28 +131,31 @@ impl Sha512 {
         self.total_length = 0;
         self.buffer = [0; 128];
         self.buflen = 0;
+        self.finished = false;
     }
 
     /// Consume the last buffer data, finalize the calculation and return
     /// the digest as a `[u8; 64]` array format.
     #[inline]
     pub fn result(&mut self) -> [u8; 64] {
-        let len_mod = self.total_length % 128;
-        let pad_idx = if 111 < len_mod {
-            111 + 128 - len_mod
-        } else {
-            111 - len_mod
-        };
-        // transform the total length of all data to a 128-bit representation,
-        // note that the length itself needs to be represented as `bits`, which
-        // means a length of 1 needs to be tranformed to a 8 bits representation,
-        // then extend the 8bits representation to the 128-bit long.
-        //
-        // To transform the length to `bits`, simply multiply it by 8. We use
-        // left-shift operation here for a better perfermance.
-        let total: [u8; 16] = (self.total_length << 3).to_be_bytes();
+        if !self.finished {
+            let len_mod = self.total_length % 128;
+            let pad_idx = if 111 < len_mod {
+                111 + 128 - len_mod
+            } else {
+                111 - len_mod
+            };
+            // transform the total length of all data to a 128-bit representation,
+            // note that the length itself needs to be represented as `bits`, which
+            // means a length of 1 needs to be tranformed to a 8 bits representation,
+            // then extend the 8bits representation to the 128-bit long.
+            //
+            // To transform the length to `bits`, simply multiply it by 8. We use
+            // left-shift operation here for a better perfermance.
+            let total: [u8; 16] = (self.total_length << 3).to_be_bytes();
 
-        self.consume([&[0x80u8], &[0x00; 127][..pad_idx as usize], &total].concat());
+            self.consume([&[0x80u8], &[0x00; 127][..pad_idx as usize], &total].concat());
+        }
 
         self.state
             .iter()
