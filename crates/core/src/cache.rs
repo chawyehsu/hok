@@ -101,7 +101,7 @@ impl CacheManager {
         // regex to match valid named cache files:
         // "app#version#filenamified_url"
         static RE: Lazy<Regex> = Lazy::new(|| {
-            RegexBuilder::new(r"(?P<app>[0-9a-zA-Z_-.]+)#(?P<version>[0-9a-zA-Z-.]+)#(?P<url>.*)")
+            RegexBuilder::new(r"(?P<app>[0-9a-zA-Z-_.]+)#(?P<version>[0-9a-zA-Z-.]+)#(?P<url>.*)")
                 .build()
                 .unwrap()
         });
