@@ -1,19 +1,14 @@
 use clap::ArgMatches;
-use scoop_core::{
-    manifest::{BinType, License, Manifest, StringOrStringArray},
-    Scoop,
-};
+use scoop_core::{BinType, License, Scoop, StringOrStringArray};
 
 pub fn cmd_info(matches: &ArgMatches, scoop: &mut Scoop) {
     let app = matches.value_of("app").unwrap();
     match scoop.find_local_manifest(app) {
         Ok(Some(manifest)) => {
-            let Manifest {
-                name,
-                path,
-                bucket,
-                data,
-            } = manifest;
+            let name = manifest.name;
+            let path = manifest.path;
+            let bucket = manifest.bucket;
+            let data = manifest.data;
 
             // Name
             println!("Name: {}", name);

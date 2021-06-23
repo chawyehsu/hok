@@ -11,17 +11,19 @@ mod error;
 pub mod fs;
 mod git;
 mod http;
-pub mod manifest;
+mod manifest;
 mod persist;
 mod scoop_impl;
 mod search;
 pub mod sys;
 pub mod utils;
 
+use error::Result;
+
 pub use apps::AppManager;
 pub use bucket::{is_known_bucket, known_bucket_url, known_buckets, BucketManager};
 pub use cache::{CacheEntry, CacheManager};
 pub use config::Config;
-use error::Result;
+pub use manifest::{BinType, License, Manifest, StringOrStringArray};
 pub use persist::PersistManager;
 pub use scoop_impl::Scoop;

@@ -81,12 +81,8 @@ pub(crate) fn travel_manifest(
 
         match Manifest::from_path(manifest_path) {
             Ok(manifest) => {
-                let Manifest {
-                    name,
-                    path: _,
-                    bucket: _,
-                    data,
-                } = manifest;
+                let name = manifest.name;
+                let data = manifest.data;
 
                 let bin_match = try_match_bin(query, data.bin);
                 if bin_match.is_some() {

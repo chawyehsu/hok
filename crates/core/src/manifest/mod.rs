@@ -1,21 +1,26 @@
-mod hashstring;
 mod license;
-mod url;
 
+use once_cell::sync::Lazy;
+use regex::Regex;
+use regex::RegexBuilder;
+use serde::de;
+use serde::de::SeqAccess;
+use serde::de::Visitor;
+use serde::Deserializer;
 use serde_json::Map;
+use std::fmt;
 use std::fs::File;
 use std::io::Read;
+use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use serde_json::Value;
 
-use crate::error::Result;
+use crate::error::{Error, ErrorKind, Result};
 use crate::fs::leaf_base;
 use crate::utils;
-use hashstring::{deserialize_option_hash, Hash};
-use url::{deserialize_option_url, Url};
-
 ////////////////////////////////////////////////////////////////////////////////
 //  Manifest Custom Types
 ////////////////////////////////////////////////////////////////////////////////
@@ -111,15 +116,15 @@ pub struct ArchitectureInner {
     pub env_add_path: Option<StringOrStringArray>,
     pub env_set: Option<Map<String, Value>>,
     pub extract_dir: Option<StringOrStringArray>,
-    #[serde(default, deserialize_with = "deserialize_option_hash")]
-    pub hash: Option<Hash>,
+    #[serde(default, deserialize_with = "deserialize_option_hashes")]
+    pub hash: Option<Hashes>,
     pub installer: Option<Installer>,
     pub post_install: Option<StringOrStringArray>,
     pub pre_install: Option<StringOrStringArray>,
     pub shortcuts: Option<Vec<ShortcutsType>>,
     pub uninstaller: Option<Uninstaller>,
     #[serde(default, deserialize_with = "deserialize_option_url")]
-    pub url: Option<Url>,
+    pub url: Option<Urls>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -186,7 +191,7 @@ pub struct Psmodule {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ManifestRaw {
+pub struct ManifestInner {
     pub architecture: Option<Architecture>,
     pub autoupdate: Option<Autoupdate>,
     pub bin: Option<BinType>,
@@ -199,8 +204,8 @@ pub struct ManifestRaw {
     pub env_set: Option<Map<String, Value>>,
     pub extract_dir: Option<StringOrStringArray>,
     pub extract_to: Option<StringOrStringArray>,
-    #[serde(default, deserialize_with = "deserialize_option_hash")]
-    pub hash: Option<Hash>,
+    #[serde(default, deserialize_with = "deserialize_option_hashes")]
+    pub hash: Option<Hashes>,
     pub homepage: Option<String>,
     pub innosetup: Option<bool>,
     pub installer: Option<Installer>,
@@ -213,7 +218,7 @@ pub struct ManifestRaw {
     pub suggest: Option<Value>,
     pub uninstaller: Option<Uninstaller>,
     #[serde(default, deserialize_with = "deserialize_option_url")]
-    pub url: Option<Url>,
+    pub url: Option<Urls>,
     pub version: String,
 }
 
@@ -222,7 +227,202 @@ pub struct Manifest {
     pub name: String,
     pub path: PathBuf,
     pub bucket: Option<String>,
-    pub data: ManifestRaw,
+    pub data: ManifestInner,
+    _private: (),
+}
+
+/// A representation of the download urls of a Scoop app manifest.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Urls(Vec<String>);
+
+impl Deref for Urls {
+    type Target = Vec<String>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+struct UrlVisitor;
+impl<'de> Visitor<'de> for UrlVisitor {
+    type Value = Urls;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("url string or list of url strings")
+    }
+
+    fn visit_str<E>(self, s: &str) -> std::result::Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Urls(vec![s.to_string()]))
+    }
+
+    fn visit_seq<S>(self, mut seq: S) -> std::result::Result<Self::Value, S::Error>
+    where
+        S: SeqAccess<'de>,
+    {
+        let mut v: Vec<String> = Vec::new();
+        while let Some(item) = seq.next_element()? {
+            v.push(item)
+        }
+
+        Ok(Urls(v))
+    }
+}
+
+#[allow(unused)]
+fn deserialize_url<'de, D>(deserializer: D) -> std::result::Result<Urls, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_any(UrlVisitor)
+}
+
+fn deserialize_option_url<'de, D>(deserializer: D) -> std::result::Result<Option<Urls>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct OptionalUrlVisitor;
+    impl<'de> Visitor<'de> for OptionalUrlVisitor {
+        type Value = Option<Urls>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("null or string or list of strings")
+        }
+
+        fn visit_none<E>(self) -> std::result::Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_some<D>(self, d: D) -> std::result::Result<Self::Value, D::Error>
+        where
+            D: de::Deserializer<'de>,
+        {
+            Ok(Some(d.deserialize_any(UrlVisitor)?))
+        }
+    }
+
+    deserializer.deserialize_option(OptionalUrlVisitor)
+}
+
+/// [`Hash(String)`] represents a valid hash provided in a Scoop app manifest.
+/// Currently, it could be one of the following formats:
+///
+/// - **md5**: `^md5:[a-fA-F0-9]{32}$`
+/// - **sha1**: `^sha1:[a-fA-F0-9]{40}$`
+/// - **sha256**: `^(sha256:)?[a-fA-F0-9]{64}$`
+/// - **sha512**: `^sha512:[a-fA-F0-9]{128}$`
+///
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Hash(String);
+
+impl FromStr for Hash {
+    type Err = Error;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match Self::validate(s) {
+            false => Err(Error(ErrorKind::Custom(format!(
+                "{} is not a valid hash string",
+                s
+            )))),
+            true => Ok(Self(String::from(s))),
+        }
+    }
+}
+
+impl Hash {
+    fn validate(s: &str) -> bool {
+        static REGEX_HASH: Lazy<Regex> = Lazy::new(|| {
+            RegexBuilder::new(r"^md5:[a-fA-F0-9]{32}|sha1:[a-fA-F0-9]{40}|(sha256:)?[a-fA-F0-9]{64}|sha512:[a-fA-F0-9]{128}$")
+                .build()
+                .unwrap()
+        });
+        REGEX_HASH.is_match(s)
+    }
+}
+
+impl Deref for Hash {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+fn deserialize_option_hashes<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<Hashes>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct OptionalHashesVisitor;
+    impl<'de> Visitor<'de> for OptionalHashesVisitor {
+        type Value = Option<Hashes>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("null or string or list of strings")
+        }
+
+        fn visit_none<E>(self) -> std::result::Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_some<D>(self, d: D) -> std::result::Result<Self::Value, D::Error>
+        where
+            D: de::Deserializer<'de>,
+        {
+            let inner = d.deserialize_any(HashVisitor)?;
+            Ok(Some(Hashes(inner)))
+        }
+    }
+
+    struct HashVisitor;
+    impl<'de> Visitor<'de> for HashVisitor {
+        type Value = Vec<Hash>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("hash string or list of hash strings")
+        }
+
+        fn visit_str<E>(self, s: &str) -> std::result::Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Hash::from_str(s).map(|hs| vec![hs]).map_err(E::custom)
+        }
+
+        fn visit_seq<S>(self, mut seq: S) -> std::result::Result<Self::Value, S::Error>
+        where
+            S: SeqAccess<'de>,
+        {
+            let mut v: Vec<Hash> = Vec::new();
+            while let Some(item) = seq.next_element()? {
+                match Hash::from_str(item).map_err(de::Error::custom) {
+                    Ok(hs) => v.push(hs),
+                    Err(e) => return Err(e),
+                }
+            }
+
+            Ok(v)
+        }
+    }
+
+    deserializer.deserialize_option(OptionalHashesVisitor)
+}
+
+/// A representation of the download files' hashes of a Scoop app manifest.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Hashes(Vec<Hash>);
+
+impl Deref for Hashes {
+    type Target = Vec<Hash>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -230,22 +430,27 @@ pub struct Manifest {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Manifest {
+    /// Create a [`Manifest`] representation of a json file with the given path.
+    ///
+    /// ## Errors
+    ///
+    /// This method will return a `std::io::Error` when the given path can't be
+    /// read.
+    ///
+    /// It will return a `serde_json::Error` when json deserializing fail.
     pub fn from_path<P: AsRef<Path> + ?Sized>(path: &P) -> Result<Manifest> {
         // We read the entire manifest json file into memory first and then
         // deserialize it, as this is *a lot* faster than reading via the
         // `serde_json::from_reader`. See https://github.com/serde-rs/json/issues/160
-        //
+        let mut bytes = Vec::new();
+        File::open(path)?.read_to_end(&mut bytes)?;
+
         // Reading manifest json file is a bottleneck of the whole scoop-rs
         // project. We use `serde_json` because it's well documented and easy
         // to integrate. But I believe there should be an alternative to
         // `serde_json` which can parse json file much *faster*, perhaps
         // `simd_json` can be. See https://github.com/serde-rs/json-benchmark
-        let mut bytes = Vec::new();
-        File::open(path)?.read_to_end(&mut bytes)?;
-        let manifest = serde_json::from_slice(&bytes);
-
-        let data: ManifestRaw = manifest?;
-
+        let data = serde_json::from_slice(&bytes)?;
         let name = leaf_base(path);
         let bucket = utils::extract_bucket_from(path);
         let path = path.as_ref().to_path_buf();
@@ -255,42 +460,24 @@ impl Manifest {
             path,
             bucket,
             data,
+            _private: (),
         })
     }
-
-    // pub fn from_url<U: IntoUrl>(url: U, scoop: &Scoop) -> Result<Manifest> {
-    //     let resp = scoop.http.get(url.as_str()).send();
-    //     match resp {
-    //         Ok(res) => {
-    //             let path = PathBuf::from(url.as_str());
-    //             let name = leaf_base(path.as_path());
-    //             let raw = res.json().unwrap();
-    //             Ok(Manifest {
-    //                 name,
-    //                 bucket: None,
-    //                 path,
-    //                 data: raw,
-    //             })
-    //         }
-    //         Err(e) => Err(error::Error::from(e)),
-    //     }
-    // }
 
     /// Extract download urls from this manifest, in following order:
     ///
     /// 1. if "64bit" urls are available, return;
     /// 2. then if "32bit" urls are available, return;
     /// 3. fallback to return common urls.
-    pub fn get_download_urls(&self) -> Option<Url> {
+    pub fn get_download_urls(&self) -> Urls {
         let manifest = &self.data;
-        let fallback_url = manifest.url.clone();
 
         match manifest.architecture.clone() {
             Some(arch) => {
                 // Find amd64 urls first
                 if arch.amd64.is_some() && utils::os_is_arch64() {
                     match arch.amd64.unwrap().url {
-                        Some(url) => return Some(url),
+                        Some(url) => return url,
                         None => {}
                     }
                 }
@@ -298,7 +485,7 @@ impl Manifest {
                 // Find ia32 urls if amd64 is not available
                 if arch.ia32.is_some() {
                     match arch.ia32.unwrap().url {
-                        Some(url) => return Some(url),
+                        Some(url) => return url,
                         None => {}
                     }
                 }
@@ -306,26 +493,48 @@ impl Manifest {
             None => {}
         }
 
-        // Final, fallback to common urls
-        fallback_url
+        // Finally fallback to common urls.
+        //
+        // SAFETY: this is safe because a valid manifest must have at least
+        // one download url.
+        manifest.url.clone().unwrap()
     }
 
-    pub fn get_hashes(&self) -> Option<Hash> {
+    /// Extract file hashes from this manifest, in following order:
+    ///
+    /// 1. if "64bit" hashes are available, return;
+    /// 2. then if "32bit" hashes are available, return;
+    /// 3. fallback to return common hashes.
+    pub fn get_hashes(&self) -> Option<Hashes> {
         let manifest = &self.data;
 
-        if manifest.architecture.is_some() {
-            let arch = manifest.architecture.clone().unwrap();
-            if arch.amd64.is_some() && utils::os_is_arch64() {
-                arch.amd64.clone().unwrap().hash
-            } else if arch.ia32.is_some() {
-                arch.ia32.clone().unwrap().hash
-            } else {
-                None
-            }
-        } else if manifest.hash.is_some() {
-            manifest.hash.clone()
-        } else {
-            None
+        // `nightly` version does not have hashes.
+        if manifest.version == "nightly" {
+            return None;
         }
+
+        match manifest.architecture.clone() {
+            Some(arch) => {
+                // Find amd64 hashes first
+                if arch.amd64.is_some() && utils::os_is_arch64() {
+                    let hashes = arch.amd64.unwrap().hash;
+                    if hashes.is_some() {
+                        return hashes.clone();
+                    }
+                }
+
+                // Find ia32 hashes if amd64 is not available
+                if arch.ia32.is_some() {
+                    let hashes = arch.ia32.unwrap().hash;
+                    if hashes.is_some() {
+                        return hashes.clone();
+                    }
+                }
+            }
+            None => {}
+        }
+
+        // Finally fallback to common hashes.
+        manifest.hash.clone()
     }
 }
