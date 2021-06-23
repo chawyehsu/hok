@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{crate_description, crate_name, crate_version, App, AppSettings, Arg, SubCommand};
 use env_logger::Env;
-use scoop_core::{utils, Config, Scoop};
+use scoop_core::{Config, Scoop};
 
 mod cmd;
 mod indicator;
@@ -31,7 +31,7 @@ fn main() -> Result<()> {
         ("unhold", Some(matches)) => cmd::cmd_unhold(matches, &mut scoop),
         ("uninstall", Some(_matches)) => unimplemented!(),
         ("update", Some(matches)) => cmd::cmd_update(matches, &mut scoop),
-        ("upgrade", Some(_matches)) => unimplemented!(),
+        ("upgrade", Some(matches)) => cmd::cmd_upgrade(matches, &mut scoop),
         ("which", Some(_matches)) => unimplemented!(),
         _ => unreachable!(),
     }
@@ -211,9 +211,10 @@ fn build_app() -> App<'static, 'static> {
                         .long("independent"),
                 )
                 .arg(
-                    Arg::with_name("skip_cache")
+                    Arg::with_name("ignore_cache")
                         .help("Do not use previous download cache")
-                        .long("skip-cache"),
+                        .short("k")
+                        .long("ignore-cache"),
                 )
                 .arg(
                     Arg::with_name("skip_hash_validation")

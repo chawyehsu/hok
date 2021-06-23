@@ -1,15 +1,85 @@
 use crate::error::Result;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
-use std::{fs::DirEntry, path::PathBuf, result};
+use std::{
+    path::{Path, PathBuf},
+    result,
+};
 
-/// A struct represents a downloaded cache item of scoop.
+/// An entry represents a cache file downloaded and managed by Scoop.
 #[derive(Debug)]
 pub struct CacheEntry {
-    entry: DirEntry,
-    app_name: String,
-    version: String,
-    file_name: String,
+    path: PathBuf,
+}
+
+impl CacheEntry {
+    /// Create a Scoop [`CacheEntry`] with the given PathBuf.
+    ///
+    /// This constructor is marked as private, since we don't want any caller
+    /// outside the [`CacheManager`] to create new CacheEntry directly.
+    #[inline]
+    fn new(path: PathBuf) -> CacheEntry {
+        CacheEntry { path }
+    }
+
+    /// Get the `app` name of this Scoop [`CacheEntry`].
+    #[inline]
+    pub fn app_name(&self) -> String {
+        self.path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .split_once("#")
+            .unwrap()
+            .0
+            .to_string()
+    }
+
+    /// Get the filename of this Scoop [`CacheEntry`].
+    #[inline]
+    pub fn file_name(&self) -> String {
+        self.path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned()
+    }
+
+    /// Get the filepath of this Scoop [`CacheEntry`].
+    #[inline]
+    pub fn path(&self) -> &Path {
+        self.path.as_path()
+    }
+
+    /// Get the tmp download path of this Scoop [`CacheEntry`].
+    #[inline]
+    pub fn tmp_path(&self) -> PathBuf {
+        let mut temp = self.path.as_path().as_os_str().to_os_string();
+        temp.push(".download");
+        PathBuf::from(temp)
+    }
+
+    /// Get the file size of this Scoop [`CacheEntry`].
+    #[inline]
+    pub fn size(&self) -> u64 {
+        self.path.metadata().unwrap().len()
+    }
+
+    /// Get the app `version` of this Scoop [`CacheEntry`].
+    #[inline]
+    pub fn version(&self) -> String {
+        self.path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .split_once("#")
+            .unwrap()
+            .1
+            .split_once("#")
+            .unwrap()
+            .0
+            .to_string()
+    }
 }
 
 #[derive(Debug)]
@@ -17,53 +87,21 @@ pub struct CacheManager {
     working_dir: PathBuf,
 }
 
-impl CacheEntry {
-    /// Create a new Scoop [`CacheEntry`] from given [`DirEntry`]
-    ///
-    /// Caveat: the constructor does not validate given DirEntry.
-    pub fn new(entry: DirEntry) -> CacheEntry {
-        let fname = entry.file_name().into_string().unwrap();
-        let meta = fname.split("#").collect::<Vec<_>>();
-        let (app_name, version, file_name) = (
-            meta[0].to_string(),
-            meta[1].to_string(),
-            meta[2].to_string(),
-        );
-
-        CacheEntry {
-            entry,
-            app_name,
-            version,
-            file_name,
-        }
-    }
-
-    pub fn app_name(&self) -> &str {
-        &self.app_name
-    }
-
-    pub fn file_name(&self) -> &str {
-        &self.file_name
-    }
-
-    pub fn size(&self) -> u64 {
-        self.entry.metadata().unwrap().len()
-    }
-
-    pub fn version(&self) -> &str {
-        &self.version
-    }
-}
-
 impl CacheManager {
+    /// Create a Scoop [`CacheManager`] with the given PathBuf. The given
+    /// PathBuf will be the working directory of this CacheManager.
+    #[inline]
     pub fn new(working_dir: PathBuf) -> CacheManager {
         CacheManager { working_dir }
     }
 
-    /// Collect all cache files represented as [`CacheEntry`]
+    /// Get all cache files representing as [`CacheEntry`].
+    #[inline]
     pub fn get_all(&self) -> Result<Vec<CacheEntry>> {
+        // regex to match valid named cache files:
+        // "app#version#filenamified_url"
         static RE: Lazy<Regex> = Lazy::new(|| {
-            RegexBuilder::new(r"(?P<app>[a-zA-Z0-9-_.]+)#(?P<version>[a-zA-Z0-9-.]+)#(?P<url>.*)")
+            RegexBuilder::new(r"(?P<app>[0-9a-zA-Z_-.]+)#(?P<version>[0-9a-zA-Z-.]+)#(?P<url>.*)")
                 .build()
                 .unwrap()
         });
@@ -72,68 +110,69 @@ impl CacheManager {
             .working_dir
             .read_dir()?
             .filter_map(result::Result::ok)
-            .filter(|de| RE.is_match(de.file_name().to_str().unwrap()))
-            .map(|entry| CacheEntry::new(entry))
+            .filter(|de| RE.is_match(de.file_name().to_string_lossy().as_ref()))
+            .map(|de| CacheEntry::new(de.path()))
             .collect();
 
         Ok(entries)
     }
 
-    /// Collect cache files, which its name matching given `pattern`,
-    /// represented as [`CacheEntry`]
+    /// Get cache files, which its name matching the given `pattern`,
+    /// representing as [`CacheEntry`].
+    #[inline]
     pub fn get<T: AsRef<str>>(&self, pattern: T) -> Result<Vec<CacheEntry>> {
         let all_cache_items = self.get_all();
 
         match pattern.as_ref() {
             "*" => all_cache_items,
-            mut query => {
-                if query.ends_with("*") {
-                    query = query.trim_end_matches("*")
-                }
-
-                let filtered = all_cache_items?
-                    .into_iter()
-                    .filter(|ce| ce.app_name().starts_with(query))
-                    .collect();
-                Ok(filtered)
-            }
+            query => Ok(all_cache_items?
+                .into_iter()
+                .filter(|ce| ce.app_name().starts_with(query.trim_end_matches("*")))
+                .collect()),
         }
     }
 
-    /// Remove all Scoop cache files
-    pub fn clean_all(&self) -> Result<()> {
+    /// Remove all cache files.
+    #[inline]
+    pub fn remove_all(&self) -> Result<()> {
         Ok(crate::fs::empty_dir(&self.working_dir)?)
     }
 
-    /// Remove `app_name` related cache files, `*` wildcard pattern is support.
-    pub fn clean<T: AsRef<str>>(&self, app_name: T) -> Result<()> {
+    /// Remove cache files, which its name matching the given `pattern`.
+    /// (wildcard `*` pattern is support)
+    #[inline]
+    pub fn remove<T: AsRef<str>>(&self, app_name: T) -> Result<()> {
         match app_name.as_ref() {
-            "*" => self.clean_all()?,
+            "*" => Ok(self.remove_all()?),
             _ => {
-                let cache_items = self.get(app_name.as_ref())?;
-                for item in cache_items {
-                    std::fs::remove_file(item.entry.path())?;
+                for item in self.get(app_name.as_ref())? {
+                    std::fs::remove_file(item.path())?;
                 }
+                Ok(())
             }
         }
-
-        Ok(())
     }
 
-    pub fn create<S: AsRef<str>>(&self, filename: S) -> PathBuf {
-        let path = self.working_dir.join(filename.as_ref());
-        let mut tmp_path = path.clone().into_os_string();
-        tmp_path.push(".download");
-        let tmp_path = PathBuf::from(tmp_path);
-
-        if path.exists() {
-            std::fs::remove_file(path.as_path()).unwrap();
-        }
-
-        if tmp_path.exists() {
-            std::fs::remove_file(tmp_path.as_path()).unwrap();
-        }
-
-        path
+    /// Create a new [`CacheEntry`] with the given `app`, `version` and `url`.
+    ///
+    /// This method does not actually creates the cache file, caller should
+    /// use the returned CacheEntry placeholder to write data to finalize
+    /// the cache creating operation.
+    ///
+    /// This method will always return a CacheEntry placeholder for the
+    /// given `app`, `version` and `url`, even it already exists. To reuse
+    /// cache that already exists, caller may call the `exists` method of
+    /// the CacheEntry's path before writing data.
+    ///
+    #[inline]
+    pub fn add<S: AsRef<str>>(&self, app: S, version: S, url: S) -> CacheEntry {
+        let filename = format!(
+            "{}#{}#{}",
+            app.as_ref(),
+            version.as_ref(),
+            crate::utils::filenamify(url.as_ref())
+        );
+        let path = self.working_dir.join(filename);
+        CacheEntry::new(path)
     }
 }

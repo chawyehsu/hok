@@ -11,6 +11,7 @@ pub fn ensure_dir<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
     }
 }
 
+#[inline(always)]
 pub fn empty_dir<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
     match path.as_ref().exists() {
         true => remove_dir_all::remove_dir_contents(path.as_ref()),

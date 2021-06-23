@@ -10,9 +10,9 @@ pub fn os_is_arch64() -> bool {
     }
 }
 
-pub fn escape_filename<S: AsRef<str>>(filename: S) -> String {
+pub fn filenamify<S: AsRef<str>>(filename: S) -> String {
     static REGEX_REPLACE: Lazy<Regex> =
-        Lazy::new(|| RegexBuilder::new(r"[^\w\.\-]+").build().unwrap());
+        Lazy::new(|| RegexBuilder::new(r"[^\w.-]+").build().unwrap());
     REGEX_REPLACE
         .replace_all(filename.as_ref(), "_")
         .into_owned()

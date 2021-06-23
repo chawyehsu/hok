@@ -11,6 +11,7 @@ mod search;
 mod status;
 mod unhold;
 mod update;
+mod upgrade;
 
 pub(super) use bucket::cmd_bucket;
 pub(super) use cache::cmd_cache;
@@ -25,3 +26,4 @@ pub(super) use search::cmd_search;
 pub(super) use status::cmd_status;
 pub(super) use unhold::cmd_unhold;
 pub(super) use update::cmd_update;
+pub(super) use upgrade::cmd_upgrade;

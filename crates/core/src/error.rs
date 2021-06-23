@@ -4,7 +4,7 @@ use std::io;
 use std::result;
 
 /// A type alias for `Result<T, scoop::Error>`.
-pub type Result<T> = result::Result<T, Error>;
+pub(crate) type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct Error(pub(crate) ErrorKind);

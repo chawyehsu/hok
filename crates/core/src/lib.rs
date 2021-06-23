@@ -20,8 +20,8 @@ pub mod utils;
 
 pub use apps::AppManager;
 pub use bucket::{is_known_bucket, known_bucket_url, known_buckets, BucketManager};
-pub use cache::CacheManager;
+pub use cache::{CacheEntry, CacheManager};
 pub use config::Config;
-pub use error::{Error, Result};
+use error::Result;
 pub use persist::PersistManager;
 pub use scoop_impl::Scoop;
