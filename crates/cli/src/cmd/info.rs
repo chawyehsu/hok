@@ -1,5 +1,7 @@
+use std::path::PathBuf;
+
 use clap::ArgMatches;
-use scoop_core::{BinType, License, Scoop, StringOrStringArray};
+use scoop_core::{License, Scoop, fs::leaf};
 
 pub fn cmd_info(matches: &ArgMatches, scoop: &mut Scoop) {
     let app = matches.value_of("app").unwrap();
@@ -44,26 +46,20 @@ pub fn cmd_info(matches: &ArgMatches, scoop: &mut Scoop) {
             // Manifest
             println!("Manifest:\n  {}", path.display());
 
+            // FIXME: check data.architecture.<arch>.bin
             // Binaries
-            match data.bin {
-                Some(bintype) => match bintype {
-                    BinType::String(bin) => println!("Binary: {}", bin),
-                    BinType::Array(complex) => {
-                        println!("Binaries:");
-
-                        let mut bins = Vec::new();
-
-                        for item in complex.into_iter() {
-                            match item {
-                                StringOrStringArray::String(bin) => bins.push(bin),
-                                StringOrStringArray::Array(pair) => bins.push(pair[1].to_string()),
-                            }
-                        }
-
-                        println!("  {}", bins.join(" "));
-                    }
-                },
-                None => {}
+            if data.bin.is_some() {
+                let bins = data.bin.unwrap();
+                if bins.len() == 1 {
+                    let bin = bins[0][0].as_str();
+                    println!("Binary: {}", bin);
+                } else {
+                    println!("Binaries:");
+                    let out = bins.iter().map(|b| {
+                        leaf(PathBuf::from(b[0].as_str()).as_path())
+                    }).collect::<Vec<String>>();
+                    println!("  {}", out.join(" "));
+                }
             }
 
             std::process::exit(0);

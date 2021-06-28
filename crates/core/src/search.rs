@@ -1,10 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::{
-    fs::{leaf, leaf_base},
-    manifest::{BinType, Manifest, StringOrStringArray},
-    Result,
-};
+use crate::{Result, fs::{leaf, leaf_base}, manifest::{Bins, Manifest}};
 
 #[derive(Clone, Debug)]
 pub struct SearchMatch {
@@ -19,35 +15,15 @@ pub struct Matches {
     pub collected: Vec<SearchMatch>,
 }
 
-fn try_match_bin(query: &str, input: Option<BinType>) -> Option<String> {
-    match input {
-        None => {}
-        Some(bintype) => match bintype {
-            BinType::String(bin) => {
-                let bin = leaf(PathBuf::from(bin).as_path());
-                if bin.contains(query) {
-                    return Some(bin);
-                }
+fn try_match_bin(query: &str, input: Option<Bins>) -> Option<String> {
+    if input.is_some() {
+        let bins = input.unwrap();
+        for bin in bins.iter() {
+            let bin_name = leaf(PathBuf::from(bin[0].as_str()).as_path());
+            if bin_name.contains(query) {
+                return Some(bin_name);
             }
-            BinType::Array(arr) => {
-                for item in arr.into_iter() {
-                    match item {
-                        StringOrStringArray::String(bin) => {
-                            let bin = leaf(PathBuf::from(bin).as_path());
-                            if bin.contains(query) {
-                                return Some(bin);
-                            }
-                        }
-                        StringOrStringArray::Array(pair) => {
-                            let bin = leaf(PathBuf::from(pair[1].to_string()).as_path());
-                            if bin.contains(query) {
-                                return Some(bin);
-                            }
-                        }
-                    }
-                }
-            }
-        },
+        }
     }
 
     None
@@ -89,14 +65,14 @@ pub(crate) fn travel_manifest(
                     let name = name;
                     let version = data.version;
                     let bin = format!("'{}'", bin_match.unwrap());
-                    Ok(Some(SearchMatch {
+                    return Ok(Some(SearchMatch {
                         name,
                         version,
                         bin: Some(bin),
-                    }))
-                } else {
-                    Ok(None)
+                    }));
                 }
+
+                Ok(None)
             }
             Err(e) => Err(e),
         }

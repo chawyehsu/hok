@@ -1,10 +1,10 @@
 use std::fmt;
 use std::fmt::Debug;
 use std::io;
-use std::result;
+use std::result::Result as StdResult;
 
 /// A type alias for `Result<T, scoop::Error>`.
-pub(crate) type Result<T> = result::Result<T, Error>;
+pub(crate) type Result<T> = StdResult<T, Error>;
 
 #[derive(Debug)]
 pub struct Error(pub(crate) ErrorKind);
