@@ -9,9 +9,11 @@ use serde::de::SeqAccess;
 use serde::de::Visitor;
 use serde::Deserializer;
 use serde_json::Map;
+use std::convert::Infallible;
 use std::fmt;
 use std::fs::File;
 use std::io::Read;
+use std::marker::PhantomData;
 use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
@@ -27,7 +29,6 @@ use crate::utils;
 //  Manifest Custom Types
 ////////////////////////////////////////////////////////////////////////////////
 type LicenseIdentifier = String;
-type PersistType = BinType;
 ////////////////////////////////////////////////////////////////////////////////
 //  Manifest Custom Enums
 ////////////////////////////////////////////////////////////////////////////////
@@ -125,7 +126,6 @@ pub struct ArchitectureInner {
     pub pre_install: Option<StringOrStringArray>,
     pub shortcuts: Option<Vec<ShortcutsType>>,
     pub uninstaller: Option<Uninstaller>,
-    #[serde(default, deserialize_with = "deserialize_url")]
     pub url: Option<Urls>,
 }
 
@@ -197,7 +197,7 @@ pub struct ManifestInner {
     pub architecture: Option<Architecture>,
     pub autoupdate: Option<Autoupdate>,
     pub bin: Option<Bins>,
-    pub persist: Option<PersistType>,
+    pub persist: Option<Persist>,
     pub checkver: Option<CheckverType>,
     pub cookie: Option<Value>,
     pub depends: Option<StringOrStringArray>,
@@ -219,7 +219,6 @@ pub struct ManifestInner {
     pub shortcuts: Option<Vec<ShortcutsType>>,
     pub suggest: Option<Value>,
     pub uninstaller: Option<Uninstaller>,
-    #[serde(default, deserialize_with = "deserialize_url")]
     pub url: Option<Urls>,
     pub version: String,
 }
@@ -233,91 +232,77 @@ pub struct Manifest {
     _private: (),
 }
 
-/// A representation of a single bin to be shimmed of a Scoop app manifest.
-#[derive(Clone, Debug, Serialize)]
-pub struct Bin(Vec<String>);
+/// A custom [`Visitor`] to visit a single `T` item or a vec of `T` items.
+struct OneOrVecVisitor<T>(PhantomData<T>);
+impl<'de, T> Visitor<'de> for OneOrVecVisitor<T>
+where
+    T: Deserialize<'de> + FromStr,
+{
+    type Value = Vec<T>;
 
-impl Deref for Bin {
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("one item or list of items")
+    }
+
+    fn visit_str<E>(self, s: &str) -> StdResult<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(vec![T::from_str(s).ok().unwrap()])
+    }
+
+    fn visit_seq<S>(self, mut seq: S) -> StdResult<Self::Value, S::Error>
+    where
+        S: SeqAccess<'de>,
+    {
+        let mut vec: Vec<T> = vec![];
+        while let Some(item) = seq.next_element()? {
+            vec.push(item)
+        }
+
+        Ok(vec)
+    }
+}
+
+/// A [`Item`] represents a `bin` or `persist` item which may contains extra
+/// properties, i.e.:
+///
+/// - **bin**: (`bin_original_name`, `Option<bin_shimming_name>`, `Option<bin_shimming_args>`)
+/// - **persist**: (`persist_original_name`, `Option<persist_persisting_name>`)
+#[derive(Clone, Debug, Serialize)]
+pub struct Item(Vec<String>);
+
+impl Deref for Item {
     type Target = Vec<String>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-struct BinVistor;
-impl<'de> Visitor<'de> for BinVistor {
-    type Value = Bin;
-
-    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("string or list of strings")
-    }
-
-    fn visit_str<E>(self, s: &str) -> StdResult<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(Bin(vec![s.to_owned()]))
-    }
-
-    fn visit_seq<S>(self, mut seq: S) -> StdResult<Self::Value, S::Error>
-    where
-        S: SeqAccess<'de>,
-    {
-        let mut vec: Vec<String> = vec![];
-        while let Some(item) = seq.next_element()? {
-            vec.push(item)
-        }
-
-        Ok(Bin(vec))
+impl FromStr for Item {
+    type Err = Infallible;
+    fn from_str(s: &str) -> StdResult<Self, Self::Err> {
+        Ok(Item(vec![s.to_owned()]))
     }
 }
 
-impl<'de> Deserialize<'de> for Bin {
+impl<'de> Deserialize<'de> for Item {
     fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        deserializer.deserialize_any(BinVistor)
+        Ok(Item(deserializer.deserialize_any(OneOrVecVisitor(PhantomData))?))
     }
 }
 
 /// A representation of binaries to be shimmed of a Scoop app manifest.
 #[derive(Clone, Debug, Serialize)]
-pub struct Bins(Vec<Bin>);
+pub struct Bins(Vec<Item>);
 
 impl Deref for Bins {
-    type Target = Vec<Bin>;
+    type Target = Vec<Item>;
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-struct BinsVistor;
-impl<'de> Visitor<'de> for BinsVistor {
-    type Value = Bins;
-
-    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("string or list of strings or array")
-    }
-
-    fn visit_str<E>(self, s: &str) -> StdResult<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        let bin = Bin(vec![s.to_owned()]);
-        Ok(Bins(vec![bin]))
-    }
-
-    fn visit_seq<S>(self, mut seq: S) -> StdResult<Self::Value, S::Error>
-    where
-        S: SeqAccess<'de>,
-    {
-        let mut bins: Vec<Bin> = vec![];
-        while let Some(item) = seq.next_element::<Bin>()? {
-            bins.push(item)
-        }
-
-        Ok(Bins(bins))
     }
 }
 
@@ -326,12 +311,32 @@ impl<'de> Deserialize<'de> for Bins {
     where
         D: Deserializer<'de>,
     {
-        deserializer.deserialize_any(BinsVistor)
+        Ok(Bins(deserializer.deserialize_any(OneOrVecVisitor(PhantomData))?))
+    }
+}
+
+/// A representation of a list of entry to be persisted a Scoop app manifest.
+#[derive(Clone, Debug, Serialize)]
+pub struct Persist(Vec<Item>);
+
+impl Deref for Persist {
+    type Target = Vec<Item>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for Persist {
+    fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Persist(deserializer.deserialize_any(OneOrVecVisitor(PhantomData))?))
     }
 }
 
 /// A representation of the download urls of a Scoop app manifest.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Urls(Vec<String>);
 
 impl Deref for Urls {
@@ -341,64 +346,13 @@ impl Deref for Urls {
     }
 }
 
-fn deserialize_url<'de, D>(d: D) -> StdResult<Option<Urls>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    // Url Visitor
-    struct UrlVisitor;
-    impl<'de> Visitor<'de> for UrlVisitor {
-        type Value = Urls;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("url or list of url")
-        }
-
-        fn visit_str<E>(self, s: &str) -> StdResult<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            Ok(Urls(vec![s.to_owned()]))
-        }
-
-        fn visit_seq<S>(self, mut seq: S) -> StdResult<Self::Value, S::Error>
-        where
-            S: SeqAccess<'de>,
-        {
-            let mut vec: Vec<String> = Vec::new();
-            while let Some(item) = seq.next_element()? {
-                vec.push(item)
-            }
-
-            Ok(Urls(vec))
-        }
+impl<'de> Deserialize<'de> for Urls {
+    fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Urls(deserializer.deserialize_any(OneOrVecVisitor(PhantomData))?))
     }
-
-    // Optional url Visitor
-    struct OptionalUrlVisitor;
-    impl<'de> Visitor<'de> for OptionalUrlVisitor {
-        type Value = Option<Urls>;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("null or string or list of strings")
-        }
-
-        fn visit_none<E>(self) -> StdResult<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            Ok(None)
-        }
-
-        fn visit_some<D>(self, d: D) -> StdResult<Self::Value, D::Error>
-        where
-            D: de::Deserializer<'de>,
-        {
-            Ok(Some(d.deserialize_any(UrlVisitor)?))
-        }
-    }
-
-    d.deserialize_option(OptionalUrlVisitor)
 }
 
 /// [`Hash(String)`] represents a valid hash provided in a Scoop app manifest.
