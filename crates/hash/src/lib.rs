@@ -96,10 +96,7 @@ impl Checksum {
             _ => unreachable!(),
         };
 
-        Checksum {
-            hasher,
-            input_hash,
-        }
+        Checksum { hasher, input_hash }
     }
 
     pub fn consume(&mut self, data: &[u8]) {
