@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
-pub static _SPDX: Lazy<HashSet<&str>> = Lazy::new(|| {
+pub static SPDX: Lazy<HashSet<&str>> = Lazy::new(|| {
     // Reference: https://github.com/spdx/license-list-data
     const ID_LIST: [&'static str; 458] = [
         "0BSD",

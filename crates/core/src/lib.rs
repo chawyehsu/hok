@@ -24,6 +24,6 @@ pub use apps::AppManager;
 pub use bucket::{is_known_bucket, known_bucket_url, known_buckets, BucketManager};
 pub use cache::{CacheEntry, CacheManager};
 pub use config::Config;
-pub use manifest::{BinType, License, Manifest, StringOrStringArray};
+pub use manifest::{License, Manifest};
 pub use persist::PersistManager;
 pub use scoop_impl::Scoop;

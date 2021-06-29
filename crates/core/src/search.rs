@@ -1,6 +1,10 @@
 use std::path::{Path, PathBuf};
 
-use crate::{Result, fs::{leaf, leaf_base}, manifest::{Bins, Manifest}};
+use crate::{
+    fs::{leaf, leaf_base},
+    manifest::{Bins, Manifest},
+    Result,
+};
 
 #[derive(Clone, Debug)]
 pub struct SearchMatch {
@@ -39,7 +43,7 @@ pub(crate) fn travel_manifest(
     if name.contains(query) {
         match Manifest::from_path(manifest_path) {
             Ok(manifest) => {
-                let version = manifest.data.version;
+                let version = manifest.get_version().to_owned();
                 Ok(Some(SearchMatch {
                     name,
                     version,
@@ -57,13 +61,12 @@ pub(crate) fn travel_manifest(
 
         match Manifest::from_path(manifest_path) {
             Ok(manifest) => {
-                let name = manifest.name;
-                let data = manifest.data;
+                let bins = manifest.get_bins();
 
-                let bin_match = try_match_bin(query, data.bin);
+                let bin_match = try_match_bin(query, bins);
                 if bin_match.is_some() {
-                    let name = name;
-                    let version = data.version;
+                    let name = manifest.get_name().to_owned();
+                    let version = manifest.get_version().to_owned();
                     let bin = format!("'{}'", bin_match.unwrap());
                     return Ok(Some(SearchMatch {
                         name,

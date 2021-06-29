@@ -3,10 +3,10 @@ mod license;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use regex::RegexBuilder;
-use serde::Deserialize;
 use serde::de;
 use serde::de::SeqAccess;
 use serde::de::Visitor;
+use serde::Deserialize;
 use serde::Deserializer;
 use serde_json::Map;
 use std::convert::Infallible;
@@ -17,49 +17,16 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::result::Result as StdResult;
-
-use serde_json::Value;
+use std::str::FromStr;
 
 use crate::error::{Error, ErrorKind, Result};
 use crate::fs::leaf_base;
 use crate::utils;
-////////////////////////////////////////////////////////////////////////////////
-//  Manifest Custom Types
-////////////////////////////////////////////////////////////////////////////////
-type LicenseIdentifier = String;
+
 ////////////////////////////////////////////////////////////////////////////////
 //  Manifest Custom Enums
 ////////////////////////////////////////////////////////////////////////////////
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(untagged)]
-pub enum StringOrStringArray {
-    String(String),
-    Array(Vec<String>),
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(untagged)]
-pub enum BinType {
-    String(String),
-    Array(Vec<StringOrStringArray>),
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(untagged)]
-pub enum CheckverType {
-    Simple(String),
-    Complex(ComplexCheckver),
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(untagged)]
-pub enum License {
-    Simple(LicenseIdentifier),
-    Complex(LicensePair),
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum ShortcutsType {
@@ -92,38 +59,31 @@ pub enum HashExtractionMode {
 //  Manifest Custom Structs
 ////////////////////////////////////////////////////////////////////////////////
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct LicensePair {
-    pub identifier: LicenseIdentifier,
-    pub url: Option<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Installer {
-    pub args: Option<StringOrStringArray>,
+    pub args: Option<VecItem>,
     pub file: Option<String>,
-    pub script: Option<StringOrStringArray>,
+    pub script: Option<VecItem>,
     pub keep: Option<bool>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Uninstaller {
-    pub args: Option<StringOrStringArray>,
+    pub args: Option<VecItem>,
     pub file: Option<String>,
-    pub script: Option<StringOrStringArray>,
+    pub script: Option<VecItem>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ArchitectureInner {
     pub bin: Option<Bins>,
-    pub checkver: Option<CheckverType>,
-    pub env_add_path: Option<StringOrStringArray>,
-    pub env_set: Option<Map<String, Value>>,
-    pub extract_dir: Option<StringOrStringArray>,
-    #[serde(default, deserialize_with = "deserialize_option_hashes")]
+    pub checkver: Option<Checkver>,
+    pub env_add_path: Option<VecItem>,
+    pub env_set: Option<Map<String, serde_json::Value>>,
+    pub extract_dir: Option<VecItem>,
     pub hash: Option<Hashes>,
     pub installer: Option<Installer>,
-    pub post_install: Option<StringOrStringArray>,
-    pub pre_install: Option<StringOrStringArray>,
+    pub post_install: Option<VecItem>,
+    pub pre_install: Option<VecItem>,
     pub shortcuts: Option<Vec<ShortcutsType>>,
     pub uninstaller: Option<Uninstaller>,
     pub url: Option<Urls>,
@@ -135,21 +95,6 @@ pub struct Architecture {
     ia32: Option<ArchitectureInner>,
     #[serde(rename = "64bit")]
     amd64: Option<ArchitectureInner>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ComplexCheckver {
-    pub github: Option<String>,
-    pub re: Option<String>,
-    pub regex: Option<String>,
-    pub url: Option<String>,
-    pub jp: Option<String>,
-    pub jsonpath: Option<String>,
-    pub xpath: Option<String>,
-    pub reverse: Option<bool>,
-    pub replace: Option<String>,
-    pub useragent: Option<String>,
-    pub script: Option<StringOrStringArray>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -165,8 +110,8 @@ pub struct HashExtraction {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AutoupdateArchitectureInner {
-    pub extract_dir: Option<StringOrStringArray>,
-    pub url: Option<StringOrStringArray>,
+    pub extract_dir: Option<VecItem>,
+    pub url: Option<VecItem>,
     pub hash: Option<HashExtraction>,
 }
 
@@ -181,9 +126,9 @@ pub struct AutoupdateArchitecture {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Autoupdate {
     pub architecture: Option<AutoupdateArchitecture>,
-    pub extract_dir: Option<StringOrStringArray>,
+    pub extract_dir: Option<VecItem>,
     pub hash: Option<HashExtraction>,
-    pub note: Option<StringOrStringArray>,
+    pub note: Option<VecItem>,
     pub url: Option<String>,
 }
 
@@ -196,40 +141,143 @@ pub struct Psmodule {
 pub struct ManifestInner {
     pub architecture: Option<Architecture>,
     pub autoupdate: Option<Autoupdate>,
-    pub bin: Option<Bins>,
+    bin: Option<Bins>,
     pub persist: Option<Persist>,
-    pub checkver: Option<CheckverType>,
-    pub cookie: Option<Value>,
-    pub depends: Option<StringOrStringArray>,
-    pub description: Option<String>,
-    pub env_add_path: Option<StringOrStringArray>,
-    pub env_set: Option<Map<String, Value>>,
-    pub extract_dir: Option<StringOrStringArray>,
-    pub extract_to: Option<StringOrStringArray>,
-    #[serde(default, deserialize_with = "deserialize_option_hashes")]
+    pub checkver: Option<Checkver>,
+    pub cookie: Option<serde_json::Value>,
+    pub depends: Option<VecItem>,
+    description: Option<String>,
+    pub env_add_path: Option<VecItem>,
+    pub env_set: Option<Map<String, serde_json::Value>>,
+    pub extract_dir: Option<VecItem>,
+    pub extract_to: Option<VecItem>,
     pub hash: Option<Hashes>,
-    pub homepage: Option<String>,
-    pub innosetup: Option<bool>,
+    homepage: Option<String>,
+    innosetup: Option<bool>,
     pub installer: Option<Installer>,
-    pub license: Option<License>,
-    pub notes: Option<StringOrStringArray>,
-    pub post_install: Option<StringOrStringArray>,
-    pub pre_install: Option<StringOrStringArray>,
+    license: Option<License>,
+    pub notes: Option<VecItem>,
+    pub post_install: Option<VecItem>,
+    pub pre_install: Option<VecItem>,
     pub psmodule: Option<Psmodule>,
     pub shortcuts: Option<Vec<ShortcutsType>>,
-    pub suggest: Option<Value>,
+    pub suggest: Option<serde_json::Value>,
     pub uninstaller: Option<Uninstaller>,
-    pub url: Option<Urls>,
-    pub version: String,
+    url: Option<Urls>,
+    version: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Manifest {
-    pub name: String,
-    pub path: PathBuf,
-    pub bucket: Option<String>,
-    pub data: ManifestInner,
+    name: String,
+    path: PathBuf,
+    bucket: Option<String>,
+    inner: ManifestInner,
     _private: (),
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct Checkver {
+    // pub github: Option<String>,
+    // pub re: Option<String>,
+    pub regex: Option<String>,
+    pub url: Option<String>,
+    // pub jp: Option<String>,
+    pub jsonpath: Option<String>,
+    pub xpath: Option<String>,
+    pub reverse: Option<bool>,
+    pub replace: Option<String>,
+    pub useragent: Option<String>,
+    pub script: Option<VecItem>,
+}
+
+impl<'de> Deserialize<'de> for Checkver {
+    fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct CheckverVisitor;
+        impl<'de> Visitor<'de> for CheckverVisitor {
+            type Value = Checkver;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("license string or map")
+            }
+
+            fn visit_str<E>(self, s: &str) -> StdResult<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let regex = match s {
+                    "github" => Some("/releases/tag/(?:v|V)?([\\d.]+)".to_owned()),
+                    _ => Some(s.to_owned()),
+                };
+
+                Ok(Checkver {
+                    regex,
+                    url: None,
+                    jsonpath: None,
+                    xpath: None,
+                    reverse: None,
+                    replace: None,
+                    useragent: None,
+                    script: None,
+                })
+            }
+
+            fn visit_map<A>(self, mut map: A) -> StdResult<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                let mut regex = None;
+                let mut url = None;
+                let mut jsonpath = None;
+                let mut xpath = None;
+                let mut reverse = None;
+                let mut replace = None;
+                let mut useragent = None;
+                let mut script = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        "re" | "regex" => regex = Some(map.next_value()?),
+                        "url" => url = Some(map.next_value()?),
+                        "jp" | "jsonpath" => jsonpath = Some(map.next_value()?),
+                        "xpath" => xpath = Some(map.next_value()?),
+                        "reverse" => {
+                            let val =
+                                bool::from_str(map.next_value()?).map_err(de::Error::custom)?;
+                            reverse = Some(val);
+                        }
+                        "replace" => replace = Some(map.next_value()?),
+                        "useragent" => useragent = Some(map.next_value()?),
+                        "script" => {
+                            // Can we avoid using `serde_json::Value` here?
+                            let value: serde_json::Value = map.next_value()?;
+                            let vi = value
+                                .deserialize_any(OneOrVecVisitor(PhantomData))
+                                .map_err(de::Error::custom)?;
+                            script = Some(VecItem(vi))
+                        }
+                        _ => continue,
+                    }
+                }
+
+                Ok(Checkver {
+                    regex,
+                    url,
+                    jsonpath,
+                    xpath,
+                    reverse,
+                    replace,
+                    useragent,
+                    script,
+                })
+            }
+        }
+
+        Ok(deserializer.deserialize_any(CheckverVisitor)?)
+    }
 }
 
 /// A custom [`Visitor`] to visit a single `T` item or a vec of `T` items.
@@ -244,6 +292,7 @@ where
         f.write_str("one item or list of items")
     }
 
+    #[inline]
     fn visit_str<E>(self, s: &str) -> StdResult<Self::Value, E>
     where
         E: de::Error,
@@ -264,43 +313,58 @@ where
     }
 }
 
-/// A [`Item`] represents a `bin` or `persist` item which may contains extra
-/// properties, i.e.:
+/// A [`VecItem`] represents an special item which might be deserialized from
+/// a single `String` or a list or `String`s. There are different fields in a
+/// Scoop [`Manifest`] using this data type:
 ///
-/// - **bin**: (`bin_original_name`, `Option<bin_shimming_name>`, `Option<bin_shimming_args>`)
-/// - **persist**: (`persist_original_name`, `Option<persist_persisting_name>`)
+/// - **bin**: A `bin` can be represented with a single `String` as its name,
+/// or a `String` array containing 3 `String`s, *name*, *shim name* and *shim
+/// args* respectively. \[`name`, `Option<shim_name>`, `Option<shim_args>`]
+/// - **persist**: A `persist` item can be represented with a single `String`
+/// as its name or a `String` array containing 2 `String`s, *source name*,
+/// *target name* respectively. \[`source_name`, `Option<target_name>`]
+/// - **notes**: A `notes` can be represented with a single `String` as the
+/// only one note or a `String` vector containing more notes. \[`note_string`, ...]
 #[derive(Clone, Debug, Serialize)]
-pub struct Item(Vec<String>);
+pub struct VecItem(Vec<String>);
 
-impl Deref for Item {
+impl Deref for VecItem {
     type Target = Vec<String>;
+
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl FromStr for Item {
+impl FromStr for VecItem {
     type Err = Infallible;
+
+    #[inline]
     fn from_str(s: &str) -> StdResult<Self, Self::Err> {
-        Ok(Item(vec![s.to_owned()]))
+        Ok(VecItem(vec![s.to_owned()]))
     }
 }
 
-impl<'de> Deserialize<'de> for Item {
+impl<'de> Deserialize<'de> for VecItem {
     fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        Ok(Item(deserializer.deserialize_any(OneOrVecVisitor(PhantomData))?))
+        Ok(VecItem(
+            deserializer.deserialize_any(OneOrVecVisitor(PhantomData))?,
+        ))
     }
 }
 
 /// A representation of binaries to be shimmed of a Scoop app manifest.
 #[derive(Clone, Debug, Serialize)]
-pub struct Bins(Vec<Item>);
+pub struct Bins(Vec<VecItem>);
 
 impl Deref for Bins {
-    type Target = Vec<Item>;
+    type Target = Vec<VecItem>;
+
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -311,16 +375,20 @@ impl<'de> Deserialize<'de> for Bins {
     where
         D: Deserializer<'de>,
     {
-        Ok(Bins(deserializer.deserialize_any(OneOrVecVisitor(PhantomData))?))
+        Ok(Bins(
+            deserializer.deserialize_any(OneOrVecVisitor(PhantomData))?,
+        ))
     }
 }
 
 /// A representation of a list of entry to be persisted a Scoop app manifest.
 #[derive(Clone, Debug, Serialize)]
-pub struct Persist(Vec<Item>);
+pub struct Persist(Vec<VecItem>);
 
 impl Deref for Persist {
-    type Target = Vec<Item>;
+    type Target = Vec<VecItem>;
+
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -331,7 +399,9 @@ impl<'de> Deserialize<'de> for Persist {
     where
         D: Deserializer<'de>,
     {
-        Ok(Persist(deserializer.deserialize_any(OneOrVecVisitor(PhantomData))?))
+        Ok(Persist(
+            deserializer.deserialize_any(OneOrVecVisitor(PhantomData))?,
+        ))
     }
 }
 
@@ -341,6 +411,8 @@ pub struct Urls(Vec<String>);
 
 impl Deref for Urls {
     type Target = Vec<String>;
+
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -351,7 +423,82 @@ impl<'de> Deserialize<'de> for Urls {
     where
         D: Deserializer<'de>,
     {
-        Ok(Urls(deserializer.deserialize_any(OneOrVecVisitor(PhantomData))?))
+        Ok(Urls(
+            deserializer.deserialize_any(OneOrVecVisitor(PhantomData))?,
+        ))
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct License {
+    identifier: String,
+    url: Option<String>,
+}
+
+impl License {
+    fn new(identifier: String, mut url: Option<String>) -> License {
+        // SPDX identifier detection
+        let id = identifier.as_str();
+        let is_spdx = self::license::SPDX.contains(id);
+        if url.is_none() && is_spdx {
+            url = Some(format!("https://spdx.org/licenses/{}.html", id));
+        }
+
+        License { identifier, url }
+    }
+
+    #[inline]
+    pub fn identifier(&self) -> &str {
+        &self.identifier
+    }
+
+    #[inline]
+    pub fn url(&self) -> Option<&String> {
+        self.url.as_ref()
+    }
+}
+
+impl<'de> Deserialize<'de> for License {
+    fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct LicenseVisitor;
+        impl<'de> Visitor<'de> for LicenseVisitor {
+            type Value = License;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("license string or map")
+            }
+
+            #[inline]
+            fn visit_str<E>(self, s: &str) -> StdResult<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(License::new(s.to_owned(), None))
+            }
+
+            fn visit_map<A>(self, mut map: A) -> StdResult<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                let mut identifier = Err(de::Error::missing_field("identifier"));
+                let mut url = None;
+
+                while let Some((key, value)) = map.next_entry()? {
+                    match key {
+                        "identifier" => identifier = Ok(value),
+                        "url" => url = Some(value),
+                        _ => continue,
+                    }
+                }
+
+                Ok(License::new(identifier?, url))
+            }
+        }
+
+        Ok(deserializer.deserialize_any(LicenseVisitor)?)
     }
 }
 
@@ -392,83 +539,34 @@ impl Hash {
 
 impl Deref for Hash {
     type Target = str;
+
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-fn deserialize_option_hashes<'de, D>(
-    deserializer: D,
-) -> StdResult<Option<Hashes>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct OptionalHashesVisitor;
-    impl<'de> Visitor<'de> for OptionalHashesVisitor {
-        type Value = Option<Hashes>;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("null or string or list of strings")
-        }
-
-        fn visit_none<E>(self) -> StdResult<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            Ok(None)
-        }
-
-        fn visit_some<D>(self, d: D) -> StdResult<Self::Value, D::Error>
-        where
-            D: de::Deserializer<'de>,
-        {
-            let inner = d.deserialize_any(HashVisitor)?;
-            Ok(Some(Hashes(inner)))
-        }
-    }
-
-    struct HashVisitor;
-    impl<'de> Visitor<'de> for HashVisitor {
-        type Value = Vec<Hash>;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("hash string or list of hash strings")
-        }
-
-        fn visit_str<E>(self, s: &str) -> StdResult<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            Hash::from_str(s).map(|hs| vec![hs]).map_err(E::custom)
-        }
-
-        fn visit_seq<S>(self, mut seq: S) -> StdResult<Self::Value, S::Error>
-        where
-            S: SeqAccess<'de>,
-        {
-            let mut v: Vec<Hash> = Vec::new();
-            while let Some(item) = seq.next_element()? {
-                match Hash::from_str(item).map_err(de::Error::custom) {
-                    Ok(hs) => v.push(hs),
-                    Err(e) => return Err(e),
-                }
-            }
-
-            Ok(v)
-        }
-    }
-
-    deserializer.deserialize_option(OptionalHashesVisitor)
-}
-
 /// A representation of the download files' hashes of a Scoop app manifest.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Hashes(Vec<Hash>);
 
 impl Deref for Hashes {
     type Target = Vec<Hash>;
+
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for Hashes {
+    fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Hashes(
+            deserializer.deserialize_any(OneOrVecVisitor(PhantomData))?,
+        ))
     }
 }
 
@@ -501,15 +599,64 @@ impl Manifest {
         let name = leaf_base(path);
         let bucket = utils::extract_bucket_from(path);
         let path = path.as_ref().to_path_buf();
-        // log::debug!("{:?}", data);
+        log::debug!("{:?}", data);
 
         Ok(Manifest {
             name,
             path,
             bucket,
-            data,
+            inner: data,
             _private: (),
         })
+    }
+
+    #[inline]
+    pub fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    #[inline]
+    pub fn get_manifest_bucket(&self) -> Option<&String> {
+        self.bucket.as_ref()
+    }
+
+    #[inline]
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    #[inline]
+    pub fn get_version(&self) -> &str {
+        &self.inner.version
+    }
+
+    #[inline]
+    pub fn get_description(&self) -> Option<&String> {
+        self.inner.description.as_ref()
+    }
+
+    #[inline]
+    pub fn get_homepage(&self) -> Option<&String> {
+        self.inner.homepage.as_ref()
+    }
+
+    #[inline]
+    pub fn get_license(&self) -> Option<&License> {
+        self.inner.license.as_ref()
+    }
+
+    #[inline]
+    pub fn get_checkver(&self) -> Option<&Checkver> {
+        self.inner.checkver.as_ref()
+    }
+
+    #[inline]
+    pub fn get_bins(&self) -> Option<Bins> {
+        let manifest = &self.inner;
+
+        // TODO
+
+        manifest.bin.clone()
     }
 
     /// Extract download urls from this manifest, in following order:
@@ -518,7 +665,7 @@ impl Manifest {
     /// 2. then if "32bit" urls are available, return;
     /// 3. fallback to return common urls.
     pub fn get_download_urls(&self) -> Urls {
-        let manifest = &self.data;
+        let manifest = &self.inner;
 
         match manifest.architecture.clone() {
             Some(arch) => {
@@ -554,7 +701,7 @@ impl Manifest {
     /// 2. then if "32bit" hashes are available, return;
     /// 3. fallback to return common hashes.
     pub fn get_hashes(&self) -> Option<Hashes> {
-        let manifest = &self.data;
+        let manifest = &self.inner;
 
         // `nightly` version does not have hashes.
         if manifest.version == "nightly" {
