@@ -8,48 +8,28 @@ use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 
+/// A representation of an installed Scoop app.
 #[derive(Debug)]
 pub struct App {
-    pub name: String,
+    name: String,
     path: PathBuf,
 }
 
-#[derive(Debug)]
-pub struct AppManager {
-    working_dir: PathBuf,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct InstallInfo {
-    pub architecture: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub bucket: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    hold: Option<bool>,
-}
-
-impl InstallInfo {
-    pub fn hold(&mut self) -> &Self {
-        self.hold = Some(true);
-        self
-    }
-
-    pub fn unhold(&mut self) -> &Self {
-        self.hold = None;
-        self
-    }
-
-    pub fn is_hold(&self) -> bool {
-        self.hold == Some(true)
-    }
-}
-
 impl App {
-    pub fn new(path: PathBuf) -> App {
+    /// Create a Scoop [`App`] with the given PathBuf.
+    ///
+    /// This constructor is marked as private, since we don't want any caller
+    /// outside the [`AppManager`] to create new App directly.
+    #[inline]
+    fn new(path: PathBuf) -> App {
         let name = leaf(path.as_path()).to_string();
         App { name, path }
+    }
+
+    /// Get the `app_name` of this [`App`]
+    #[inline(always)]
+    pub fn name(&self) -> String {
+        self.name.clone()
     }
 
     pub fn current_version(&self) -> String {
@@ -146,10 +126,47 @@ impl App {
     }
 }
 
+#[derive(Debug)]
+pub struct AppManager {
+    working_dir: PathBuf,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct InstallInfo {
+    pub architecture: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bucket: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hold: Option<bool>,
+}
+
+impl InstallInfo {
+    pub fn hold(&mut self) -> &Self {
+        self.hold = Some(true);
+        self
+    }
+
+    pub fn unhold(&mut self) -> &Self {
+        self.hold = None;
+        self
+    }
+
+    pub fn is_hold(&self) -> bool {
+        self.hold == Some(true)
+    }
+}
+
 impl AppManager {
     /// Create an [`AppsManager`] from the given Scoop [`Config`]
     pub fn new(working_dir: PathBuf) -> AppManager {
         AppManager { working_dir }
+    }
+
+    pub fn add(&self, app_name: &str) -> App {
+        let path = self.working_dir.join(app_name);
+        App::new(path)
     }
 
     /// Create an [`AppsManager`] and set its working directory to the given

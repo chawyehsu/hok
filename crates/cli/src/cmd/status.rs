@@ -12,27 +12,27 @@ pub fn cmd_status(_: &ArgMatches, scoop: &mut scoop_core::Scoop) {
     installed_apps.into_iter().for_each(|app| {
         let install_info = app.current_install_info().ok();
         match install_info {
-            None => failed_apps.push(app.name),
+            None => failed_apps.push(app.name()),
             Some(info) => {
                 let cur_version = app.current_version();
                 let is_hold = info.is_hold();
 
                 if info.bucket.is_some() {
-                    let pattern = format!("{}/{}", info.bucket.unwrap(), app.name);
+                    let pattern = format!("{}/{}", info.bucket.unwrap(), app.name());
 
                     match scoop.find_local_manifest(pattern).unwrap() {
-                        None => removed_apps.push(app.name),
+                        None => removed_apps.push(app.name()),
                         Some(manifest) => {
-                            let latest_version = manifest.data.version;
+                            let latest_version = manifest.get_version().to_owned();
                             match compare_versions(&latest_version, &cur_version) {
                                 Ordering::Greater => {
                                     outdated_apps.push((
-                                        app.name.clone(),
+                                        app.name(),
                                         cur_version.clone(),
                                         latest_version.clone(),
                                     ));
                                     if is_hold {
-                                        onhold_apps.push((app.name, cur_version, latest_version));
+                                        onhold_apps.push((app.name(), cur_version, latest_version));
                                     }
                                 }
                                 _ => {}

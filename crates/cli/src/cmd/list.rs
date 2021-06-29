@@ -16,7 +16,7 @@ pub fn cmd_list(_matches: &ArgMatches, scoop: &mut Scoop) {
                 let install_info = app.current_install_info();
 
                 // name, version
-                print!("  {} {}", app.name, version);
+                print!("  {} {}", app.name(), version);
                 // global
                 // if app.global {
                 //   print!(" *global*");
