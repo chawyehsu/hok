@@ -60,10 +60,32 @@ pub enum HashExtractionMode {
 ////////////////////////////////////////////////////////////////////////////////
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Installer {
-    pub args: Option<VecItem>,
-    pub file: Option<String>,
-    pub script: Option<VecItem>,
-    pub keep: Option<bool>,
+    args: Option<VecItem>,
+    file: Option<String>,
+    script: Option<VecItem>,
+    keep: Option<bool>,
+}
+
+impl Installer {
+    #[inline]
+    pub fn get_args(&self) -> Option<&VecItem> {
+        self.args.as_ref()
+    }
+
+    #[inline]
+    pub fn get_file(&self) -> Option<&String> {
+        self.file.as_ref()
+    }
+
+    #[inline]
+    pub fn get_script(&self) -> Option<&VecItem> {
+        self.script.as_ref()
+    }
+
+    #[inline]
+    pub fn is_keep(&self) -> bool {
+        self.keep.unwrap_or(false)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -75,18 +97,18 @@ pub struct Uninstaller {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ArchitectureInner {
-    pub bin: Option<Bins>,
-    pub checkver: Option<Checkver>,
-    pub env_add_path: Option<VecItem>,
-    pub env_set: Option<Map<String, serde_json::Value>>,
-    pub extract_dir: Option<VecItem>,
-    pub hash: Option<Hashes>,
-    pub installer: Option<Installer>,
-    pub post_install: Option<VecItem>,
-    pub pre_install: Option<VecItem>,
-    pub shortcuts: Option<Vec<ShortcutsType>>,
-    pub uninstaller: Option<Uninstaller>,
-    pub url: Option<Urls>,
+    bin: Option<Bins>,
+    checkver: Option<Checkver>,
+    env_add_path: Option<VecItem>,
+    env_set: Option<Map<String, serde_json::Value>>,
+    extract_dir: Option<VecItem>,
+    hash: Option<Hashes>,
+    installer: Option<Installer>,
+    post_install: Option<VecItem>,
+    pre_install: Option<VecItem>,
+    shortcuts: Option<Vec<ShortcutsType>>,
+    uninstaller: Option<Uninstaller>,
+    url: Option<Urls>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -139,30 +161,30 @@ pub struct Psmodule {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ManifestInner {
-    pub architecture: Option<Architecture>,
-    pub autoupdate: Option<Autoupdate>,
+    architecture: Option<Architecture>,
+    autoupdate: Option<Autoupdate>,
     bin: Option<Bins>,
-    pub persist: Option<Persist>,
-    pub checkver: Option<Checkver>,
-    pub cookie: Option<serde_json::Value>,
-    pub depends: Option<VecItem>,
+    persist: Option<Persist>,
+    checkver: Option<Checkver>,
+    cookie: Option<Map<String, serde_json::Value>>,
+    depends: Option<VecItem>,
     description: Option<String>,
-    pub env_add_path: Option<VecItem>,
-    pub env_set: Option<Map<String, serde_json::Value>>,
-    pub extract_dir: Option<VecItem>,
-    pub extract_to: Option<VecItem>,
-    pub hash: Option<Hashes>,
+    env_add_path: Option<VecItem>,
+    env_set: Option<Map<String, serde_json::Value>>,
+    extract_dir: Option<VecItem>,
+    extract_to: Option<VecItem>,
+    hash: Option<Hashes>,
     homepage: Option<String>,
     innosetup: Option<bool>,
-    pub installer: Option<Installer>,
+    installer: Option<Installer>,
     license: Option<License>,
-    pub notes: Option<VecItem>,
-    pub post_install: Option<VecItem>,
-    pub pre_install: Option<VecItem>,
-    pub psmodule: Option<Psmodule>,
-    pub shortcuts: Option<Vec<ShortcutsType>>,
-    pub suggest: Option<serde_json::Value>,
-    pub uninstaller: Option<Uninstaller>,
+    notes: Option<VecItem>,
+    post_install: Option<VecItem>,
+    pre_install: Option<VecItem>,
+    psmodule: Option<Psmodule>,
+    shortcuts: Option<Vec<ShortcutsType>>,
+    suggest: Option<serde_json::Value>,
+    uninstaller: Option<Uninstaller>,
     url: Option<Urls>,
     version: String,
 }
@@ -178,11 +200,8 @@ pub struct Manifest {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Checkver {
-    // pub github: Option<String>,
-    // pub re: Option<String>,
     pub regex: Option<String>,
     pub url: Option<String>,
-    // pub jp: Option<String>,
     pub jsonpath: Option<String>,
     pub xpath: Option<String>,
     pub reverse: Option<bool>,
@@ -240,15 +259,16 @@ impl<'de> Deserialize<'de> for Checkver {
 
                 while let Some(key) = map.next_key()? {
                     match key {
+                        "github" => {
+                            let prefix: String = map.next_value()?;
+                            url = Some(format!("{}/releases/latest", prefix));
+                            regex = Some("/releases/tag/(?:v|V)?([\\d.]+)".to_owned());
+                        },
                         "re" | "regex" => regex = Some(map.next_value()?),
                         "url" => url = Some(map.next_value()?),
                         "jp" | "jsonpath" => jsonpath = Some(map.next_value()?),
                         "xpath" => xpath = Some(map.next_value()?),
-                        "reverse" => {
-                            let val =
-                                bool::from_str(map.next_value()?).map_err(de::Error::custom)?;
-                            reverse = Some(val);
-                        }
+                        "reverse" => reverse = Some(map.next_value()?),
                         "replace" => replace = Some(map.next_value()?),
                         "useragent" => useragent = Some(map.next_value()?),
                         "script" => {
@@ -259,7 +279,11 @@ impl<'de> Deserialize<'de> for Checkver {
                                 .map_err(de::Error::custom)?;
                             script = Some(VecItem(vi))
                         }
-                        _ => continue,
+                        _ => {
+                            // skip next_value
+                            let _ = map.next_value()?;
+                            continue
+                        },
                     }
                 }
 
@@ -570,6 +594,181 @@ impl<'de> Deserialize<'de> for Hashes {
     }
 }
 
+impl Architecture {
+    #[inline]
+    pub fn ia32(&self) -> Option<&ArchitectureInner> {
+        self.ia32.as_ref()
+    }
+
+    #[inline]
+    pub fn amd64(&self) -> Option<&ArchitectureInner> {
+        self.amd64.as_ref()
+    }
+}
+
+impl ArchitectureInner {
+    #[inline]
+    pub fn get_bin(&self) -> Option<&Bins> {
+        self.bin.as_ref()
+    }
+
+    #[inline]
+    pub fn get_checkver(&self) -> Option<&Checkver> {
+        self.checkver.as_ref()
+    }
+
+    #[inline]
+    pub fn get_hash(&self) -> Option<&Hashes> {
+        self.hash.as_ref()
+    }
+
+    #[inline]
+    pub fn get_post_install(&self) -> Option<&VecItem> {
+        self.post_install.as_ref()
+    }
+
+    #[inline]
+    pub fn get_pre_install(&self) -> Option<&VecItem> {
+        self.pre_install.as_ref()
+    }
+
+    #[inline]
+    pub fn get_installer(&self) -> Option<&Installer> {
+        self.installer.as_ref()
+    }
+
+    #[inline]
+    pub fn get_shortcuts(&self) -> Option<&Vec<ShortcutsType>> {
+        self.shortcuts.as_ref()
+    }
+
+    #[inline]
+    pub fn get_url(&self) -> Option<&Urls> {
+        self.url.as_ref()
+    }
+}
+
+impl ManifestInner {
+    #[inline]
+    pub fn get_architecture(&self) -> Option<&Architecture> {
+        self.architecture.as_ref()
+    }
+
+    #[inline]
+    pub fn get_hash(&self) -> Option<&Hashes> {
+        self.hash.as_ref()
+    }
+
+    #[inline]
+    pub fn get_url(&self) -> Option<&Urls> {
+        self.url.as_ref()
+    }
+
+    #[inline]
+    pub fn get_post_install(&self) -> Option<&VecItem> {
+        match self.get_architecture() {
+            None => {}
+            Some(arch) => {
+                // amd64
+                if cfg!(target_arch = "x86_64") {
+                    if arch.amd64().is_some() {
+                        let post_install = arch.amd64().unwrap().get_post_install();
+                        // ensure post_install script exists while return,
+                        // or fallback to the arch-less post_install one.
+                        if post_install.is_some() {
+                            return post_install;
+                        }
+                    }
+                }
+
+                // ia32
+                if cfg!(target_arch = "x86") {
+                    if arch.ia32().is_some() {
+                        let post_install = arch.ia32().unwrap().get_post_install();
+                        if post_install.is_some() {
+                            return post_install;
+                        }
+                    }
+                }
+            }
+        }
+
+        // fallback, arch-less `post_install`
+        self.post_install.as_ref()
+    }
+
+    #[inline]
+    pub fn get_pre_install(&self) -> Option<&VecItem> {
+        match self.get_architecture() {
+            None => {}
+            Some(arch) => {
+                // amd64
+                if cfg!(target_arch = "x86_64") {
+                    if arch.amd64().is_some() {
+                        let pre_install = arch.amd64().unwrap().get_pre_install();
+                        // ensure pre_install script exists while return,
+                        // or fallback to the arch-less pre_install one.
+                        if pre_install.is_some() {
+                            return pre_install;
+                        }
+                    }
+                }
+
+                // ia32
+                if cfg!(target_arch = "x86") {
+                    if arch.ia32().is_some() {
+                        let pre_install = arch.ia32().unwrap().get_pre_install();
+                        if pre_install.is_some() {
+                            return pre_install;
+                        }
+                    }
+                }
+            }
+        }
+
+        // fallback, arch-less `pre_install`
+        self.pre_install.as_ref()
+    }
+
+    #[inline]
+    pub fn get_installer(&self) -> Option<&Installer> {
+        match self.get_architecture() {
+            None => {}
+            Some(arch) => {
+                // amd64
+                if cfg!(target_arch = "x86_64") {
+                    if arch.amd64().is_some() {
+                        let installer = arch.amd64().unwrap().get_installer();
+                        // ensure installer script exists while return,
+                        // or fallback to the arch-less installer one.
+                        if installer.is_some() {
+                            return installer;
+                        }
+                    }
+                }
+
+                // ia32
+                if cfg!(target_arch = "x86") {
+                    if arch.ia32().is_some() {
+                        let installer = arch.ia32().unwrap().get_installer();
+                        if installer.is_some() {
+                            return installer;
+                        }
+                    }
+                }
+            }
+        }
+
+        // fallback, arch-less `installer`
+        self.installer.as_ref()
+    }
+
+    #[inline]
+    pub fn get_shortcuts(&self) -> Option<&Vec<ShortcutsType>> {
+        self.shortcuts.as_ref()
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //  Manifest impls
 ////////////////////////////////////////////////////////////////////////////////
@@ -595,11 +794,12 @@ impl Manifest {
         // to integrate. But I believe there should be an alternative to
         // `serde_json` which can parse json file much *faster*, perhaps
         // `simd_json` can be. See https://github.com/serde-rs/json-benchmark
-        let data = serde_json::from_slice(&bytes)?;
+        let data: ManifestInner = serde_json::from_slice(&bytes)?;
         let name = leaf_base(path);
         let bucket = utils::extract_bucket_from(path);
         let path = path.as_ref().to_path_buf();
-        log::debug!("{:?}", data);
+        // let _ = serde_json::to_writer_pretty(std::io::stdout(), &data);
+        // log::debug!("{:?}", data.get_shortcuts());
 
         Ok(Manifest {
             name,
@@ -651,7 +851,17 @@ impl Manifest {
     }
 
     #[inline]
-    pub fn get_bins(&self) -> Option<Bins> {
+    pub fn get_architecture(&self) -> Option<&Architecture> {
+        self.inner.architecture.as_ref()
+    }
+
+    #[inline]
+    pub fn get_cookie(&self) -> Option<&Map<String, serde_json::Value>> {
+        self.inner.cookie.as_ref()
+    }
+
+    #[inline]
+    pub fn get_bin(&self) -> Option<Bins> {
         let manifest = &self.inner;
 
         // TODO
@@ -659,77 +869,80 @@ impl Manifest {
         manifest.bin.clone()
     }
 
+    #[inline]
+    pub fn is_innosetup(&self) -> bool {
+        self.inner.innosetup.unwrap_or(false)
+    }
+
     /// Extract download urls from this manifest, in following order:
     ///
-    /// 1. if "64bit" urls are available, return;
-    /// 2. then if "32bit" urls are available, return;
+    /// 1. return "64bit" urls for amd64 arch if available;
+    /// 2. return "32bit" urls for ia32 arch if available;
     /// 3. fallback to return common urls.
-    pub fn get_download_urls(&self) -> Urls {
-        let manifest = &self.inner;
-
-        match manifest.architecture.clone() {
+    pub fn get_url(&self) -> &Urls {
+        match self.get_architecture() {
+            None => {}
             Some(arch) => {
-                // Find amd64 urls first
-                if arch.amd64.is_some() && utils::os_is_arch64() {
-                    match arch.amd64.unwrap().url {
-                        Some(url) => return url,
-                        None => {}
+                // arch amd64
+                if cfg!(target_arch = "x86_64") {
+                    if arch.amd64().is_some() {
+                        let urls = arch.amd64().unwrap().get_url();
+                        if urls.is_some() {
+                            return urls.unwrap();
+                        }
                     }
                 }
 
-                // Find ia32 urls if amd64 is not available
-                if arch.ia32.is_some() {
-                    match arch.ia32.unwrap().url {
-                        Some(url) => return url,
-                        None => {}
+                // arch ia32
+                if cfg!(target_arch = "x86") {
+                    if arch.ia32().is_some() {
+                        let urls = arch.ia32().unwrap().get_url();
+                        if urls.is_some() {
+                            return urls.unwrap();
+                        }
                     }
                 }
             }
-            None => {}
         }
 
         // Finally fallback to common urls.
         //
-        // SAFETY: this is safe because a valid manifest must have at least
-        // one download url.
-        manifest.url.clone().unwrap()
+        // SAFETY: this unwrap is safe because a valid manifest must have at
+        // least one download url.
+        self.inner.get_url().unwrap()
     }
 
     /// Extract file hashes from this manifest, in following order:
     ///
-    /// 1. if "64bit" hashes are available, return;
-    /// 2. then if "32bit" hashes are available, return;
+    /// 1. return "64bit" hashes for amd64 arch if available;
+    /// 2. return "32bit" hashes for ia32 arch if available;
     /// 3. fallback to return common hashes.
-    pub fn get_hashes(&self) -> Option<Hashes> {
-        let manifest = &self.inner;
-
+    pub fn get_hash(&self) -> Option<&Hashes> {
         // `nightly` version does not have hashes.
-        if manifest.version == "nightly" {
+        if self.get_version() == "nightly" {
             return None;
         }
 
-        match manifest.architecture.clone() {
+        match self.get_architecture() {
+            None => {}
             Some(arch) => {
-                // Find amd64 hashes first
-                if arch.amd64.is_some() && utils::os_is_arch64() {
-                    let hashes = arch.amd64.unwrap().hash;
-                    if hashes.is_some() {
-                        return hashes.clone();
+                // arch amd64
+                if cfg!(target_arch = "x86_64") {
+                    if arch.amd64().is_some() {
+                        return arch.amd64().unwrap().get_hash();
                     }
                 }
 
-                // Find ia32 hashes if amd64 is not available
-                if arch.ia32.is_some() {
-                    let hashes = arch.ia32.unwrap().hash;
-                    if hashes.is_some() {
-                        return hashes.clone();
+                // arch ia32
+                if cfg!(target_arch = "x86") {
+                    if arch.ia32().is_some() {
+                        return arch.ia32().unwrap().get_hash();
                     }
                 }
             }
-            None => {}
         }
 
-        // Finally fallback to common hashes.
-        manifest.hash.clone()
+        // fallback
+        self.inner.get_hash()
     }
 }

@@ -1,63 +1,54 @@
 use std::path::PathBuf;
 
 use clap::ArgMatches;
-use scoop_core::{License, Scoop, fs::leaf};
+use scoop_core::{fs::leaf, Scoop};
 
 pub fn cmd_info(matches: &ArgMatches, scoop: &mut Scoop) {
     let app = matches.value_of("app").unwrap();
     match scoop.find_local_manifest(app) {
         Ok(Some(manifest)) => {
-            let name = manifest.name;
-            let path = manifest.path;
-            let bucket = manifest.bucket;
-            let data = manifest.data;
-
             // Name
-            println!("Name: {}", name);
+            println!("Name: {}", manifest.get_name());
             // Bucket
-            if bucket.is_some() {
-                println!("Bucket: {}", bucket.unwrap());
+            if let Some(bucket) = manifest.get_manifest_bucket() {
+                println!("Bucket: {}", bucket);
             }
             // Description
-            if data.description.is_some() {
-                println!("Description: {}", data.description.unwrap());
+            if let Some(description) = manifest.get_description() {
+                println!("Description: {}", description);
             }
             // Version
-            println!("Version: {}", data.version);
+            println!("Version: {}", manifest.get_version());
             // Homepage
-            if data.homepage.is_some() {
-                println!("Website: {}", data.homepage.unwrap());
+            if let Some(homepage) = manifest.get_homepage() {
+                println!("Website: {}", homepage);
             }
             // License
-            if data.license.is_some() {
-                let licenses = data.license.unwrap();
+            if let Some(license) = manifest.get_license() {
+                let identifier = license.identifier();
 
-                match licenses {
-                    License::Simple(str) => println!("License: {}", str),
-                    License::Complex(pair) => {
-                        println!("License:");
-                        match pair.url {
-                            Some(url) => println!("  {} ({})", pair.identifier, url),
-                            None => println!("  {}", pair.identifier),
-                        }
-                    }
+                if license.url().is_some() {
+                    let url = license.url().unwrap();
+                    println!("License:\n  {} ({})", identifier, url);
+                } else {
+                    println!("License: {}", identifier);
                 }
             }
             // Manifest
-            println!("Manifest:\n  {}", path.display());
+            println!("Manifest:\n  {}", manifest.path().display());
 
             // FIXME: check data.architecture.<arch>.bin
             // Binaries
-            if data.bin.is_some() {
-                let bins = data.bin.unwrap();
+            if let Some(bins) = manifest.get_bin() {
                 if bins.len() == 1 {
                     let bin = bins[0][0].as_str();
                     println!("Binary: {}", bin);
                 } else {
                     println!("Binaries:");
-                    let out = bins.iter().map(|b| {
-                        leaf(PathBuf::from(b[0].as_str()).as_path())
-                    }).collect::<Vec<String>>();
+                    let out = bins
+                        .iter()
+                        .map(|b| leaf(PathBuf::from(b[0].as_str()).as_path()))
+                        .collect::<Vec<String>>();
                     println!("  {}", out.join(" "));
                 }
             }
