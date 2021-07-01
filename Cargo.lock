@@ -1043,8 +1043,8 @@ dependencies = [
  "reqwest",
  "scoop-core",
  "scoop-hash",
- "serde_json",
  "sysinfo",
+ "termcolor",
  "tokio",
  "tokio-stream",
 ]
