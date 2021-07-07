@@ -1,3 +1,3 @@
-use scoop_core::Scoop;
+use scoop_core::Config;
 
-pub fn cmd_upgrade(_: &clap::ArgMatches, _scoop: &mut Scoop) {}
+pub fn cmd_upgrade(_: &clap::ArgMatches, _config: &Config) {}

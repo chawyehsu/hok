@@ -1,9 +1,11 @@
 use clap::ArgMatches;
-use scoop_core::utils::compare_versions;
+use scoop_core::{find_manifest, utils::compare_versions, AppManager, Config};
 use std::cmp::Ordering;
 
-pub fn cmd_status(_: &ArgMatches, scoop: &mut scoop_core::Scoop) {
-    let installed_apps = scoop.app_manager.installed_apps();
+pub fn cmd_status(_: &ArgMatches, config: &Config) {
+    let app_manager = AppManager::new(config);
+
+    let installed_apps = app_manager.installed_apps();
     let mut outdated_apps = Vec::new();
     let mut onhold_apps = Vec::new();
     let mut removed_apps = Vec::new();
@@ -20,7 +22,7 @@ pub fn cmd_status(_: &ArgMatches, scoop: &mut scoop_core::Scoop) {
                 if info.bucket.is_some() {
                     let pattern = format!("{}/{}", info.bucket.unwrap(), app.name());
 
-                    match scoop.find_local_manifest(pattern).unwrap() {
+                    match find_manifest(config, pattern).unwrap() {
                         None => removed_apps.push(app.name()),
                         Some(manifest) => {
                             let latest_version = manifest.get_version().to_owned();

@@ -1,6 +1,6 @@
 use crate::fs::leaf;
 use crate::utils::compare_versions;
-use crate::Result;
+use crate::{Config, ScoopResult};
 use serde::Deserialize;
 use std::fs::OpenOptions;
 use std::fs::{DirEntry, File};
@@ -55,11 +55,11 @@ impl App {
         versions
     }
 
-    pub fn current_install_info(&self) -> Result<InstallInfo> {
+    pub fn current_install_info(&self) -> ScoopResult<InstallInfo> {
         self.install_info_of(self.current_version())
     }
 
-    pub fn install_info_of<S: AsRef<str>>(&self, version: S) -> Result<InstallInfo> {
+    pub fn install_info_of<S: AsRef<str>>(&self, version: S) -> ScoopResult<InstallInfo> {
         let path = self.path.join(version.as_ref()).join("install.json");
 
         let mut bytes = Vec::new();
@@ -67,7 +67,7 @@ impl App {
         Ok(serde_json::from_slice(&bytes)?)
     }
 
-    pub fn hold(&self) -> Result<()> {
+    pub fn hold(&self) -> ScoopResult<()> {
         let version = self.current_version();
         let path = self.path.join(version.as_str()).join("install.json");
         let mut cur_info = self.install_info_of(version.as_str())?;
@@ -76,7 +76,7 @@ impl App {
         Ok(())
     }
 
-    pub fn unhold(&self) -> Result<()> {
+    pub fn unhold(&self) -> ScoopResult<()> {
         let version = self.current_version();
         let path = self.path.join(version.as_str()).join("install.json");
         let mut cur_info = self.install_info_of(version.as_str())?;
@@ -127,7 +127,8 @@ impl App {
 }
 
 #[derive(Debug)]
-pub struct AppManager {
+pub struct AppManager<'a> {
+    config: &'a Config,
     working_dir: PathBuf,
 }
 
@@ -158,33 +159,19 @@ impl InstallInfo {
     }
 }
 
-impl AppManager {
+impl<'a> AppManager<'a> {
     /// Create an [`AppsManager`] from the given Scoop [`Config`]
-    pub fn new(working_dir: PathBuf) -> AppManager {
-        AppManager { working_dir }
+    pub fn new(config: &Config) -> AppManager {
+        let working_dir = config.get_root_path().join("apps");
+        AppManager {
+            config,
+            working_dir,
+        }
     }
 
     pub fn add(&self, app_name: &str) -> App {
         let path = self.working_dir.join(app_name);
         App::new(path)
-    }
-
-    /// Create an [`AppsManager`] and set its working directory to the given
-    /// [`PathBuf`].
-    ///
-    /// Caveats: the constructor does not validate the given PathBuf. Caller
-    /// should ensure the path is a valid apps directory.
-    ///
-    /// # Examples
-    ///
-    /// Basic usage:
-    ///
-    /// ```
-    /// let working_dir = PathBuf::from(r"C:\Scoop\apps");
-    /// let am = AppManager::from(working_dir);
-    /// ```
-    pub fn from(working_dir: PathBuf) -> AppManager {
-        AppManager { working_dir }
     }
 
     /// Check if app of the given name is installed.

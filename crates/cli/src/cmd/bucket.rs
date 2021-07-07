@@ -1,56 +1,33 @@
 use clap::ArgMatches;
-use scoop_core::{is_known_bucket, known_bucket_url, known_buckets, Scoop};
+use scoop_core::{BucketManager, Config};
 
-pub fn cmd_bucket(matches: &ArgMatches, scoop: &mut Scoop) {
+use crate::error::CliResult;
+
+pub fn cmd_bucket(matches: &ArgMatches, config: &Config) -> CliResult<()> {
+    let bucket_manager = BucketManager::new(config);
+
     match matches.subcommand() {
         ("add", Some(matches)) => {
-            let bucket_name = matches.value_of("name").unwrap();
-
-            if scoop.bucket_manager.contains(bucket_name) {
-                println!("The '{}' already exists.", bucket_name);
-                std::process::exit(1);
-            }
-
-            if is_known_bucket(bucket_name) {
-                let bucket_url = known_bucket_url(bucket_name).unwrap();
-                scoop.git.clone(bucket_name, bucket_url).unwrap();
-            } else {
-                match matches.value_of("repo") {
-                    Some(repo) => {
-                        scoop.git.clone(bucket_name, repo).unwrap();
-                    }
-                    None => {
-                        eprintln!("<repo> is required for unknown bucket.");
-                        std::process::exit(1);
-                    }
-                }
-            }
+            let name = matches.value_of("name").unwrap();
+            let repo = matches.value_of("repo");
+            return bucket_manager.add_bucket(name, repo);
         }
         ("list", Some(_)) => {
-            for b in scoop.bucket_manager.get_buckets() {
-                println!("{}", b.0.as_str());
-            }
+            bucket_manager.buckets().iter().for_each(|(name, _)| {
+                println!("{}", name);
+            });
         }
         ("known", Some(_)) => {
-            for b in known_buckets() {
-                println!("{}", b);
-            }
+            bucket_manager.known_buckets().iter().for_each(|name| {
+                println!("{}", name);
+            });
         }
-        ("rm", Some(matches)) => {
-            let bucket_name = matches.value_of("name").unwrap();
-
-            if scoop.bucket_manager.contains(bucket_name) {
-                let bucket_dir = scoop.config.root_path.join("buckets").join(bucket_name);
-                if bucket_dir.exists() {
-                    match remove_dir_all::remove_dir_all(bucket_dir) {
-                        Ok(()) => {}
-                        Err(e) => panic!("failed to remove '{}' bucket. {}", bucket_name, e),
-                    };
-                }
-            } else {
-                println!("The '{}' bucket not found.", bucket_name);
-            }
+        ("remove", Some(matches)) => {
+            let name = matches.value_of("name").unwrap();
+            return bucket_manager.remove_bucket(name);
         }
         _ => unreachable!(),
     }
+
+    Ok(())
 }

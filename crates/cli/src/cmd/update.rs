@@ -1,25 +1,21 @@
 use chrono::{SecondsFormat, Utc};
-use scoop_core::Scoop;
+use scoop_core::{BucketManager, Config};
 
-pub fn cmd_update(_: &clap::ArgMatches, scoop: &mut Scoop) {
-    for (bucket_name, bucket) in scoop.bucket_manager.get_buckets() {
-        print!("Updating '{}' bucket...", bucket_name);
+pub fn cmd_update(_: &clap::ArgMatches, config: &mut Config) {
+    let bucket_manager = BucketManager::new(config);
 
-        match scoop.git.reset_head(bucket.path.as_path()) {
+    bucket_manager.buckets().iter().for_each(|(name, bucket)| {
+        print!("Updating '{}' bucket...", name);
+        match bucket.update() {
             Ok(()) => {}
             Err(e) => {
                 print!(" failed. ({})", e);
             }
         }
-
         println!("");
-    }
+    });
 
     // update lastupdate
     let time = Utc::now().to_rfc3339_opts(SecondsFormat::Micros, false);
-    scoop
-        .config
-        .set("lastupdate", time.as_str())
-        .unwrap()
-        .save();
+    config.set("lastupdate", time.as_str()).unwrap().save();
 }

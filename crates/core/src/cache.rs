@@ -1,4 +1,4 @@
-use crate::error::Result;
+use crate::{error::ScoopResult, Config};
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
 use std::{
@@ -83,21 +83,26 @@ impl CacheEntry {
 }
 
 #[derive(Debug)]
-pub struct CacheManager {
+pub struct CacheManager<'a> {
+    config: &'a Config,
     working_dir: PathBuf,
 }
 
-impl CacheManager {
+impl<'a> CacheManager<'a> {
     /// Create a Scoop [`CacheManager`] with the given PathBuf. The given
     /// PathBuf will be the working directory of this CacheManager.
     #[inline]
-    pub fn new(working_dir: PathBuf) -> CacheManager {
-        CacheManager { working_dir }
+    pub fn new(config: &Config) -> CacheManager {
+        let working_dir = config.cache_path.clone();
+        CacheManager {
+            config,
+            working_dir,
+        }
     }
 
     /// Get all cache files representing as [`CacheEntry`].
     #[inline]
-    pub fn get_all(&self) -> Result<Vec<CacheEntry>> {
+    pub fn get_all(&self) -> ScoopResult<Vec<CacheEntry>> {
         // regex to match valid named cache files:
         // "app#version#filenamified_url"
         static RE: Lazy<Regex> = Lazy::new(|| {
@@ -120,7 +125,7 @@ impl CacheManager {
     /// Get cache files, which its name matching the given `pattern`,
     /// representing as [`CacheEntry`].
     #[inline]
-    pub fn get<T: AsRef<str>>(&self, pattern: T) -> Result<Vec<CacheEntry>> {
+    pub fn get<T: AsRef<str>>(&self, pattern: T) -> ScoopResult<Vec<CacheEntry>> {
         let all_cache_items = self.get_all();
 
         match pattern.as_ref() {
@@ -134,14 +139,14 @@ impl CacheManager {
 
     /// Remove all cache files.
     #[inline]
-    pub fn remove_all(&self) -> Result<()> {
+    pub fn remove_all(&self) -> ScoopResult<()> {
         Ok(crate::fs::empty_dir(&self.working_dir)?)
     }
 
     /// Remove cache files, which its name matching the given `pattern`.
     /// (wildcard `*` pattern is support)
     #[inline]
-    pub fn remove<T: AsRef<str>>(&self, app_name: T) -> Result<()> {
+    pub fn remove<T: AsRef<str>>(&self, app_name: T) -> ScoopResult<()> {
         match app_name.as_ref() {
             "*" => Ok(self.remove_all()?),
             _ => {

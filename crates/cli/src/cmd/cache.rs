@@ -1,11 +1,12 @@
 use clap::ArgMatches;
 
-use scoop_core::{utils, Scoop};
+use scoop_core::{utils, CacheManager, Config};
 
-pub fn cmd_cache(matches: &ArgMatches, scoop: &mut Scoop) {
+pub fn cmd_cache(matches: &ArgMatches, config: &Config) {
+    let cache_manager = CacheManager::new(config);
     if let Some(sub_m2) = matches.subcommand_matches("rm") {
         if let Some(app_name) = sub_m2.value_of("app") {
-            match scoop.cache_manager.remove(app_name) {
+            match cache_manager.remove(app_name) {
                 Ok(()) => {
                     match app_name == "*" {
                         true => println!("All download caches were removed."),
@@ -19,7 +20,7 @@ pub fn cmd_cache(matches: &ArgMatches, scoop: &mut Scoop) {
                 }
             }
         } else if sub_m2.is_present("all") {
-            match scoop.cache_manager.remove_all() {
+            match cache_manager.remove_all() {
                 Ok(()) => {
                     println!("All download caches were removed.");
                     std::process::exit(0);
@@ -31,7 +32,7 @@ pub fn cmd_cache(matches: &ArgMatches, scoop: &mut Scoop) {
             }
         }
     } else {
-        let cache_items = scoop.cache_manager.get_all().unwrap();
+        let cache_items = cache_manager.get_all().unwrap();
         let mut total_size: u64 = 0;
         let total_count = cache_items.len();
 

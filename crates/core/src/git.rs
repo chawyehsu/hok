@@ -1,27 +1,14 @@
-use crate::{
-    config::Config,
-    error::{Error, ErrorKind, Result},
-};
-use git2::{ProxyOptions, Repository};
-use std::{io::Write, path::Path, result};
+use crate::{config::Config, error::ScoopResult};
+use std::{path::Path, result};
 
-#[derive(Debug)]
-pub struct GitTool {
+pub struct Git {
     proxy: Option<String>,
 }
 
-impl GitTool {
-    pub fn new(config: &Config) -> GitTool {
-        match config.proxy.clone() {
-            Some(mut proxy) => {
-                if !proxy.starts_with("http") {
-                    proxy.insert_str(0, "http://");
-                }
-
-                GitTool { proxy: Some(proxy) }
-            }
-            None => GitTool { proxy: None },
-        }
+impl Git {
+    pub fn new(config: &Config) -> Git {
+        let proxy = config.proxy.clone();
+        Git { proxy }
     }
 
     fn fetch_options(&self) -> git2::FetchOptions {
@@ -30,7 +17,7 @@ impl GitTool {
 
         cb.credentials(
             move |url, username, cred| -> result::Result<git2::Cred, git2::Error> {
-                // println!("{:?} {:?} {:?}", url, username, cred);
+                log::trace!("{:?} {:?} {:?}", url, username, cred);
                 let user = username.unwrap_or("git");
                 let ref cfg = git2::Config::open_default()?;
 
@@ -48,13 +35,16 @@ impl GitTool {
 
         fo.remote_callbacks(cb);
 
-        match &self.proxy {
-            Some(proxy) => {
-                let mut po = ProxyOptions::new();
-                po.url(proxy.as_str());
-                fo.proxy_options(po);
+        if self.proxy.is_some() {
+            let mut proxy = self.proxy.clone().unwrap();
+            // prepend protocol if it does not exist
+            if !(proxy.starts_with("http") || proxy.starts_with("socks")) {
+                proxy.insert_str(0, "http://");
             }
-            None => {}
+
+            let mut po = git2::ProxyOptions::new();
+            po.url(proxy.as_str());
+            fo.proxy_options(po);
         }
 
         fo
@@ -67,31 +57,20 @@ impl GitTool {
         repo_builder
     }
 
-    pub fn clone<S: AsRef<str>, P: AsRef<Path>>(&self, local_path: P, remote_url: S) -> Result<()> {
-        print!("Checking repo... ");
-        std::io::stdout().flush().unwrap();
-
-        let mut rb = self.repo_builder();
-        match rb.clone(remote_url.as_ref(), local_path.as_ref()) {
-            Ok(_repo) => {
-                print!("ok\n");
-                std::io::stdout().flush().unwrap();
-                println!(
-                    "The {} bucket was added successfully.",
-                    local_path.as_ref().to_str().unwrap()
-                );
-                return Ok(());
-            }
-            Err(_e) => {
-                let msg = format!("Failed to clone repo {} as bucket.", remote_url.as_ref());
-                return Err(Error(ErrorKind::Custom(msg)));
-            }
-        }
+    pub fn clone<S, P>(&self, local_path: P, remote_url: S) -> ScoopResult<()>
+    where
+        S: AsRef<str>,
+        P: AsRef<Path>,
+    {
+        self.repo_builder()
+            .clone(remote_url.as_ref(), local_path.as_ref())
+            .map_err(anyhow::Error::from)
+            .map(|_| ())
     }
 
     // NOTE: this will discard all local changes.
-    pub fn reset_head<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let repo = Repository::open(path.as_ref())?;
+    pub fn reset_head<P: AsRef<Path>>(&self, path: P) -> ScoopResult<()> {
+        let repo = git2::Repository::open(path.as_ref())?;
 
         let mut origin = repo.find_remote("origin")?;
         // fetch origin all refs

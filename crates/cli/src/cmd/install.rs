@@ -2,18 +2,19 @@ use crate::indicator::pb_download;
 use crate::tokio_util::{block_on, StreamExt};
 use clap::ArgMatches;
 use scoop_core::fs::leaf;
-use scoop_core::Scoop;
+use scoop_core::{find_manifest, AppManager, CacheManager, Config, HttpClient};
 use std::cmp::min;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
-async fn download_file<'a>(
-    scoop: &Scoop<'a>,
+async fn download_file(
+    config: &Config,
     app: &str,
     version: &str,
     url: &str,
     ignore_cache: bool,
+    hash: Option<&str>,
 ) {
     // Remove the trailing file renaming part
     let original_url = url.split_once("#").unwrap_or((url, "")).0;
@@ -22,7 +23,8 @@ async fn download_file<'a>(
     log::debug!("{} original download url: {}", app, original_url);
 
     // Prepare the CacheEntry
-    let ce = scoop.cache_manager.add(app, version, url);
+    let cache_manager = CacheManager::new(config);
+    let ce = cache_manager.add(app, version, url);
     let cache_real_path = ce.path();
 
     if !ignore_cache && cache_real_path.exists() {
@@ -35,7 +37,8 @@ async fn download_file<'a>(
     log::debug!("{} cache temp path: {}", app, cache_temp_path.display());
 
     // Send http request to get the file
-    let resp = scoop.http.get(original_url).send().await.unwrap();
+    let http_client = HttpClient::new(config).unwrap();
+    let resp = http_client.get(original_url).send().await.unwrap();
     assert!(resp.status().is_success());
 
     // Create cache tmp file
@@ -44,11 +47,23 @@ async fn download_file<'a>(
     let dl_size = resp.content_length().unwrap();
     let pb = pb_download(original_fname.as_str(), dl_size);
 
+    // Init Checksum
+    let mut checksum = None;
+    if hash.is_some() {
+        checksum = Some(scoop_hash::Checksum::new(hash.unwrap()));
+    }
+
     let mut stream = resp.bytes_stream();
     // Write stream data into the tmp file and display the progress
     while let Some(item) = stream.next().await {
         let chunk = item.unwrap();
         cache_file.write(&chunk).unwrap();
+
+        // Checksum consume data
+        if hash.is_some() {
+            checksum.as_mut().unwrap().consume(&chunk);
+        }
+
         let new = min(downloaded + (chunk.len() as u64), dl_size);
         downloaded = new;
         pb.set_position(new);
@@ -58,13 +73,31 @@ async fn download_file<'a>(
     // Finalize the progress
     pb.finish();
 
-    // TODO: Check hash
+    // Finalize the checksum
+    let hash = hash
+        .unwrap()
+        .split_once(":")
+        .unwrap_or(("", hash.unwrap()))
+        .1;
+    let actual_checksum = checksum.unwrap().result();
+    if hash != actual_checksum {
+        eprintln!(
+            "Checking hash of {} ... ERROR Hash check failed!",
+            original_fname
+        );
+        eprintln!("URL:      {}", url);
+        eprintln!("Expected: {}", hash);
+        eprintln!("Actual:   {}", actual_checksum);
+        eprintln!();
+    }
 }
 
-pub fn cmd_install(matches: &ArgMatches, scoop: &mut Scoop) {
+pub fn cmd_install(matches: &ArgMatches, config: &Config) {
     if let Some(apps) = matches.values_of("app") {
         let ignore_cache = matches.is_present("ignore_cache");
+        let skip_hash_validation = matches.is_present("skip_hash_validation");
 
+        let app_manager = AppManager::new(config);
         let mut manifests = Vec::new();
         for app in apps.into_iter() {
             let (_, app_name) = match app.contains("/") {
@@ -72,12 +105,12 @@ pub fn cmd_install(matches: &ArgMatches, scoop: &mut Scoop) {
                 false => ("", app),
             };
 
-            if scoop.app_manager.is_app_installed(app_name) {
+            if app_manager.is_app_installed(app_name) {
                 eprintln!("'{}' is already installed.", app_name);
                 std::process::exit(1);
             }
 
-            match scoop.find_local_manifest(app).unwrap() {
+            match find_manifest(config, app).unwrap() {
                 Some(man) => manifests.push((app_name, man)),
                 None => {
                     eprintln!("Couldn't find manifest for '{}'", app);
@@ -87,15 +120,40 @@ pub fn cmd_install(matches: &ArgMatches, scoop: &mut Scoop) {
         }
 
         manifests.iter().for_each(|(app, manifest)| {
-            let version = &manifest.data.version;
-            let urls = manifest.get_download_urls();
-            // let hashes = manifest.get_hashes();
+            let version = manifest.get_version();
+            let urls = manifest.get_url();
 
-            if urls.is_some() {
-                let urls = urls.unwrap();
-
+            if version == "nightly" || skip_hash_validation {
                 urls.iter().for_each(|url| {
-                    block_on(download_file(scoop, app, version, url, ignore_cache));
+                    block_on(download_file(config, app, version, url, ignore_cache, None));
+                })
+            } else {
+                let hashes = manifest.get_hash();
+                if hashes.is_none() {
+                    eprint!(
+                        "no hash is provided in '{}''s manifest, skipped download.",
+                        app
+                    );
+                    return;
+                }
+
+                let hashes = hashes.unwrap();
+
+                // number of hashes needs to be equal to number of urls
+                if hashes.len() != urls.len() {
+                    eprintln!("missing hashes in '{}''s manifest, skipped download.", app);
+                }
+
+                urls.iter().zip(hashes.iter()).for_each(|(url, hash)| {
+                    log::debug!("url {}, hash {:?}", url, hash);
+                    block_on(download_file(
+                        config,
+                        app,
+                        version,
+                        url,
+                        ignore_cache,
+                        Some(&**hash),
+                    ));
                 })
             }
         });

@@ -1,18 +1,16 @@
 use std::path::PathBuf;
 
 use clap::ArgMatches;
-use scoop_core::{fs::leaf, Scoop};
+use scoop_core::{find_manifest, fs::leaf, Config};
 
-pub fn cmd_info(matches: &ArgMatches, scoop: &mut Scoop) {
+pub fn cmd_info(matches: &ArgMatches, config: &Config) {
     let app = matches.value_of("app").unwrap();
-    match scoop.find_local_manifest(app) {
+    match find_manifest(&config, app) {
         Ok(Some(manifest)) => {
             // Name
             println!("Name: {}", manifest.get_name());
             // Bucket
-            if let Some(bucket) = manifest.get_manifest_bucket() {
-                println!("Bucket: {}", bucket);
-            }
+            println!("Bucket: {}", manifest.get_bucket());
             // Description
             if let Some(description) = manifest.get_description() {
                 println!("Description: {}", description);

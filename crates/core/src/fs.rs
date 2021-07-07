@@ -40,6 +40,7 @@ where
 
 /// Return the Leaf, i.e. file name (with extension), or directory name
 /// of given path.
+#[inline(always)]
 pub fn leaf<P: AsRef<Path> + ?Sized>(path: &P) -> String {
     path.as_ref()
         .file_name()
@@ -54,6 +55,7 @@ pub fn leaf<P: AsRef<Path> + ?Sized>(path: &P) -> String {
 /// If the given path is a directory, it returns the [Leaf] of the path instead.
 ///
 /// [Leaf]: self::leaf
+#[inline]
 pub fn leaf_base<P: AsRef<Path> + ?Sized>(path: &P) -> String {
     if path.as_ref().is_file() {
         path.as_ref()

@@ -1,12 +1,11 @@
 use clap::ArgMatches;
+use scoop_core::{find_manifest, Config};
 use std::process::Command;
 
-use crate::Scoop;
-
-pub fn cmd_home(matches: &ArgMatches, scoop: &mut Scoop) {
+pub fn cmd_home(matches: &ArgMatches, config: &Config) {
     if let Some(app_name) = matches.value_of("app") {
         // find local manifest and parse it
-        match scoop.find_local_manifest(app_name).unwrap() {
+        match find_manifest(&config, app_name).unwrap() {
             Some(manifest) => {
                 if let Some(url) = manifest.get_homepage() {
                     let url = std::ffi::OsStr::new(url.as_str());

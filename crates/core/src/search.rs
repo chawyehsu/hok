@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::{
     fs::{leaf, leaf_base},
     manifest::{Bins, Manifest},
-    Result,
+    ScoopResult,
 };
 
 #[derive(Clone, Debug)]
@@ -37,7 +37,7 @@ pub(crate) fn travel_manifest(
     query: &str,
     search_bin: bool,
     manifest_path: &Path,
-) -> Result<Option<SearchMatch>> {
+) -> ScoopResult<Option<SearchMatch>> {
     let name = leaf_base(manifest_path);
     // substring check on app_name
     if name.contains(query) {
@@ -61,7 +61,7 @@ pub(crate) fn travel_manifest(
 
         match Manifest::from_path(manifest_path) {
             Ok(manifest) => {
-                let bins = manifest.get_bins();
+                let bins = manifest.get_bin();
 
                 let bin_match = try_match_bin(query, bins);
                 if bin_match.is_some() {

@@ -1,4 +1,4 @@
-use crate::Scoop;
+use crate::Config;
 use std::collections::HashMap;
 use sysinfo::{Process, ProcessExt, System, SystemExt};
 
@@ -10,9 +10,9 @@ impl SysTool {
         SysTool(System::default())
     }
 
-    pub fn running_apps(&mut self, scoop: &Scoop) -> HashMap<&usize, &Process> {
+    pub fn running_apps(&mut self, config: &Config) -> HashMap<&usize, &Process> {
         // Find all running processes of installed Scoop apps.
-        let root_path = scoop.config.root_path.as_path();
+        let root_path = config.get_root_path();
         self.0.refresh_processes();
         let processes = self
             .0

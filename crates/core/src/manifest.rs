@@ -1,5 +1,3 @@
-mod license;
-
 use once_cell::sync::Lazy;
 use regex::Regex;
 use regex::RegexBuilder;
@@ -9,6 +7,7 @@ use serde::de::Visitor;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde_json::Map;
+use std::collections::HashSet;
 use std::convert::Infallible;
 use std::fmt;
 use std::fs::File;
@@ -17,24 +16,17 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::path::Path;
 use std::path::PathBuf;
-use std::result::Result as StdResult;
+use std::result::Result;
 use std::str::FromStr;
 
-use crate::error::{Error, ErrorKind, Result};
+use crate::error::ScoopResult;
 use crate::fs::leaf_base;
+use crate::license;
 use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////
 //  Manifest Custom Enums
 ////////////////////////////////////////////////////////////////////////////////
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(untagged)]
-pub enum ShortcutsType {
-    TwoElement([String; 2]),
-    ThreeElement([String; 3]),
-    FourElement([String; 4]),
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum HashExtractionMode {
     #[serde(rename = "download")]
@@ -95,6 +87,23 @@ pub struct Uninstaller {
     pub script: Option<VecItem>,
 }
 
+impl Uninstaller {
+    #[inline]
+    pub fn get_args(&self) -> Option<&VecItem> {
+        self.args.as_ref()
+    }
+
+    #[inline]
+    pub fn get_file(&self) -> Option<&String> {
+        self.file.as_ref()
+    }
+
+    #[inline]
+    pub fn get_script(&self) -> Option<&VecItem> {
+        self.script.as_ref()
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ArchitectureInner {
     bin: Option<Bins>,
@@ -106,7 +115,7 @@ pub struct ArchitectureInner {
     installer: Option<Installer>,
     post_install: Option<VecItem>,
     pre_install: Option<VecItem>,
-    shortcuts: Option<Vec<ShortcutsType>>,
+    shortcuts: Option<Vec<Vec<String>>>,
     uninstaller: Option<Uninstaller>,
     url: Option<Urls>,
 }
@@ -159,41 +168,43 @@ pub struct Psmodule {
     pub name: String,
 }
 
+/// [`ManifestInner`] represents the actual structure of a Scoop app manifest.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ManifestInner {
-    architecture: Option<Architecture>,
-    autoupdate: Option<Autoupdate>,
-    bin: Option<Bins>,
-    persist: Option<Persist>,
-    checkver: Option<Checkver>,
-    cookie: Option<Map<String, serde_json::Value>>,
-    depends: Option<VecItem>,
+    version: String,
     description: Option<String>,
-    env_add_path: Option<VecItem>,
-    env_set: Option<Map<String, serde_json::Value>>,
+    homepage: Option<String>,
+    license: Option<License>,
+    depends: Option<VecItem>,
+    innosetup: Option<bool>,
+    cookie: Option<Map<String, serde_json::Value>>,
+    architecture: Option<Architecture>,
+    url: Option<Urls>,
+    hash: Option<Hashes>,
     extract_dir: Option<VecItem>,
     extract_to: Option<VecItem>,
-    hash: Option<Hashes>,
-    homepage: Option<String>,
-    innosetup: Option<bool>,
-    installer: Option<Installer>,
-    license: Option<License>,
-    notes: Option<VecItem>,
-    post_install: Option<VecItem>,
     pre_install: Option<VecItem>,
-    psmodule: Option<Psmodule>,
-    shortcuts: Option<Vec<ShortcutsType>>,
-    suggest: Option<serde_json::Value>,
+    installer: Option<Installer>,
     uninstaller: Option<Uninstaller>,
-    url: Option<Urls>,
-    version: String,
+    post_install: Option<VecItem>,
+    bin: Option<Bins>,
+    env_add_path: Option<VecItem>,
+    env_set: Option<Map<String, serde_json::Value>>,
+    shortcuts: Option<Vec<Vec<String>>>,
+    persist: Option<Persist>,
+    psmodule: Option<Psmodule>,
+    suggest: Option<Map<String, serde_json::Value>>,
+    checkver: Option<Checkver>,
+    autoupdate: Option<Autoupdate>,
+    notes: Option<VecItem>,
 }
 
+/// [`Manifest`] represents a local Scoop app manifest.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Manifest {
     name: String,
     path: PathBuf,
-    bucket: Option<String>,
+    bucket: String,
     inner: ManifestInner,
     _private: (),
 }
@@ -211,7 +222,7 @@ pub struct Checkver {
 }
 
 impl<'de> Deserialize<'de> for Checkver {
-    fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -223,7 +234,7 @@ impl<'de> Deserialize<'de> for Checkver {
                 f.write_str("license string or map")
             }
 
-            fn visit_str<E>(self, s: &str) -> StdResult<Self::Value, E>
+            fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
@@ -244,7 +255,7 @@ impl<'de> Deserialize<'de> for Checkver {
                 })
             }
 
-            fn visit_map<A>(self, mut map: A) -> StdResult<Self::Value, A::Error>
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
             where
                 A: de::MapAccess<'de>,
             {
@@ -263,7 +274,7 @@ impl<'de> Deserialize<'de> for Checkver {
                             let prefix: String = map.next_value()?;
                             url = Some(format!("{}/releases/latest", prefix));
                             regex = Some("/releases/tag/(?:v|V)?([\\d.]+)".to_owned());
-                        },
+                        }
                         "re" | "regex" => regex = Some(map.next_value()?),
                         "url" => url = Some(map.next_value()?),
                         "jp" | "jsonpath" => jsonpath = Some(map.next_value()?),
@@ -282,8 +293,8 @@ impl<'de> Deserialize<'de> for Checkver {
                         _ => {
                             // skip next_value
                             let _ = map.next_value()?;
-                            continue
-                        },
+                            continue;
+                        }
                     }
                 }
 
@@ -317,14 +328,14 @@ where
     }
 
     #[inline]
-    fn visit_str<E>(self, s: &str) -> StdResult<Self::Value, E>
+    fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
     where
         E: de::Error,
     {
         Ok(vec![T::from_str(s).ok().unwrap()])
     }
 
-    fn visit_seq<S>(self, mut seq: S) -> StdResult<Self::Value, S::Error>
+    fn visit_seq<S>(self, mut seq: S) -> Result<Self::Value, S::Error>
     where
         S: SeqAccess<'de>,
     {
@@ -365,13 +376,13 @@ impl FromStr for VecItem {
     type Err = Infallible;
 
     #[inline]
-    fn from_str(s: &str) -> StdResult<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(VecItem(vec![s.to_owned()]))
     }
 }
 
 impl<'de> Deserialize<'de> for VecItem {
-    fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -395,7 +406,7 @@ impl Deref for Bins {
 }
 
 impl<'de> Deserialize<'de> for Bins {
-    fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -419,7 +430,7 @@ impl Deref for Persist {
 }
 
 impl<'de> Deserialize<'de> for Persist {
-    fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -443,7 +454,7 @@ impl Deref for Urls {
 }
 
 impl<'de> Deserialize<'de> for Urls {
-    fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -463,7 +474,7 @@ impl License {
     fn new(identifier: String, mut url: Option<String>) -> License {
         // SPDX identifier detection
         let id = identifier.as_str();
-        let is_spdx = self::license::SPDX.contains(id);
+        let is_spdx = license::SPDX.contains(id);
         if url.is_none() && is_spdx {
             url = Some(format!("https://spdx.org/licenses/{}.html", id));
         }
@@ -483,7 +494,7 @@ impl License {
 }
 
 impl<'de> Deserialize<'de> for License {
-    fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -496,14 +507,14 @@ impl<'de> Deserialize<'de> for License {
             }
 
             #[inline]
-            fn visit_str<E>(self, s: &str) -> StdResult<Self::Value, E>
+            fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
                 Ok(License::new(s.to_owned(), None))
             }
 
-            fn visit_map<A>(self, mut map: A) -> StdResult<Self::Value, A::Error>
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
             where
                 A: de::MapAccess<'de>,
             {
@@ -538,13 +549,10 @@ impl<'de> Deserialize<'de> for License {
 pub struct Hash(String);
 
 impl FromStr for Hash {
-    type Err = Error;
-    fn from_str(s: &str) -> StdResult<Self, Self::Err> {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match Self::validate(s) {
-            false => Err(Error(ErrorKind::Custom(format!(
-                "{} is not a valid hash string",
-                s
-            )))),
+            false => anyhow::bail!("{} is not a valid hash string", s),
             true => Ok(Self(String::from(s))),
         }
     }
@@ -584,7 +592,7 @@ impl Deref for Hashes {
 }
 
 impl<'de> Deserialize<'de> for Hashes {
-    fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -638,7 +646,12 @@ impl ArchitectureInner {
     }
 
     #[inline]
-    pub fn get_shortcuts(&self) -> Option<&Vec<ShortcutsType>> {
+    pub fn get_uninstaller(&self) -> Option<&Uninstaller> {
+        self.uninstaller.as_ref()
+    }
+
+    #[inline]
+    pub fn get_shortcuts(&self) -> Option<&Vec<Vec<String>>> {
         self.shortcuts.as_ref()
     }
 
@@ -764,8 +777,62 @@ impl ManifestInner {
     }
 
     #[inline]
-    pub fn get_shortcuts(&self) -> Option<&Vec<ShortcutsType>> {
+    pub fn get_uninstaller(&self) -> Option<&Uninstaller> {
+        match self.get_architecture() {
+            None => {}
+            Some(arch) => {
+                // amd64
+                if cfg!(target_arch = "x86_64") {
+                    if arch.amd64().is_some() {
+                        let uninstaller = arch.amd64().unwrap().get_uninstaller();
+                        // ensure installer script exists while return,
+                        // or fallback to the arch-less installer one.
+                        if uninstaller.is_some() {
+                            return uninstaller;
+                        }
+                    }
+                }
+
+                // ia32
+                if cfg!(target_arch = "x86") {
+                    if arch.ia32().is_some() {
+                        let uninstaller = arch.ia32().unwrap().get_uninstaller();
+                        if uninstaller.is_some() {
+                            return uninstaller;
+                        }
+                    }
+                }
+            }
+        }
+
+        // fallback, arch-less `uninstaller`
+        self.uninstaller.as_ref()
+    }
+
+    #[inline]
+    pub fn get_installer_script(&self) -> Option<&VecItem> {
+        match self.get_installer() {
+            None => None,
+            Some(installer) => installer.get_script(),
+        }
+    }
+
+    #[inline]
+    pub fn get_uninstaller_script(&self) -> Option<&VecItem> {
+        match self.get_uninstaller() {
+            None => None,
+            Some(uninstaller) => uninstaller.get_script(),
+        }
+    }
+
+    #[inline]
+    pub fn get_shortcuts(&self) -> Option<&Vec<Vec<String>>> {
         self.shortcuts.as_ref()
+    }
+
+    #[inline]
+    pub fn get_suggest(&self) -> Option<&Map<String, serde_json::Value>> {
+        self.suggest.as_ref()
     }
 }
 
@@ -782,7 +849,10 @@ impl Manifest {
     /// read.
     ///
     /// It will return a `serde_json::Error` when json deserializing fail.
-    pub fn from_path<P: AsRef<Path> + ?Sized>(path: &P) -> Result<Manifest> {
+    pub fn from_path<P: AsRef<Path> + ?Sized>(path: &P) -> ScoopResult<Manifest> {
+        // `bucket` is a required field.
+        let bucket = utils::extract_bucket_from(path).expect("failed to extract bucket name.");
+
         // We read the entire manifest json file into memory first and then
         // deserialize it, as this is *a lot* faster than reading via the
         // `serde_json::from_reader`. See https://github.com/serde-rs/json/issues/160
@@ -794,20 +864,28 @@ impl Manifest {
         // to integrate. But I believe there should be an alternative to
         // `serde_json` which can parse json file much *faster*, perhaps
         // `simd_json` can be. See https://github.com/serde-rs/json-benchmark
-        let data: ManifestInner = serde_json::from_slice(&bytes)?;
+        let inner: ManifestInner = serde_json::from_slice(&bytes)?;
         let name = leaf_base(path);
-        let bucket = utils::extract_bucket_from(path);
         let path = path.as_ref().to_path_buf();
-        // let _ = serde_json::to_writer_pretty(std::io::stdout(), &data);
-        // log::debug!("{:?}", data.get_shortcuts());
+        // let _ = serde_json::to_writer_pretty(std::io::stdout(), &inner);
+        // log::debug!("{:?}", inner.get_suggest());
 
-        Ok(Manifest {
+        let manifest = Manifest {
             name,
             path,
             bucket,
-            inner: data,
+            inner,
             _private: (),
-        })
+        };
+
+        log::debug!(
+            "{}/{}: {:?}",
+            manifest.get_bucket(),
+            manifest.get_name(),
+            manifest.get_deps()
+        );
+
+        Ok(manifest)
     }
 
     #[inline]
@@ -816,13 +894,13 @@ impl Manifest {
     }
 
     #[inline]
-    pub fn get_manifest_bucket(&self) -> Option<&String> {
-        self.bucket.as_ref()
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 
     #[inline]
-    pub fn path(&self) -> &Path {
-        &self.path
+    pub fn get_bucket(&self) -> &str {
+        &self.bucket
     }
 
     #[inline]
@@ -852,12 +930,54 @@ impl Manifest {
 
     #[inline]
     pub fn get_architecture(&self) -> Option<&Architecture> {
-        self.inner.architecture.as_ref()
+        self.inner.get_architecture()
     }
 
     #[inline]
     pub fn get_cookie(&self) -> Option<&Map<String, serde_json::Value>> {
         self.inner.cookie.as_ref()
+    }
+
+    #[inline]
+    pub fn get_post_install(&self) -> Option<String> {
+        match self.inner.get_post_install() {
+            None => None,
+            Some(vi) => Some(vi.join("\r\n")),
+        }
+    }
+
+    #[inline]
+    pub fn get_installer_script(&self) -> Option<String> {
+        match self.inner.get_installer_script() {
+            None => None,
+            Some(vi) => Some(vi.join("\r\n")),
+        }
+    }
+
+    #[inline]
+    pub fn get_uninstaller_script(&self) -> Option<String> {
+        match self.inner.get_uninstaller_script() {
+            None => None,
+            Some(vi) => Some(vi.join("\r\n")),
+        }
+    }
+
+    #[inline]
+    pub fn get_pre_install(&self) -> Option<String> {
+        match self.inner.get_pre_install() {
+            None => None,
+            Some(vi) => Some(vi.join("\r\n")),
+        }
+    }
+
+    #[inline]
+    pub fn get_shortcuts(&self) -> Option<&Vec<Vec<String>>> {
+        self.inner.get_shortcuts()
+    }
+
+    #[inline]
+    pub fn get_suggest(&self) -> Option<&Map<String, serde_json::Value>> {
+        self.inner.get_suggest()
     }
 
     #[inline]
@@ -869,9 +989,55 @@ impl Manifest {
         manifest.bin.clone()
     }
 
+    /// Returns the dependencies of this manifest.
+    pub fn get_deps(&self) -> Vec<String> {
+        let mut deps = HashSet::new();
+        // depends
+        if self.inner.depends.is_some() {
+            let depends = self.inner.depends.clone().unwrap();
+            for dep in depends.iter() {
+                drop(deps.insert(dep.to_owned()));
+            }
+        }
+        // innosetup
+        if self.is_innosetup() {
+            drop(deps.insert("innounp".to_owned()));
+        }
+        // scripts
+        [
+            self.get_pre_install(),
+            self.get_installer_script(),
+            self.get_post_install(),
+        ]
+        .iter()
+        .for_each(|script| {
+            if let Some(s) = script {
+                if s.contains("Expand-7zipArchive") || s.contains("extract_7zip") {
+                    drop(deps.insert("7zip".to_owned()));
+                }
+                if s.contains("Expand-MsiArchive") || s.contains("extract_msi") {
+                    drop(deps.insert("lessmsi".to_owned()));
+                }
+                if s.contains("Expand-InnoArchive") || s.contains("unpack_inno") {
+                    drop(deps.insert("innounp".to_owned()));
+                }
+                if s.contains("Expand-DarkArchive") {
+                    drop(deps.insert("dark".to_owned()));
+                }
+            }
+        });
+
+        deps.into_iter().collect()
+    }
+
     #[inline]
     pub fn is_innosetup(&self) -> bool {
         self.inner.innosetup.unwrap_or(false)
+    }
+
+    #[inline]
+    pub fn is_nightly_version(&self) -> bool {
+        self.get_version() == "nightly"
     }
 
     /// Extract download urls from this manifest, in following order:

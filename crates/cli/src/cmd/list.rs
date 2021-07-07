@@ -1,11 +1,10 @@
 use clap::ArgMatches;
+use scoop_core::{AppManager, Config};
 
-use crate::Scoop;
-
-pub fn cmd_list(_matches: &ArgMatches, scoop: &mut Scoop) {
+pub fn cmd_list(_matches: &ArgMatches, config: &Config) {
     let brew_list_mode = false;
-
-    let apps = scoop.app_manager.installed_apps();
+    let app_manager = AppManager::new(config);
+    let apps = app_manager.installed_apps();
     if apps.len() > 0 {
         if brew_list_mode {
             todo!();
