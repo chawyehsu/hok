@@ -21,7 +21,7 @@ fn run() -> CliResult<()> {
     let app = cli::build_app();
     let matches = app.get_matches();
     // Init global config
-    let mut config = Config::default();
+    let mut config = Config::init();
 
     match matches.subcommand() {
         ("bucket", Some(matches)) => return cmd::cmd_bucket(matches, &config),
