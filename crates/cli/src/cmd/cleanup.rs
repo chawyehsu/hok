@@ -2,7 +2,9 @@ use clap::ArgMatches;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
 use remove_dir_all::remove_dir_all;
-use scoop_core::{fs, AppManager, Config};
+use scoop_core::manager::AppManager;
+use scoop_core::util::leaf;
+use scoop_core::Config;
 use sysinfo::ProcessExt;
 
 pub fn cmd_cleanup(matches: &ArgMatches, config: &Config) {
@@ -41,7 +43,7 @@ pub fn cmd_cleanup(matches: &ArgMatches, config: &Config) {
                 print!("Removed {}", name);
                 for path in out.1 {
                     remove_dir_all(path.as_path()).expect("failed to remove");
-                    print!(" {}", fs::leaf(path.as_path()));
+                    print!(" {}", leaf(path.as_path()));
                 }
                 println!("");
             }
@@ -64,7 +66,7 @@ pub fn cmd_cleanup(matches: &ArgMatches, config: &Config) {
                             for path in outdated {
                                 // TODO: Add clean logic
                                 remove_dir_all(path.as_path()).expect("failed to remove");
-                                print!(" {}", fs::leaf(path.as_path()));
+                                print!(" {}", leaf(path.as_path()));
                             }
                             println!("");
                             println!("Everything is shiny now!");

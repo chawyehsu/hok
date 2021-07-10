@@ -1,8 +1,10 @@
 use crate::indicator::pb_download;
-use crate::tokio_util::{block_on, StreamExt};
 use clap::ArgMatches;
-use scoop_core::fs::leaf;
-use scoop_core::{find_manifest, AppManager, CacheManager, Config, HttpClient};
+use scoop_core::util::leaf;
+use scoop_core::util::{block_on, StreamExt};
+use scoop_core::{
+    manager::AppManager, manager::CacheManager, ops::find_manifest, Config, HttpClient,
+};
 use std::cmp::min;
 use std::fs::File;
 use std::io::Write;
@@ -120,7 +122,7 @@ pub fn cmd_install(matches: &ArgMatches, config: &Config) {
         }
 
         manifests.iter().for_each(|(app, manifest)| {
-            let version = manifest.get_version();
+            let version = manifest.version();
             let urls = manifest.get_url();
 
             if version == "nightly" || skip_hash_validation {

@@ -1,4 +1,5 @@
-use crate::{config::Config, error::ScoopResult};
+use crate::Config;
+use crate::ScoopResult;
 use std::{path::Path, result};
 
 pub struct Git {

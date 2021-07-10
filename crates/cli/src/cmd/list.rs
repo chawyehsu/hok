@@ -1,5 +1,5 @@
 use clap::ArgMatches;
-use scoop_core::{AppManager, Config};
+use scoop_core::{manager::AppManager, Config};
 
 pub fn cmd_list(_matches: &ArgMatches, config: &Config) {
     let brew_list_mode = false;

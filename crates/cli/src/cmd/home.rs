@@ -1,14 +1,16 @@
 use clap::ArgMatches;
-use scoop_core::{find_manifest, Config};
+use scoop_core::{ops::find_manifest, Config};
 use std::process::Command;
 
-pub fn cmd_home(matches: &ArgMatches, config: &Config) {
+use crate::error::CliResult;
+
+pub fn cmd_home(matches: &ArgMatches, config: &Config) -> CliResult<()> {
     if let Some(app_name) = matches.value_of("app") {
         // find local manifest and parse it
-        match find_manifest(&config, app_name).unwrap() {
+        match find_manifest(&config, app_name)? {
             Some(manifest) => {
-                if let Some(url) = manifest.get_homepage() {
-                    let url = std::ffi::OsStr::new(url.as_str());
+                if let Some(url) = manifest.homepage() {
+                    let url = std::ffi::OsStr::new(url);
                     Command::new("cmd")
                         .arg("/C")
                         .arg("start")
@@ -24,4 +26,5 @@ pub fn cmd_home(matches: &ArgMatches, config: &Config) {
             }
         }
     }
+    Ok(())
 }

@@ -25,7 +25,8 @@ pub fn build_app() -> App<'static, 'static> {
                         .arg(
                             Arg::with_name("repo")
                                 .help("The bucket repository url")
-                                .index(2),
+                                .index(2)
+                                .required(false),
                         ),
                 )
                 .subcommand(SubCommand::with_name("list").about("List all added buckets"))
@@ -43,10 +44,11 @@ pub fn build_app() -> App<'static, 'static> {
         )
         .subcommand(
             SubCommand::with_name("cache")
-                .about("Show or clear the download cache")
+                .about("List or remove download caches")
+                .setting(AppSettings::ArgRequiredElseHelp)
                 .subcommand(
-                    SubCommand::with_name("show")
-                        .about("Show the download cache")
+                    SubCommand::with_name("list")
+                        .about("List download caches")
                         .arg(
                             Arg::with_name("app")
                                 .help("The app name")
@@ -55,9 +57,9 @@ pub fn build_app() -> App<'static, 'static> {
                         ),
                 )
                 .subcommand(
-                    SubCommand::with_name("rm")
+                    SubCommand::with_name("remove")
                         .about("Remove the download cache")
-                        .alias("remove")
+                        .alias("rm")
                         .setting(AppSettings::ArgRequiredElseHelp)
                         .arg(Arg::with_name("app").help("The app name"))
                         .arg(
@@ -129,14 +131,15 @@ pub fn build_app() -> App<'static, 'static> {
         .subcommand(
             SubCommand::with_name("hold")
                 .about("Hold an app to disable updates")
+                .setting(AppSettings::ArgRequiredElseHelp)
                 .arg(Arg::with_name("app").help("The app name").required(true)),
         )
         .subcommand(
             SubCommand::with_name("home")
                 .about("Opens the app homepage")
+                .setting(AppSettings::ArgRequiredElseHelp)
                 .arg(Arg::with_name("app").help("The app name").required(true)),
         )
-        .subcommand(SubCommand::with_name("update").about("Fetch and update all buckets"))
         .subcommand(
             SubCommand::with_name("info")
                 .about("Display information about an app")
@@ -179,16 +182,11 @@ pub fn build_app() -> App<'static, 'static> {
         .subcommand(
             SubCommand::with_name("search")
                 .about("Searches for apps that are available to install")
+                .setting(AppSettings::ArgRequiredElseHelp)
                 .arg(
                     Arg::with_name("query")
-                        .help("The query string, precision searching by default")
+                        .help("The query string")
                         .required(true),
-                )
-                .arg(
-                    Arg::with_name("binary")
-                        .help("Enable search on manifest 'bin' property")
-                        .short("b")
-                        .long("with-binary"),
                 ),
         )
         .subcommand(
@@ -197,8 +195,10 @@ pub fn build_app() -> App<'static, 'static> {
         .subcommand(
             SubCommand::with_name("unhold")
                 .about("Unhold an app to enable updates")
+                .setting(AppSettings::ArgRequiredElseHelp)
                 .arg(Arg::with_name("app").help("The app name").required(true)),
-        );
+        )
+        .subcommand(SubCommand::with_name("update").about("Fetch and update all buckets"));
 
     app
 }

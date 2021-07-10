@@ -1,4 +1,4 @@
-use crate::error::ScoopResult;
+use crate::ScoopResult;
 use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io;
@@ -11,19 +11,22 @@ pub struct Config {
     #[serde(skip)]
     #[serde(default = "default::config_path")]
     config_path: PathBuf,
-    #[serde(alias = "7zipextract_use_external")]
+    #[serde(rename = "7zipextract_use_external")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub szipextract_use_external: Option<bool>,
-    #[serde(alias = "aria2-enabled")]
+    #[serde(alias = "aria2_enabled")]
+    #[serde(rename = "aria2-enabled")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aria2_enabled: Option<bool>,
     /// The cache path
-    #[serde(alias = "cachePath")]
+    #[serde(alias = "cache_path")]
+    #[serde(rename = "cachePath")]
     #[serde(default = "default::cache_path")]
     #[serde(skip_serializing_if = "default::is_default_cache_path")]
-    pub cache_path: PathBuf,
+    cache_path: PathBuf,
     /// The global path
-    #[serde(alias = "globalPath")]
+    #[serde(alias = "global_path")]
+    #[serde(rename = "globalPath")]
     #[serde(default = "default::global_path")]
     #[serde(skip_serializing_if = "default::is_default_global_path")]
     pub global_path: PathBuf,
@@ -41,8 +44,11 @@ pub struct Config {
     pub shim: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub show_update_log: Option<bool>,
-    /// The root path
-    #[serde(alias = "rootPath")]
+    /// This is the root directory of a Scoop installation, by default the value
+    /// is `$HOME/scoop`. If this field has a default value, then it will not be
+    /// written into Scoop's config file.
+    #[serde(alias = "root_path")]
+    #[serde(rename = "rootPath")]
     #[serde(default = "default::root_path")]
     #[serde(skip_serializing_if = "default::is_default_root_path")]
     root_path: PathBuf,
@@ -126,8 +132,7 @@ impl Config {
     /// the config file.
     pub fn init() -> Config {
         let default = default::config_path();
-        log::debug!("{:?}", default);
-
+        log::debug!("loading '{}'", default.display());
         Self::from_path(default.as_path()).unwrap_or_else(|_| {
             log::warn!("failed to read config file {}", default.display());
             Self::new()
@@ -145,9 +150,25 @@ impl Config {
         Ok(serde_json::from_reader(buf)?)
     }
 
+    /// Get Scoop's cache path from the [`Config`], by default the value is
+    /// `$HOME/scoop/cache`.
     #[inline]
-    pub fn get_root_path(&self) -> &Path {
+    pub fn cache_path(&self) -> &Path {
+        &self.cache_path
+    }
+
+    /// Get Scoop's root path from the [`Config`], by default the value is
+    /// `$HOME/scoop`.
+    #[inline]
+    pub fn root_path(&self) -> &Path {
         &self.root_path
+    }
+
+    /// Get Scoop's buckets path from the [`Config`], by default the value is
+    /// `$HOME/scoop/buckets`.
+    #[inline]
+    pub fn buckets_path(&self) -> PathBuf {
+        self.root_path.join("buckets")
     }
 
     pub fn set<S>(&mut self, key: S, value: S) -> Result<&Config, &'static str>
@@ -193,7 +214,7 @@ impl Config {
 
     pub fn save(&self) {
         // Ensure config directory exists
-        crate::fs::ensure_dir(self.config_path.parent().unwrap()).unwrap();
+        crate::util::ensure_dir(self.config_path.parent().unwrap()).unwrap();
         // Then read or create the config file
         let file = OpenOptions::new()
             .write(true)

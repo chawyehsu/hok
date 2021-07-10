@@ -1,4 +1,4 @@
-use scoop_core::{AppManager, Config};
+use scoop_core::{manager::AppManager, Config};
 
 pub fn cmd_hold(matches: &clap::ArgMatches, config: &Config) {
     if let Some(name) = matches.value_of("app") {

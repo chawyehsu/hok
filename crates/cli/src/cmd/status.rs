@@ -1,5 +1,8 @@
 use clap::ArgMatches;
-use scoop_core::{find_manifest, utils::compare_versions, AppManager, Config};
+use scoop_core::manager::AppManager;
+use scoop_core::ops::find_manifest;
+use scoop_core::util::compare_versions;
+use scoop_core::Config;
 use std::cmp::Ordering;
 
 pub fn cmd_status(_: &ArgMatches, config: &Config) {
@@ -25,7 +28,7 @@ pub fn cmd_status(_: &ArgMatches, config: &Config) {
                     match find_manifest(config, pattern).unwrap() {
                         None => removed_apps.push(app.name()),
                         Some(manifest) => {
-                            let latest_version = manifest.get_version().to_owned();
+                            let latest_version = manifest.version().to_owned();
                             match compare_versions(&latest_version, &cur_version) {
                                 Ordering::Greater => {
                                     outdated_apps.push((

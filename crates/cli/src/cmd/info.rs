@@ -1,28 +1,32 @@
+use clap::ArgMatches;
+use scoop_core::ops::find_app;
+use scoop_core::util::leaf;
+use scoop_core::Config;
 use std::path::PathBuf;
 
-use clap::ArgMatches;
-use scoop_core::{find_manifest, fs::leaf, Config};
+use crate::error::CliResult;
 
-pub fn cmd_info(matches: &ArgMatches, config: &Config) {
+pub fn cmd_info(matches: &ArgMatches, config: &Config) -> CliResult<()> {
     let app = matches.value_of("app").unwrap();
-    match find_manifest(&config, app) {
-        Ok(Some(manifest)) => {
+    match find_app(&config, app) {
+        Ok(Some(app)) => {
             // Name
-            println!("Name: {}", manifest.get_name());
+            println!("Name: {}", app.name());
             // Bucket
-            println!("Bucket: {}", manifest.get_bucket());
+            println!("Bucket: {}", app.bucket());
+            let manifest = app.manifest();
             // Description
-            if let Some(description) = manifest.get_description() {
+            if let Some(description) = manifest.description() {
                 println!("Description: {}", description);
             }
             // Version
-            println!("Version: {}", manifest.get_version());
+            println!("Version: {}", manifest.version());
             // Homepage
-            if let Some(homepage) = manifest.get_homepage() {
+            if let Some(homepage) = manifest.homepage() {
                 println!("Website: {}", homepage);
             }
             // License
-            if let Some(license) = manifest.get_license() {
+            if let Some(license) = manifest.license() {
                 let identifier = license.identifier();
 
                 if license.url().is_some() {
@@ -33,11 +37,11 @@ pub fn cmd_info(matches: &ArgMatches, config: &Config) {
                 }
             }
             // Manifest
-            println!("Manifest:\n  {}", manifest.path().display());
+            // println!("Manifest:\n  {}", manifest.path().display());
 
             // FIXME: check data.architecture.<arch>.bin
             // Binaries
-            if let Some(bins) = manifest.get_bin() {
+            if let Some(bins) = manifest.bin() {
                 if bins.len() == 1 {
                     let bin = bins[0][0].as_str();
                     println!("Binary: {}", bin);
@@ -50,16 +54,9 @@ pub fn cmd_info(matches: &ArgMatches, config: &Config) {
                     println!("  {}", out.join(" "));
                 }
             }
-
-            std::process::exit(0);
+            Ok(())
         }
-        Ok(None) => {
-            eprintln!("Could not find manifest for '{}'", app);
-            std::process::exit(1);
-        }
-        Err(e) => {
-            eprintln!("Failed to operate. ({})", e);
-            std::process::exit(1);
-        }
+        Ok(None) => anyhow::bail!("could not find manifest for '{}'", app),
+        Err(err) => Err(err),
     }
 }

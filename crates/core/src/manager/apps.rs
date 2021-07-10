@@ -1,6 +1,7 @@
-use crate::fs::leaf;
-use crate::utils::compare_versions;
-use crate::{Config, ScoopResult};
+use crate::util::compare_versions;
+use crate::util::leaf;
+use crate::Config;
+use crate::ScoopResult;
 use serde::Deserialize;
 use std::fs::OpenOptions;
 use std::fs::{DirEntry, File};
@@ -162,7 +163,7 @@ impl InstallInfo {
 impl<'a> AppManager<'a> {
     /// Create an [`AppsManager`] from the given Scoop [`Config`]
     pub fn new(config: &Config) -> AppManager {
-        let working_dir = config.get_root_path().join("apps");
+        let working_dir = config.root_path().join("apps");
         AppManager {
             config,
             working_dir,
@@ -193,8 +194,9 @@ impl<'a> AppManager<'a> {
         self.working_dir.as_path().join(name).exists()
     }
 
+    /// Return
     pub fn get_app<S: AsRef<str>>(&self, name: S) -> App {
-        let path = self.working_dir.as_path().join(name.as_ref());
+        let path = self.working_dir.join(name.as_ref());
         let name = leaf(path.as_path());
         App { path, name }
     }
@@ -212,7 +214,7 @@ impl<'a> AppManager<'a> {
 
     pub fn outdated_app<S: AsRef<str>>(&self, name: S) -> Option<Vec<PathBuf>> {
         if self.is_app_installed(name.as_ref()) {
-            let path = self.working_dir.as_path().join(name.as_ref());
+            let path = self.working_dir.join(name.as_ref());
             let name = leaf(path.as_path());
             let app = App { path, name };
             return Some(app.outdated_versions());

@@ -15,14 +15,14 @@ use std::io::Read;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::path::Path;
-use std::path::PathBuf;
 use std::result::Result;
 use std::str::FromStr;
 
-use crate::error::ScoopResult;
-use crate::fs::leaf_base;
 use crate::license;
-use crate::utils;
+use crate::util::block_on;
+use crate::Config;
+use crate::HttpClient;
+use crate::ScoopResult;
 
 ////////////////////////////////////////////////////////////////////////////////
 //  Manifest Custom Enums
@@ -199,14 +199,20 @@ pub struct ManifestInner {
     notes: Option<VecItem>,
 }
 
-/// [`Manifest`] represents a local Scoop app manifest.
+/// A [`Manifest`] basicly represents an app/package which can be installed by
+/// Scoop. It is a JSON file that contains all the information, such as version,
+/// downloading source of installers and excutables, etc. about an app/package.
+///
+/// This is deserialized using the `serde_json` crate with custom settings. It
+/// has a [JSON Schema] which defines how a JSON file can be a valid Manifest.
+///
+/// [JSON Schema]: https://github.com/lukesampson/scoop/blob/master/schema.json
+///
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Manifest {
-    name: String,
-    path: PathBuf,
-    bucket: String,
+    /// A manifest's path can be a local file path or a remote URL.
+    path: String,
     inner: ManifestInner,
-    _private: (),
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -615,8 +621,9 @@ impl Architecture {
 }
 
 impl ArchitectureInner {
+    /// Return a `bin` field reference of this [`ArchitectureInner`].
     #[inline]
-    pub fn get_bin(&self) -> Option<&Bins> {
+    pub fn bin(&self) -> Option<&Bins> {
         self.bin.as_ref()
     }
 
@@ -776,6 +783,43 @@ impl ManifestInner {
         self.installer.as_ref()
     }
 
+    /// Return a `bin` reference of this [`ManifestInner`].
+    ///
+    /// It returns arch-specific `bin` field when it is [`Some`], or it will
+    /// return the arch-less one.
+    #[inline]
+    pub fn bin(&self) -> Option<&Bins> {
+        if self.get_architecture().is_some() {
+            let arch = self.get_architecture().unwrap();
+            // amd64
+            if cfg!(target_arch = "x86_64") {
+                if arch.amd64().is_some() {
+                    let bin = arch.amd64().unwrap().bin();
+                    // ensure arch-specific `bin` exists while return,
+                    // or fallback to the arch-less one.
+                    if bin.is_some() {
+                        return bin;
+                    }
+                }
+            }
+
+            // ia32
+            if cfg!(target_arch = "x86") {
+                if arch.ia32().is_some() {
+                    let bin = arch.ia32().unwrap().bin();
+                    // ensure arch-specific `bin` exists while return,
+                    // or fallback to the arch-less one.
+                    if bin.is_some() {
+                        return bin;
+                    }
+                }
+            }
+        }
+
+        // fallback, arch-less `bin`
+        self.bin.as_ref()
+    }
+
     #[inline]
     pub fn get_uninstaller(&self) -> Option<&Uninstaller> {
         match self.get_architecture() {
@@ -839,87 +883,111 @@ impl ManifestInner {
 ////////////////////////////////////////////////////////////////////////////////
 //  Manifest impls
 ////////////////////////////////////////////////////////////////////////////////
-
 impl Manifest {
-    /// Create a [`Manifest`] representation of a json file with the given path.
+    /// Create a [`Manifest`] representation of a manfest JSON file with the
+    /// given path.
+    ///
+    /// ## Examples
+    ///
+    /// ```no_run
+    /// let path = PathBuf::from(r"C:\Scoop\buckets\main\bucket\unzip.json");
+    /// let manifest = Manifest::new(path);
+    /// // Print version information of the manifest
+    /// println!("{}", manifest.version());
+    /// ```
     ///
     /// ## Errors
     ///
-    /// This method will return a `std::io::Error` when the given path can't be
-    /// read.
+    /// If the process fails to read the file, this method will return a
+    /// [`std::io::error::Error`].
     ///
-    /// It will return a `serde_json::Error` when json deserializing fail.
-    pub fn from_path<P: AsRef<Path> + ?Sized>(path: &P) -> ScoopResult<Manifest> {
-        // `bucket` is a required field.
-        let bucket = utils::extract_bucket_from(path).expect("failed to extract bucket name.");
+    /// It returns a `serde_json::Error` when the JSON deserialization fails.
+    pub fn new<P: AsRef<Path>>(path: P) -> ScoopResult<Manifest> {
+        let path = path.as_ref().to_path_buf();
 
-        // We read the entire manifest json file into memory first and then
+        // We read the entire manifest JSON file into memory first and then
         // deserialize it, as this is *a lot* faster than reading via the
         // `serde_json::from_reader`. See https://github.com/serde-rs/json/issues/160
         let mut bytes = Vec::new();
-        File::open(path)?.read_to_end(&mut bytes)?;
+        File::open(path.as_path())?.read_to_end(&mut bytes)?;
 
-        // Reading manifest json file is a bottleneck of the whole scoop-rs
+        // Reading manifest JSON file is a bottleneck of the whole scoop-rs
         // project. We use `serde_json` because it's well documented and easy
         // to integrate. But I believe there should be an alternative to
-        // `serde_json` which can parse json file much *faster*, perhaps
+        // `serde_json` which can parse JSON file much *faster*, perhaps
         // `simd_json` can be. See https://github.com/serde-rs/json-benchmark
         let inner: ManifestInner = serde_json::from_slice(&bytes)?;
-        let name = leaf_base(path);
-        let path = path.as_ref().to_path_buf();
-        // let _ = serde_json::to_writer_pretty(std::io::stdout(), &inner);
-        // log::debug!("{:?}", inner.get_suggest());
-
-        let manifest = Manifest {
-            name,
-            path,
-            bucket,
-            inner,
-            _private: (),
-        };
-
-        log::debug!(
-            "{}/{}: {:?}",
-            manifest.get_bucket(),
-            manifest.get_name(),
-            manifest.get_deps()
-        );
-
-        Ok(manifest)
+        let path = path.to_string_lossy().to_string();
+        // log::debug!("{:?}", inner);
+        Ok(Manifest { path, inner })
     }
 
-    #[inline]
-    pub fn get_name(&self) -> &str {
-        &self.name
+    /// Create a [`Manifest`] representation of a manfest JSON file with the
+    /// given url.
+    ///
+    /// ## Examples
+    ///
+    /// ```no_run
+    /// let url = "https://git.io/JcpUI";
+    /// let manifest = Manifest::from_url(url);
+    /// // Print version information of the manifest
+    /// println!("{}", manifest.version());
+    /// ```
+    ///
+    /// ## Errors
+    ///
+    /// If the process fails to download the file, this method will return a
+    /// [`reqwest::Error`].
+    ///
+    /// It returns a `serde_json::Error` when the JSON deserialization fails.
+    pub fn from_url<S: AsRef<str>>(config: &Config, url: S) -> ScoopResult<Manifest> {
+        let url = url.as_ref().to_owned();
+        let mut bytes = Vec::new();
+        block_on(Self::download_manifest(config, url.clone(), &mut bytes))?;
+        let inner: ManifestInner = serde_json::from_slice(&bytes)?;
+        // log::debug!("{:?}", inner);
+        Ok(Manifest { path: url, inner })
     }
 
-    #[inline]
-    pub fn path(&self) -> &Path {
-        &self.path
+    async fn download_manifest(
+        config: &Config,
+        url: String,
+        data: &mut Vec<u8>,
+    ) -> ScoopResult<()> {
+        let http_client = HttpClient::new(config)?;
+        let resp = http_client.get(url).send().await?;
+        assert!(resp.status().is_success());
+        data.extend(resp.bytes().await?.as_ref());
+        Ok(())
     }
 
-    #[inline]
-    pub fn get_bucket(&self) -> &str {
-        &self.bucket
-    }
+    /// Return the manifest JSON file path of this [`Manifest`].
+    // #[inline]
+    // pub fn path(&self) -> &Path {
+    //     &self.path
+    // }
 
+    /// Return the `version` of this [`Manifest`].
     #[inline]
-    pub fn get_version(&self) -> &str {
+    pub fn version(&self) -> &str {
         &self.inner.version
     }
 
+    /// Return the `description` of this [`Manifest`].
     #[inline]
-    pub fn get_description(&self) -> Option<&String> {
-        self.inner.description.as_ref()
+    pub fn description(&self) -> Option<&str> {
+        self.inner.description.as_deref()
     }
 
+    /// Return the `homepage` of this [`Manifest`].
     #[inline]
-    pub fn get_homepage(&self) -> Option<&String> {
-        self.inner.homepage.as_ref()
+    pub fn homepage(&self) -> Option<&str> {
+        self.inner.homepage.as_deref()
     }
 
+    /// Return the `license` of this [`Manifest`].
     #[inline]
-    pub fn get_license(&self) -> Option<&License> {
+    pub fn license(&self) -> Option<&License> {
         self.inner.license.as_ref()
     }
 
@@ -929,7 +997,7 @@ impl Manifest {
     }
 
     #[inline]
-    pub fn get_architecture(&self) -> Option<&Architecture> {
+    pub fn architecture(&self) -> Option<&Architecture> {
         self.inner.get_architecture()
     }
 
@@ -980,13 +1048,13 @@ impl Manifest {
         self.inner.get_suggest()
     }
 
+    /// Return a `bin` reference of this [`Manifest`].
+    ///
+    /// It returns arch-specific `bin` field when it is [`Some`], or it will
+    /// return the arch-less one.
     #[inline]
-    pub fn get_bin(&self) -> Option<Bins> {
-        let manifest = &self.inner;
-
-        // TODO
-
-        manifest.bin.clone()
+    pub fn bin(&self) -> Option<&Bins> {
+        self.inner.bin()
     }
 
     /// Returns the dependencies of this manifest.
@@ -1030,6 +1098,7 @@ impl Manifest {
         deps.into_iter().collect()
     }
 
+    /// Return the `innosetup` of this [`Manifest`].
     #[inline]
     pub fn is_innosetup(&self) -> bool {
         self.inner.innosetup.unwrap_or(false)
@@ -1037,7 +1106,7 @@ impl Manifest {
 
     #[inline]
     pub fn is_nightly_version(&self) -> bool {
-        self.get_version() == "nightly"
+        self.version() == "nightly"
     }
 
     /// Extract download urls from this manifest, in following order:
@@ -1046,7 +1115,7 @@ impl Manifest {
     /// 2. return "32bit" urls for ia32 arch if available;
     /// 3. fallback to return common urls.
     pub fn get_url(&self) -> &Urls {
-        match self.get_architecture() {
+        match self.architecture() {
             None => {}
             Some(arch) => {
                 // arch amd64
@@ -1085,11 +1154,11 @@ impl Manifest {
     /// 3. fallback to return common hashes.
     pub fn get_hash(&self) -> Option<&Hashes> {
         // `nightly` version does not have hashes.
-        if self.get_version() == "nightly" {
+        if self.version() == "nightly" {
             return None;
         }
 
-        match self.get_architecture() {
+        match self.architecture() {
             None => {}
             Some(arch) => {
                 // arch amd64

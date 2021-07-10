@@ -22,8 +22,6 @@ scoop-core = { version = "0.1.0", path = "../core" }
 scoop-hash = { version = "0.1.0", path = "../hash" }
 sysinfo = "0.18.0"
 termcolor = "1.1"
-tokio = { version = "1.6.1", features = ["full"] }
-tokio-stream = "0.1.6"
 
 [[bin]]
 name = "scoop"

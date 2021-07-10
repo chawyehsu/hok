@@ -1,5 +1,5 @@
-use crate::config::Config;
-use crate::error::ScoopResult;
+use crate::Config;
+use crate::ScoopResult;
 use std::path::PathBuf;
 
 pub struct AppPersist {
@@ -22,7 +22,7 @@ pub struct PersistManager {
 
 impl PersistManager {
     pub fn new(config: &Config) -> PersistManager {
-        let working_dir = config.get_root_path().join("apps");
+        let working_dir = config.root_path().join("apps");
 
         PersistManager { working_dir }
     }

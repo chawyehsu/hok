@@ -1,20 +1,25 @@
 use clap::ArgMatches;
-use scoop_core::{BucketManager, Config};
+use scoop_core::{manager::BucketManager, Config};
 
 use crate::error::CliResult;
 
 pub fn cmd_bucket(matches: &ArgMatches, config: &Config) -> CliResult<()> {
     let bucket_manager = BucketManager::new(config);
-
     match matches.subcommand() {
         ("add", Some(matches)) => {
             let name = matches.value_of("name").unwrap();
             let repo = matches.value_of("repo");
-            return bucket_manager.add_bucket(name, repo);
+            match bucket_manager.add_bucket(name, repo) {
+                Ok(()) => {
+                    println!("The {} bucket was added successfully", name);
+                    return Ok(());
+                }
+                Err(e) => return Err(e),
+            }
         }
         ("list", Some(_)) => {
-            bucket_manager.buckets().iter().for_each(|(name, _)| {
-                println!("{}", name);
+            bucket_manager.buckets().iter().for_each(|bucket| {
+                println!("{}", bucket.name());
             });
         }
         ("known", Some(_)) => {
@@ -24,7 +29,13 @@ pub fn cmd_bucket(matches: &ArgMatches, config: &Config) -> CliResult<()> {
         }
         ("remove", Some(matches)) => {
             let name = matches.value_of("name").unwrap();
-            return bucket_manager.remove_bucket(name);
+            match bucket_manager.remove_bucket(name) {
+                Ok(()) => {
+                    println!("The {} bucket was removed successfully", name);
+                    return Ok(());
+                }
+                Err(e) => return Err(e),
+            }
         }
         _ => unreachable!(),
     }

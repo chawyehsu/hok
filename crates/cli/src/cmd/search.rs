@@ -1,28 +1,24 @@
 use clap::ArgMatches;
-use scoop_core::{search, Config};
+use scoop_core::ops::search;
+use scoop_core::Config;
 
-pub fn cmd_search(matches: &ArgMatches, config: &Config) {
+use crate::error::CliResult;
+
+pub fn cmd_search(matches: &ArgMatches, config: &Config) -> CliResult<()> {
     if let Some(query) = matches.value_of("query") {
-        let search_bin = matches.is_present("binary");
-        let matches = search(config, query, search_bin).unwrap();
-
-        for m in matches {
-            if m.collected.len() > 0 {
-                println!("'{}' bucket:", m.bucket);
-                for sm in m.collected {
-                    if sm.bin.is_none() {
-                        println!("    {} ({})", sm.name, sm.version);
-                    } else {
-                        println!(
-                            "    {} ({}) --> includes {}",
-                            sm.name,
-                            sm.version,
-                            sm.bin.unwrap()
-                        );
-                    }
-                }
-                println!("");
+        for (bucket, apps) in search(config, query)? {
+            println!("'{}' bucket:", bucket);
+            for (app, bin) in apps {
+                let name = app.name();
+                let version = app.version();
+                let prt = match bin {
+                    Some(s) => format!("    {} ({}) --> includes '{}'", name, version, s),
+                    None => format!("    {} ({})", name, version),
+                };
+                println!("{}", prt);
             }
+            println!("");
         }
     }
+    Ok(())
 }

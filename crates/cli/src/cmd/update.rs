@@ -1,11 +1,13 @@
-use chrono::{SecondsFormat, Utc};
-use scoop_core::{BucketManager, Config};
+use chrono::SecondsFormat;
+use chrono::Utc;
+use scoop_core::manager::BucketManager;
+use scoop_core::Config;
 
 pub fn cmd_update(_: &clap::ArgMatches, config: &mut Config) {
     let bucket_manager = BucketManager::new(config);
 
-    bucket_manager.buckets().iter().for_each(|(name, bucket)| {
-        print!("Updating '{}' bucket...", name);
+    bucket_manager.buckets().iter().for_each(|bucket| {
+        print!("Updating '{}' bucket...", bucket.name());
         match bucket.update() {
             Ok(()) => {}
             Err(e) => {

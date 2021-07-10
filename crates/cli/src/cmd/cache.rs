@@ -1,88 +1,59 @@
 use clap::ArgMatches;
+use scoop_core::manager::CacheManager;
+use scoop_core::util::filesize;
+use scoop_core::Config;
+use crate::error::CliResult;
 
-use scoop_core::{utils, CacheManager, Config};
-
-pub fn cmd_cache(matches: &ArgMatches, config: &Config) {
+pub fn cmd_cache(matches: &ArgMatches, config: &Config) -> CliResult<()> {
     let cache_manager = CacheManager::new(config);
-    if let Some(sub_m2) = matches.subcommand_matches("rm") {
-        if let Some(app_name) = sub_m2.value_of("app") {
-            match cache_manager.remove(app_name) {
-                Ok(()) => {
-                    match app_name == "*" {
-                        true => println!("All download caches were removed."),
-                        false => println!("All caches that match '{}' were removed.", app_name),
+    match matches.subcommand() {
+        ("remove", Some(matches)) => {
+            if let Some(app_name) = matches.value_of("app") {
+                match cache_manager.remove(app_name) {
+                    Ok(()) => {
+                        if app_name == "*" {
+                            println!("All download caches were removed.");
+                        } else {
+                            println!("All caches that match '{}' were removed.", app_name);
+                        }
+                        return Ok(());
                     }
-                    std::process::exit(0);
-                }
-                Err(_e) => {
-                    eprintln!("Failed to remove '{}' caches.", app_name);
-                    std::process::exit(1);
+                    Err(err) => return Err(err),
                 }
             }
-        } else if sub_m2.is_present("all") {
-            match cache_manager.remove_all() {
-                Ok(()) => {
-                    println!("All download caches were removed.");
-                    std::process::exit(0);
-                }
-                Err(_e) => {
-                    eprintln!("Failed to clear caches.");
-                    std::process::exit(1);
+            if matches.is_present("all") {
+                match cache_manager.remove_all() {
+                    Ok(()) => {
+                        println!("All download caches were removed.");
+                        return Ok(());
+                    }
+                    Err(err) => return Err(err),
                 }
             }
+            Ok(())
         }
-    } else {
-        let cache_items = cache_manager.get_all().unwrap();
-        let mut total_size: u64 = 0;
-        let total_count = cache_items.len();
-
-        if let Some(sub_m2) = matches.subcommand_matches("show") {
-            if let Some(app) = sub_m2.value_of("app") {
-                let mut filter_size: u64 = 0;
-                let mut filter_count: u64 = 0;
-                for sci in cache_items {
-                    if sci.app_name().contains(app) {
-                        filter_size = filter_size + sci.size();
-                        filter_count = filter_count + 1;
-                        println!(
-                            "{: >6} {} ({}) {}",
-                            utils::filesize(sci.size(), true),
-                            sci.app_name(),
-                            sci.version(),
-                            sci.file_name()
-                        );
-                    }
-                }
-                if filter_count > 0 {
-                    println!();
-                }
+        ("list", Some(matches)) => {
+            let cache_items = match matches.value_of("app") {
+                Some(app_name) => cache_manager.entries_of(app_name).unwrap(),
+                None => cache_manager.entries().unwrap(),
+            };
+            let mut total_size: u64 = 0;
+            let total_count = cache_items.len();
+            cache_items.into_iter().for_each(|file| {
+                total_size += file.size();
                 println!(
-                    "Total: {} files, {}",
-                    filter_count,
-                    utils::filesize(filter_size, true)
+                    "{: >6} {} ({}) {:>}",
+                    file.size_as_bytes(true),
+                    file.app_name(),
+                    file.version(),
+                    file.filename()
                 );
-                std::process::exit(0);
-            }
-        }
-
-        for sci in cache_items {
-            total_size = total_size + sci.size();
+            });
             println!(
-                "{: >6} {} ({}) {}",
-                utils::filesize(sci.size(), true),
-                sci.app_name(),
-                sci.version(),
-                sci.file_name()
+                "Total: {} files, {}", total_count, filesize(total_size, true)
             );
+            Ok(())
         }
-        if total_count > 0 {
-            println!();
-        }
-        println!(
-            "Total: {} files, {}",
-            total_count,
-            utils::filesize(total_size, true)
-        );
-        std::process::exit(0);
+        _ => unreachable!(),
     }
 }

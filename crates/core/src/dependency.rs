@@ -2,7 +2,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
-use crate::error::ScoopResult;
+use crate::ScoopResult;
 
 #[derive(Debug)]
 struct Dependencies<T>(HashSet<T>);
@@ -13,7 +13,7 @@ struct Dependencies<T>(HashSet<T>);
 pub struct DepGraph<T> {
     /// Each entry in this HashMap represents a node with its dependencies in
     /// this DepGraph.
-    inner: HashMap<T, Dependencies<T>>,
+    nodes: HashMap<T, Dependencies<T>>,
 }
 
 impl<T> std::ops::Deref for Dependencies<T> {
@@ -50,7 +50,7 @@ where
     #[inline]
     pub fn new() -> DepGraph<T> {
         DepGraph {
-            inner: HashMap::new(),
+            nodes: HashMap::new(),
         }
     }
 
@@ -78,7 +78,7 @@ where
     /// If `pop` returns `None` and `len` is not 0, there is cyclic dependencies.
     pub fn pop(&mut self) -> Option<T> {
         let node = self
-            .inner
+            .nodes
             .iter()
             .filter(|(_, deps)| deps.len() == 0)
             .map(|(node, _)| node)
@@ -99,7 +99,7 @@ where
     /// dependencies.
     pub fn pop_many(&mut self) -> Vec<T> {
         let nodes = self
-            .inner
+            .nodes
             .iter()
             .filter(|(_, deps)| deps.len() == 0)
             .map(|(node, _)| node.clone())
@@ -139,18 +139,18 @@ where
     /// Return the count of unsolved nodes in this DepGraph.
     #[inline]
     pub fn len(&self) -> usize {
-        self.inner.len()
+        self.nodes.len()
     }
 
     /// Reinitialize this dependencies DAG.
     #[inline]
     pub fn reset(&mut self) {
-        self.inner = HashMap::new();
+        self.nodes = HashMap::new();
     }
 
     fn _register_dep(&mut self, node: T, dep_node: T) {
         // register node
-        match self.inner.entry(node.clone()) {
+        match self.nodes.entry(node.clone()) {
             Entry::Vacant(e) => {
                 let mut dep = Dependencies::new();
                 // Avoid self cyclic dependencies
@@ -168,7 +168,7 @@ where
         }
 
         // register dep_node
-        match self.inner.entry(dep_node) {
+        match self.nodes.entry(dep_node) {
             Entry::Vacant(e) => {
                 drop(e.insert(Dependencies::new()));
             }
@@ -180,9 +180,9 @@ where
 
     fn _remove(&mut self, node: &T) {
         // 1. remove this node from DepGraph.
-        drop(self.inner.remove(node));
+        drop(self.nodes.remove(node));
         // 2. remove this node from other nodes' dependencies.
-        self.inner.iter_mut().for_each(|(_, deps)| {
+        self.nodes.iter_mut().for_each(|(_, deps)| {
             drop(deps.remove(node));
         });
     }

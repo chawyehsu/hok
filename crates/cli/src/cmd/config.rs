@@ -1,7 +1,9 @@
 use clap::ArgMatches;
 use scoop_core::Config;
 
-pub fn cmd_config(matches: &ArgMatches, config: &mut Config) {
+use crate::error::CliResult;
+
+pub fn cmd_config(matches: &ArgMatches, config: &mut Config) -> CliResult<()> {
     if matches.is_present("edit") {
         unimplemented!();
     } else if matches.is_present("list") {
@@ -19,4 +21,5 @@ pub fn cmd_config(matches: &ArgMatches, config: &mut Config) {
             Err(err) => eprintln!("{}", err),
         }
     }
+    Ok(())
 }
