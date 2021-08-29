@@ -17,6 +17,10 @@ pub fn ensure_dir<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
     }
 }
 
+pub fn remove_dir<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
+    remove_dir_all::remove_dir_all(path.as_ref())
+}
+
 #[inline(always)]
 pub fn empty_dir<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
     match path.as_ref().exists() {
@@ -33,8 +37,8 @@ pub fn empty_dir<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
 pub fn walk_dir_json(path: &Path) -> io::Result<Vec<PathBuf>> {
     Ok(path
         .read_dir()?
-        .filter_map(io::Result::ok)
         .par_bridge()
+        .filter_map(io::Result::ok)
         .filter(|de| {
             let path = de.path();
             let name = path.file_name().unwrap().to_str().unwrap();

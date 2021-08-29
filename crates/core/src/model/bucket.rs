@@ -1,10 +1,11 @@
-use super::{App, Manifest};
 use crate::{util::walk_dir_json, Config, Git, ScoopResult};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
 };
+
+use super::AvailableApp;
 
 /// Scoop local bucket representation.
 #[derive(Debug)]
@@ -16,8 +17,11 @@ pub struct Bucket<'cfg> {
 impl<'cfg> Bucket<'cfg> {
     /// Create a [`Bucket`] representation.
     #[inline]
-    pub(crate) fn new(config: &Config, name: String) -> Bucket {
-        Bucket { config, name }
+    pub(crate) fn new<S: AsRef<str>>(config: &Config, name: S) -> Bucket {
+        Bucket {
+            config,
+            name: name.as_ref().to_owned(),
+        }
     }
 
     /// Return `name` of this bucket.
@@ -30,12 +34,6 @@ impl<'cfg> Bucket<'cfg> {
     #[inline]
     pub fn path(&self) -> PathBuf {
         self.config.buckets_path().join(self.name())
-    }
-
-    /// Return manfiest `path` of the given `name`d app in this bucket.
-    #[inline]
-    pub(crate) fn path_of(&self, name: &str) -> PathBuf {
-        self.manifest_dir().join(format!("{}.json", name))
     }
 
     /// Return the root path that contains manifest files. There are two types
@@ -57,10 +55,16 @@ impl<'cfg> Bucket<'cfg> {
         }
     }
 
+    /// Return manfiest `path` of the given `name`d app in this bucket.
+    #[inline]
+    pub(crate) fn manifest_of(&self, name: &str) -> PathBuf {
+        self.manifest_dir().join(format!("{}.json", name))
+    }
+
     /// Check if this bucket contains app named `name`.
     #[inline]
     pub fn contains_app(&self, name: &str) -> bool {
-        self.path_of(name).exists()
+        self.manifest_of(name).exists()
     }
 
     /// Get the app named `name` in this bucket.
@@ -69,15 +73,14 @@ impl<'cfg> Bucket<'cfg> {
     ///
     /// If the process failed to read manifest file, then the function will
     /// bubble up an [`std::io::error::Error`].
-    pub fn app(&self, name: &str) -> ScoopResult<App<'cfg>> {
+    pub fn app(&self, name: &str) -> ScoopResult<AvailableApp<'cfg>> {
         let bucket = self.name.as_str();
         if !self.contains_app(name) {
             anyhow::bail!("'{}' bucket doesn't have app '{}'", bucket, name);
         }
         let config = self.config;
-        let manifest = Manifest::new(self.path_of(name)).unwrap();
-        let name = name.to_owned();
-        Ok(App::new(config, name, bucket.to_owned(), manifest))
+        let path = self.manifest_of(name);
+        Ok(AvailableApp::new(config, path)?)
     }
 
     /// Get all available apps in this bucket.
@@ -88,22 +91,13 @@ impl<'cfg> Bucket<'cfg> {
     /// will bubble up an [`std::io::error::Error`].
     ///
     /// It returns a `serde_json::Error` when the JSON deserialization fails.
-    pub fn apps(&self) -> ScoopResult<Vec<App<'cfg>>> {
+    pub fn apps(&self) -> ScoopResult<Vec<AvailableApp<'cfg>>> {
         let config = self.config;
-        let bucket = self.name.as_str();
         let apps = Arc::new(Mutex::new(Vec::new()));
         let json_files = walk_dir_json(&self.manifest_dir())?;
         json_files.into_par_iter().for_each(|path| {
-            let name = path
-                .file_name()
-                .map(|s| s.to_string_lossy())
-                .unwrap()
-                .trim_end_matches(".json")
-                .to_owned();
-            let manifest = Manifest::new(path).unwrap();
-            apps.lock()
-                .unwrap()
-                .push(App::new(config, name, bucket.to_owned(), manifest));
+            let app = AvailableApp::new(config, path).unwrap();
+            apps.lock().unwrap().push(app);
         });
         let res = Arc::try_unwrap(apps).unwrap().into_inner().unwrap();
         Ok(res)

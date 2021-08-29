@@ -4,7 +4,7 @@ use std::hash::Hash;
 
 use crate::ScoopResult;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Dependencies<T>(HashSet<T>);
 
 /// This is the dependencies DAG (Direct Acyclic Graph). The type `T` is
@@ -67,6 +67,7 @@ where
     #[inline]
     pub fn register_deps<N: Into<T>>(&mut self, node: N, dep_nodes: Vec<N>) {
         let node = node.into();
+        self._register_node(node.clone());
         dep_nodes
             .into_iter()
             .for_each(|dep_node| self._register_dep(node.clone(), dep_node.into()))
@@ -86,7 +87,7 @@ where
             .map(|node| node.clone());
 
         if node.is_some() {
-            self._remove(node.as_ref().unwrap());
+            Self::remove(&mut self.nodes, node.as_ref().unwrap());
         }
 
         node
@@ -106,10 +107,31 @@ where
             .collect::<Vec<_>>();
 
         nodes.iter().for_each(|node| {
-            self._remove(node);
+            Self::remove(&mut self.nodes, node);
         });
 
         nodes
+    }
+
+    /// Check if cyclic dependencies exist in the graph. This method does not
+    /// remove any nodes from the graph, instead it manipulates a clone of the
+    /// graph.
+    pub fn check(&self) -> ScoopResult<()> {
+        let mut nodes = self.nodes.clone();
+        while nodes.len() > 0 {
+            let step = nodes
+                .iter()
+                .filter(|(_, deps)| deps.len() == 0)
+                .map(|(node, _)| node.clone())
+                .collect::<Vec<_>>();
+            step.iter().for_each(|node| {
+                Self::remove(&mut nodes, node);
+            });
+            if step.len() == 0 {
+                anyhow::bail!("cyclic dependencies detected");
+            }
+        }
+        Ok(())
     }
 
     /// Walk the whole graph and pop all of the resolved nodes. An error will
@@ -148,6 +170,10 @@ where
         self.nodes = HashMap::new();
     }
 
+    fn _register_node(&mut self, node: T) {
+        self.nodes.entry(node).or_insert_with(Dependencies::new);
+    }
+
     fn _register_dep(&mut self, node: T, dep_node: T) {
         // register node
         match self.nodes.entry(node.clone()) {
@@ -178,11 +204,11 @@ where
         }
     }
 
-    fn _remove(&mut self, node: &T) {
+    fn remove(nodes: &mut HashMap<T, Dependencies<T>>, node: &T) {
         // 1. remove this node from DepGraph.
-        drop(self.nodes.remove(node));
+        drop(nodes.remove(node));
         // 2. remove this node from other nodes' dependencies.
-        self.nodes.iter_mut().for_each(|(_, deps)| {
+        nodes.iter_mut().for_each(|(_, deps)| {
             drop(deps.remove(node));
         });
     }

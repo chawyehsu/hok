@@ -8,6 +8,8 @@ use regex::RegexBuilder;
 use std::path::Path;
 pub use tokio_util::*;
 
+use crate::ScoopResult;
+
 pub fn os_is_arch64() -> bool {
     match std::mem::size_of::<&char>() {
         4 => false,
@@ -70,15 +72,22 @@ pub fn compare_versions(ver_a: &String, ver_b: &String) -> std::cmp::Ordering {
     std::cmp::Ordering::Equal
 }
 
-pub fn extract_bucket_from<P: AsRef<Path> + ?Sized>(path: &P) -> Option<String> {
-    static REGEX_BUCKET_NAME: Lazy<Regex> = Lazy::new(|| {
-        RegexBuilder::new(r".*?[\\/]buckets[\\/](?P<bucket_name>[a-zA-Z0-9-_]+)[\\/]+.*")
-            .build()
-            .unwrap()
+pub fn extract_name_and_bucket(path: &Path) -> ScoopResult<(String, String)> {
+    static RE: Lazy<Regex> = Lazy::new(|| {
+        // FIXME: Uppercase <name> is not a good idea, the support is going to be dropped.
+        let p = r".*?[\\/]buckets[\\/](?P<bucket>[a-zA-Z0-9-_]+).*?[\\/](?P<name>[a-zA-Z0-9-_@.]+).json$";
+        RegexBuilder::new(p).build().unwrap()
     });
-
-    match REGEX_BUCKET_NAME.captures(path.as_ref().to_str().unwrap()) {
-        Some(caps) => caps.name("bucket_name").map(|m| m.as_str().to_string()),
-        None => None,
+    match RE.captures(path.to_str().unwrap()) {
+        None => {}
+        Some(caps) => {
+            let name = caps.name("name").map(|m| m.as_str().to_string());
+            let bucket = caps.name("bucket").map(|m| m.as_str().to_string());
+            if name.is_some() && bucket.is_some() {
+                return Ok((name.unwrap(), bucket.unwrap()));
+            }
+        }
     }
+
+    anyhow::bail!("unsupported manifest path {}", path.display());
 }

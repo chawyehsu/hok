@@ -1,17 +1,20 @@
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 
+use crate::manager::BucketManager;
+use crate::model::AvailableApp;
+use crate::util::leaf;
 use crate::Config;
 use crate::ScoopResult;
-use crate::{manager::BucketManager, model::App};
 
 /// Main method for `scoop search`.
 pub fn search<'cfg>(
     config: &'cfg Config,
     query: &str,
-) -> ScoopResult<Vec<(String, Vec<(App<'cfg>, Option<String>)>)>> {
+) -> ScoopResult<Vec<(String, Vec<(AvailableApp<'cfg>, Option<String>)>)>> {
     let bucket_manager = BucketManager::new(config);
     let res = Arc::new(Mutex::new(Vec::new()));
     bucket_manager.buckets().into_par_iter().for_each(|bucket| {
@@ -22,7 +25,7 @@ pub fn search<'cfg>(
                 apps.lock().unwrap().push((app, None));
             } else {
                 // 2. search app bin
-                let bin = app.search_bin(query);
+                let bin = search_bin(query, &app);
                 if bin.is_some() {
                     apps.lock().unwrap().push((app, bin));
                 }
@@ -44,4 +47,30 @@ pub fn search<'cfg>(
     }
 
     Ok(Arc::try_unwrap(res).unwrap().into_inner().unwrap())
+}
+
+/// Search App's bin.
+fn search_bin(query: &str, app: &AvailableApp) -> Option<String> {
+    match app.manifest().bin() {
+        Some(bins) => {
+            for bin in bins.iter() {
+                let length = bin.len();
+                if length > 0 {
+                    // the first is the original name
+                    let leaf_bin = leaf(&PathBuf::from(bin[0].clone()));
+                    if leaf_bin.contains(query) {
+                        return Some(leaf_bin);
+                    }
+                }
+                if length > 1 {
+                    // the second is the shim name
+                    if bin[1].contains(query) {
+                        return Some(bin[1].clone());
+                    }
+                }
+            }
+        }
+        None => {}
+    }
+    None
 }

@@ -10,7 +10,7 @@ pub fn cmd_search(matches: &ArgMatches, config: &Config) -> CliResult<()> {
             println!("'{}' bucket:", bucket);
             for (app, bin) in apps {
                 let name = app.name();
-                let version = app.version();
+                let version = app.manifest().version();
                 let prt = match bin {
                     Some(s) => format!("    {} ({}) --> includes '{}'", name, version, s),
                     None => format!("    {} ({})", name, version),

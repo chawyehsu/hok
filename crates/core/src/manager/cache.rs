@@ -1,8 +1,8 @@
-use rayon::iter::ParallelBridge;
-use rayon::iter::ParallelIterator;
 use crate::model::CacheFile;
 use crate::Config;
 use crate::ScoopResult;
+use rayon::iter::ParallelBridge;
+use rayon::iter::ParallelIterator;
 
 /// The `CacheManager` is responsible for cache manipulation, including reading
 /// and writing cache files from/to Scoop's cache directory. All cache-related
@@ -50,8 +50,8 @@ impl<'a> CacheManager<'a> {
             .config
             .cache_path()
             .read_dir()?
-            .filter_map(Result::ok)
             .par_bridge()
+            .filter_map(Result::ok)
             .filter_map(|de| CacheFile::new(de.path()).ok())
             .collect::<Vec<_>>();
         res.sort_by_key(|file| file.app_name());

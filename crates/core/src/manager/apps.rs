@@ -22,6 +22,7 @@ impl App {
     /// This constructor is marked as private, since we don't want any caller
     /// outside the [`AppManager`] to create new App directly.
     #[inline]
+    #[allow(unused)]
     fn new(path: PathBuf) -> App {
         let name = leaf(path.as_path()).to_string();
         App { name, path }
@@ -130,7 +131,6 @@ impl App {
 #[derive(Debug)]
 pub struct AppManager<'a> {
     config: &'a Config,
-    working_dir: PathBuf,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -163,40 +163,18 @@ impl InstallInfo {
 impl<'a> AppManager<'a> {
     /// Create an [`AppsManager`] from the given Scoop [`Config`]
     pub fn new(config: &Config) -> AppManager {
-        let working_dir = config.root_path().join("apps");
-        AppManager {
-            config,
-            working_dir,
-        }
-    }
-
-    pub fn add(&self, app_name: &str) -> App {
-        let path = self.working_dir.join(app_name);
-        App::new(path)
+        AppManager { config }
     }
 
     /// Check if app of the given name is installed.
-    pub fn is_app_installed<S: AsRef<str>>(&self, name: S) -> bool {
-        // transform
-        //   `app_name.json`, or
-        //   `/path/to/app_name.json`, or
-        //   `http(s)://example.com/raw/app_name.json`
-        // to `app_name`
-        let name = name
-            .as_ref()
-            .trim_end_matches(".json")
-            .split(&['/', '\\'][..])
-            .last()
-            .unwrap();
-
-        // Here we simply consider the app is installed by checking the app dir
-        // exists.
-        self.working_dir.as_path().join(name).exists()
+    pub fn is_app_installed(&self, name: &str) -> bool {
+        // Simply consider the app is installed by checking the app dir exists.
+        self.config.apps_path().join(name).exists()
     }
 
     /// Return
     pub fn get_app<S: AsRef<str>>(&self, name: S) -> App {
-        let path = self.working_dir.join(name.as_ref());
+        let path = self.config.apps_path().join(name.as_ref());
         let name = leaf(path.as_path());
         App { path, name }
     }
@@ -214,7 +192,7 @@ impl<'a> AppManager<'a> {
 
     pub fn outdated_app<S: AsRef<str>>(&self, name: S) -> Option<Vec<PathBuf>> {
         if self.is_app_installed(name.as_ref()) {
-            let path = self.working_dir.join(name.as_ref());
+            let path = self.config.apps_path().join(name.as_ref());
             let name = leaf(path.as_path());
             let app = App { path, name };
             return Some(app.outdated_versions());
@@ -237,11 +215,11 @@ impl<'a> AppManager<'a> {
     // }
 
     fn entries(&self) -> Vec<DirEntry> {
-        match self.working_dir.as_path().exists() {
+        match self.config.apps_path().exists() {
             false => vec![], // Return empty vec if `working_dir` is not created.
             true => self
-                .working_dir
-                .as_path()
+                .config
+                .apps_path()
                 .read_dir()
                 .unwrap()
                 .map(|x| x.unwrap())

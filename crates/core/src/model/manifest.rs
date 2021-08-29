@@ -564,6 +564,12 @@ impl FromStr for Hash {
     }
 }
 
+impl AsRef<str> for Hash {
+    fn as_ref(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 impl Hash {
     fn validate(s: &str) -> bool {
         static REGEX_HASH: Lazy<Regex> = Lazy::new(|| {
@@ -638,6 +644,11 @@ impl ArchitectureInner {
     }
 
     #[inline]
+    pub fn get_extract_dir(&self) -> Option<&VecItem> {
+        self.extract_dir.as_ref()
+    }
+
+    #[inline]
     pub fn get_post_install(&self) -> Option<&VecItem> {
         self.post_install.as_ref()
     }
@@ -682,6 +693,42 @@ impl ManifestInner {
     #[inline]
     pub fn get_url(&self) -> Option<&Urls> {
         self.url.as_ref()
+    }
+
+    #[inline]
+    pub fn get_extract_dir(&self) -> Option<&VecItem> {
+        match self.get_architecture() {
+            None => {}
+            Some(arch) => {
+                // amd64
+                if cfg!(target_arch = "x86_64") {
+                    if arch.amd64().is_some() {
+                        let extract_dir = arch.amd64().unwrap().get_extract_dir();
+                        if extract_dir.is_some() {
+                            return extract_dir;
+                        }
+                    }
+                }
+
+                // ia32
+                if cfg!(target_arch = "x86") {
+                    if arch.ia32().is_some() {
+                        let extract_dir = arch.ia32().unwrap().get_extract_dir();
+                        if extract_dir.is_some() {
+                            return extract_dir;
+                        }
+                    }
+                }
+            }
+        }
+
+        // fallback, arch-less `extract_dir`
+        self.extract_dir.as_ref()
+    }
+
+    #[inline]
+    pub fn get_extract_to(&self) -> Option<&VecItem> {
+        self.extract_to.as_ref()
     }
 
     #[inline]
@@ -962,15 +1009,15 @@ impl Manifest {
     }
 
     /// Return the manifest JSON file path of this [`Manifest`].
-    // #[inline]
-    // pub fn path(&self) -> &Path {
-    //     &self.path
-    // }
+    #[inline]
+    pub fn path(&self) -> &str {
+        &self.path
+    }
 
     /// Return the `version` of this [`Manifest`].
     #[inline]
     pub fn version(&self) -> &str {
-        &self.inner.version
+        self.inner.version.as_str()
     }
 
     /// Return the `description` of this [`Manifest`].
@@ -1004,6 +1051,16 @@ impl Manifest {
     #[inline]
     pub fn get_cookie(&self) -> Option<&Map<String, serde_json::Value>> {
         self.inner.cookie.as_ref()
+    }
+
+    #[inline]
+    pub fn get_extract_dir(&self) -> Option<&VecItem> {
+        self.inner.get_extract_dir()
+    }
+
+    #[inline]
+    pub fn get_extract_to(&self) -> Option<&VecItem> {
+        self.inner.get_extract_to()
     }
 
     #[inline]
@@ -1094,6 +1151,25 @@ impl Manifest {
                 }
             }
         });
+        // file extensions
+        static RE1: Lazy<Regex> = Lazy::new(|| {
+            let p = r"\.((gz)|(tar)|(tgz)|(lzma)|(bz)|(bz2)|(7z)|(rar)|(iso)|(xz)|(lzh)|(nupkg))$";
+            RegexBuilder::new(p).build().unwrap()
+        });
+        static RE2: Lazy<Regex> = Lazy::new(|| {
+            let p = r"\.(zst)$";
+            RegexBuilder::new(p).build().unwrap()
+        });
+        self.get_url()
+            .iter()
+            .for_each(|url| {
+                if RE1.is_match(url.as_str()) {
+                    drop(deps.insert("7zip".to_owned()));
+                }
+                if RE2.is_match(url.as_str()) {
+                    drop(deps.insert("zstd".to_owned()));
+                }
+            });
 
         deps.into_iter().collect()
     }

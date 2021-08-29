@@ -6,6 +6,7 @@ extern crate serde;
 mod dependency;
 mod git;
 mod http;
+mod indicator;
 mod license;
 pub mod manager;
 mod model;

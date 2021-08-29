@@ -1,45 +1,19 @@
+use crate::error::CliResult;
 use clap::ArgMatches;
-use scoop_core::{manager::AppManager, Config};
+use scoop_core::ops::app::installed_apps;
+use scoop_core::Config;
 
-pub fn cmd_list(_matches: &ArgMatches, config: &Config) {
-    let brew_list_mode = false;
-    let app_manager = AppManager::new(config);
-    let apps = app_manager.installed_apps();
+pub fn cmd_list(_matches: &ArgMatches, config: &Config) -> CliResult<()> {
+    let apps = installed_apps(config)?;
     if apps.len() > 0 {
-        if brew_list_mode {
-            todo!();
-        } else {
-            println!("Installed apps:");
-            for app in apps {
-                let version = app.current_version();
-                let install_info = app.current_install_info();
-
-                // name, version
-                print!("  {} {}", app.name(), version);
-                // global
-                // if app.global {
-                //   print!(" *global*");
-                // }
-                // failed
-                if install_info.is_err() {
-                    print!(" *failed*");
-                }
-                // hold
-                let install_info = install_info.unwrap();
-                if install_info.is_hold() {
-                    print!(" *hold*");
-                }
-                // bucket
-                if install_info.bucket.is_some() {
-                    print!(" [{}]", install_info.bucket.unwrap());
-                } else if install_info.url.is_some() {
-                    print!(" [{}]", install_info.url.unwrap());
-                }
-                // arch
-                // print!(" [{}]", install_info.architecture);
-                // TODO
-                print!("\n");
-            }
+        println!("Installed apps:");
+        for app in apps {
+            // name and version
+            print!("{} {}", app.name(), app.version());
+            // bucket
+            print!(" [{}]", app.bucket());
+            print!("\n");
         }
     }
+    Ok(())
 }

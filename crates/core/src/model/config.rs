@@ -164,11 +164,18 @@ impl Config {
         &self.root_path
     }
 
+    /// Get Scoop's `apps` directory path from the [`Config`], by default the
+    /// value is `$HOME/scoop/apps`.
+    #[inline]
+    pub fn apps_path(&self) -> PathBuf {
+        self.root_path().join("apps")
+    }
+
     /// Get Scoop's buckets path from the [`Config`], by default the value is
     /// `$HOME/scoop/buckets`.
     #[inline]
     pub fn buckets_path(&self) -> PathBuf {
-        self.root_path.join("buckets")
+        self.root_path().join("buckets")
     }
 
     pub fn set<S>(&mut self, key: S, value: S) -> Result<&Config, &'static str>

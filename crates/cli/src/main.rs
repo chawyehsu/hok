@@ -4,8 +4,8 @@ use scoop_core::Config;
 
 mod cli;
 mod cmd;
+mod console;
 mod error;
-mod indicator;
 
 fn create_logger() {
     let env = Env::default()
@@ -23,16 +23,16 @@ fn run() -> CliResult<()> {
     let mut config = Config::init();
 
     match matches.subcommand() {
-        ("bucket", Some(matches)) => return cmd::cmd_bucket(matches, &config),
-        ("cache", Some(matches)) => return cmd::cmd_cache(matches, &config),
+        ("bucket", Some(matches)) => cmd::cmd_bucket(matches, &config)?,
+        ("cache", Some(matches)) => cmd::cmd_cache(matches, &config)?,
         ("cleanup", Some(matches)) => cmd::cmd_cleanup(matches, &config),
-        ("config", Some(matches)) => return cmd::cmd_config(matches, &mut config),
+        ("config", Some(matches)) => cmd::cmd_config(matches, &mut config)?,
         ("hold", Some(matches)) => cmd::cmd_hold(matches, &config),
-        ("home", Some(matches)) => return cmd::cmd_home(matches, &config),
-        ("info", Some(matches)) => return cmd::cmd_info(matches, &config),
-        ("install", Some(matches)) => cmd::cmd_install(matches, &config),
-        ("list", Some(matches)) => cmd::cmd_list(matches, &config),
-        ("search", Some(matches)) => return cmd::cmd_search(matches, &config),
+        ("home", Some(matches)) => cmd::cmd_home(matches, &config)?,
+        ("info", Some(matches)) => cmd::cmd_info(matches, &config)?,
+        ("install", Some(matches)) => cmd::cmd_install(matches, &config)?,
+        ("list", Some(matches)) => cmd::cmd_list(matches, &config)?,
+        ("search", Some(matches)) => cmd::cmd_search(matches, &config)?,
         ("status", Some(matches)) => cmd::cmd_status(matches, &config),
         ("unhold", Some(matches)) => cmd::cmd_unhold(matches, &config),
         ("uninstall", Some(_matches)) => unimplemented!(),
@@ -50,7 +50,7 @@ fn main() {
     match res {
         Ok(()) => {}
         Err(e) => {
-            eprintln!("Error: {}", e);
+            drop(console::error(format!("{}", e)));
             std::process::exit(1);
         }
     }

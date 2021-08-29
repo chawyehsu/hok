@@ -1,8 +1,8 @@
+use crate::error::CliResult;
 use clap::ArgMatches;
 use scoop_core::manager::CacheManager;
 use scoop_core::util::filesize;
 use scoop_core::Config;
-use crate::error::CliResult;
 
 pub fn cmd_cache(matches: &ArgMatches, config: &Config) -> CliResult<()> {
     let cache_manager = CacheManager::new(config);
@@ -50,7 +50,9 @@ pub fn cmd_cache(matches: &ArgMatches, config: &Config) -> CliResult<()> {
                 );
             });
             println!(
-                "Total: {} files, {}", total_count, filesize(total_size, true)
+                "Total: {} files, {}",
+                total_count,
+                filesize(total_size, true)
             );
             Ok(())
         }

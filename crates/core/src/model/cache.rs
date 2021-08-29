@@ -1,7 +1,10 @@
-use std::{borrow::Borrow, path::{Path, PathBuf}};
+use crate::ScoopResult;
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
-use crate::ScoopResult;
+use std::{
+    borrow::Borrow,
+    path::{Path, PathBuf},
+};
 
 /// This is the representation of a Scoop's cache file.
 #[derive(Clone, Debug)]

@@ -96,8 +96,8 @@ impl<'cfg> BucketManager<'cfg> {
             buckets_dir
                 .read_dir()
                 .unwrap()
-                .filter_map(Result::ok)
                 .par_bridge()
+                .filter_map(Result::ok)
                 .filter(|de| de.file_type().unwrap().is_dir())
                 .for_each(|de| {
                     let name = leaf(de.path().as_path());
@@ -112,33 +112,33 @@ impl<'cfg> BucketManager<'cfg> {
         vec![]
     }
 
-    /// Get local bucket with the given bucket name.
+    /// Return local bucket with the given bucket name. If the given bucket does
+    /// no exist, returns `None`.
     #[inline]
     pub fn bucket<S: AsRef<str>>(&self, name: S) -> Option<Bucket<'cfg>> {
-        let path = self.config.buckets_path().join(name.as_ref());
-        if path.exists() {
-            let config = self.config;
-            let name = name.as_ref().to_owned();
-            let bucket = Bucket::new(config, name);
-            Some(bucket)
-        } else {
-            None
+        let name = name.as_ref();
+        match self.config.buckets_path().join(name).exists() {
+            true => Some(Bucket::new(self.config, name)),
+            false => None,
         }
     }
 
     /// Get all known buckets' name.
+    #[inline]
     pub fn known_buckets(&self) -> Vec<&'static str> {
         KNOWN_BUCKETS.keys().map(|k| *k).collect::<Vec<_>>()
     }
 
     /// Check if the bucket of the given `name` is a known bucket.
     /// Computes in O(1) time (average).
+    #[inline]
     fn is_known<S: AsRef<str>>(&self, bucket_name: S) -> bool {
         KNOWN_BUCKETS.contains_key(bucket_name.as_ref())
     }
 
     /// Check if the given `bucket_name` is a known bucket.
     /// Computes in O(1) time (average).
+    #[inline]
     fn known_bucket_url(&self, bucket_name: &str) -> &str {
         *(KNOWN_BUCKETS.get(bucket_name).unwrap())
     }
