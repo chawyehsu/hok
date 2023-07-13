@@ -1,9 +1,9 @@
 [workspace]
 members = [
-    "crates/archive",
     "crates/cli",
     "crates/core",
     "crates/hash",
+    "crates/libcli"
 ]
 
 [profile.release]
