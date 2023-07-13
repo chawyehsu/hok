@@ -1,14 +1,18 @@
-use crate::Config;
-use crate::ScoopResult;
-use std::{path::Path, result};
+use log::trace;
+use std::{path::Path, result, sync::Arc};
 
+use crate::error::{Error, Fallible};
+use crate::Session;
+
+#[derive(Clone, Debug)]
 pub struct Git {
-    proxy: Option<String>,
+    proxy: Arc<Option<String>>,
 }
 
 impl Git {
-    pub fn new(config: &Config) -> Git {
-        let proxy = config.proxy.clone();
+    pub fn new(session: &Session) -> Git {
+        let proxy = session.config.proxy().map(|p| p.to_string());
+        let proxy = Arc::new(proxy);
         Git { proxy }
     }
 
@@ -18,7 +22,7 @@ impl Git {
 
         cb.credentials(
             move |url, username, cred| -> result::Result<git2::Cred, git2::Error> {
-                log::trace!("{:?} {:?} {:?}", url, username, cred);
+                trace!("{:?} {:?} {:?}", url, username, cred);
                 let user = username.unwrap_or("git");
                 let ref cfg = git2::Config::open_default()?;
 
@@ -37,8 +41,8 @@ impl Git {
         fo.remote_callbacks(cb);
 
         if self.proxy.is_some() {
-            let mut proxy = self.proxy.clone().unwrap();
-            // prepend protocol if it does not exist
+            let mut proxy = self.proxy.as_deref().unwrap().to_owned();
+
             if !(proxy.starts_with("http") || proxy.starts_with("socks")) {
                 proxy.insert_str(0, "http://");
             }
@@ -51,30 +55,26 @@ impl Git {
         fo
     }
 
-    fn repo_builder(&self) -> git2::build::RepoBuilder {
-        let mut repo_builder = git2::build::RepoBuilder::new();
-        repo_builder.fetch_options(self.fetch_options());
-
-        repo_builder
-    }
-
-    pub fn clone<S, P>(&self, local_path: P, remote_url: S) -> ScoopResult<()>
+    pub fn clone_repo<S, P>(&self, local_path: P, remote_url: S) -> Fallible<()>
     where
         S: AsRef<str>,
         P: AsRef<Path>,
     {
-        self.repo_builder()
+        let mut repo_builder = git2::build::RepoBuilder::new();
+        repo_builder.fetch_options(self.fetch_options());
+
+        repo_builder
             .clone(remote_url.as_ref(), local_path.as_ref())
-            .map_err(anyhow::Error::from)
-            .map(|_| ())
+            .map_err(|e| e.into())
+            .map(|_| {})
     }
 
     // NOTE: this will discard all local changes.
-    pub fn reset_head<P: AsRef<Path>>(&self, path: P) -> ScoopResult<()> {
+    pub fn reset_head<P: AsRef<Path>>(&self, path: P) -> Fallible<()> {
         let repo = git2::Repository::open(path.as_ref())?;
 
         let mut origin = repo.find_remote("origin")?;
-        // fetch origin all refs
+        // fetch all refs
         origin.fetch(
             &["refs/heads/*:refs/heads/*"],
             Some(&mut self.fetch_options()),
@@ -87,5 +87,14 @@ impl Git {
         repo.reset(&obj, git2::ResetType::Hard, None)?;
 
         Ok(())
+    }
+}
+
+pub fn git_remote_of(repo: &Path) -> Fallible<String> {
+    let repo = git2::Repository::open(repo)?;
+    let remote = repo.find_remote("origin")?;
+    match remote.url() {
+        Some(url) => Ok(url.to_string()),
+        None => Err(Error::Custom("found invalid git remote url".to_owned()).into()),
     }
 }

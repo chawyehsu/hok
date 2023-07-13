@@ -1,23 +1,16 @@
-#[macro_use]
 extern crate log;
 #[macro_use]
 extern crate serde;
 
-mod dependency;
-mod git;
-mod http;
-mod indicator;
-mod license;
-pub mod manager;
-mod model;
-pub mod ops;
-pub mod sys;
-pub mod util;
+mod constants;
+mod manifest;
+mod session;
+mod util;
 
-pub use dependency::DepGraph;
-pub use git::Git;
-pub use http::Client as HttpClient;
-pub use model::Config;
+pub mod bucket;
+pub mod cache;
+pub mod config;
+pub mod error;
+pub mod package;
 
-/// A wrapped `Result` used in this crate.
-pub(crate) type ScoopResult<T> = anyhow::Result<T>;
+pub use session::Session;

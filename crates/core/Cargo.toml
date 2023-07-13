@@ -3,28 +3,32 @@ name = "scoop-core"
 description = "The Scoop Windows command line installer rewritten in Rust"
 homepage = "https://github.com/chawyehsu/scoop-rs"
 version = "0.1.0"
-authors = ["Chawye Hsu <chawyehsu@hotmail.com>"]
+authors = ["Chawye Hsu <su+cratesio@chawyehsu.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.41"
+blocking = "1.2.0"
+chrono = "0.4.19"
 dirs = "3.0.1"
+futures = { version = "0.3.24", features = ["thread-pool"] }
 git2 = "0.13.17"
-glob = "0.3.0"
 indexmap = "1.6.2"
-indicatif = "0.16.2"
 lazycell = "1.3.0"
 log = "0.4.14"
 once_cell = "1.7.2"
 rayon = "1.5.1"
 regex = "1.5.3"
 remove_dir_all = "0.7.0"
-reqwest = { version = "0.11.3", features = ["json", "blocking"] }
+rustls = "0.20.6"
 scoop-hash = { version = "0.1.0", path = "../hash" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.64"
-sysinfo = "0.18.0"
 thiserror = "1.0.26"
 tokio = { version = "1.6.1", features = ["full"] }
 tokio-stream = "0.1.6"
+ureq = "2.5.0"
+
+# Archive module
+# infer = "0.9.0"
+# zip = "0.6.2"

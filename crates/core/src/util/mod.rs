@@ -1,4 +1,7 @@
+pub mod archive;
+pub mod dag;
 mod fs;
+pub mod git;
 mod tokio_util;
 
 pub use fs::*;
@@ -8,7 +11,7 @@ use regex::RegexBuilder;
 use std::path::Path;
 pub use tokio_util::*;
 
-use crate::ScoopResult;
+use crate::error::{Error, Fallible};
 
 pub fn os_is_arch64() -> bool {
     match std::mem::size_of::<&char>() {
@@ -18,11 +21,26 @@ pub fn os_is_arch64() -> bool {
     }
 }
 
+/// Check if a given executable is available on the system.
+pub fn is_program_available(exe: &str) -> bool {
+    if let Ok(path) = std::env::var("PATH") {
+        for p in path.split(";") {
+            let path = Path::new(p).join(exe);
+            if std::fs::metadata(path).is_ok() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// FIXME: there is a wide knowledge of version comparsion,
 /// And of cause I can't implement all of them at one commit, so plese fix me.
 /// Perhaps https://github.com/timvisee/version-compare/issues/20 would
 /// be a good reference.
-pub fn compare_versions(ver_a: &String, ver_b: &String) -> std::cmp::Ordering {
+pub fn compare_versions<S: AsRef<str>>(ver_a: S, ver_b: S) -> std::cmp::Ordering {
+    let ver_a = ver_a.as_ref();
+    let ver_b = ver_b.as_ref();
     let mut ver_a_parsed = ver_a.split(&['.', '-'][..]);
     let mut ver_b_parsed = ver_b.split(&['.', '-'][..]);
 
@@ -72,7 +90,7 @@ pub fn compare_versions(ver_a: &String, ver_b: &String) -> std::cmp::Ordering {
     std::cmp::Ordering::Equal
 }
 
-pub fn extract_name_and_bucket(path: &Path) -> ScoopResult<(String, String)> {
+pub fn extract_name_and_bucket(path: &Path) -> Fallible<(String, String)> {
     static RE: Lazy<Regex> = Lazy::new(|| {
         // FIXME: Uppercase <name> is not a good idea, the support is going to be dropped.
         let p = r".*?[\\/]buckets[\\/](?P<bucket>[a-zA-Z0-9-_]+).*?[\\/](?P<name>[a-zA-Z0-9-_@.]+).json$";
@@ -89,5 +107,5 @@ pub fn extract_name_and_bucket(path: &Path) -> ScoopResult<(String, String)> {
         }
     }
 
-    anyhow::bail!("unsupported manifest path {}", path.display());
+    Err(Error::Custom(format!("unsupported manifest path {}", path.display())).into())
 }

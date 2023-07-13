@@ -1,8 +1,56 @@
 use once_cell::sync::Lazy;
+use regex::{Regex, RegexBuilder};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
-pub static SPDX: Lazy<HashSet<&str>> = Lazy::new(|| {
+pub static USER_AGENT: &str = "Scoop/0.1.0 (RustyScoop)";
+
+pub static BUILTIN_BUCKET_LIST: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
+    vec![
+        ("main", "https://github.com/scoopinstaller/main"),
+        ("extras", "https://github.com/scoopinstaller/extras"),
+        ("games", "https://github.com/calinou/scoop-games"),
+        ("java", "https://github.com/scoopinstaller/java"),
+        ("php", "https://github.com/scoopinstaller/php"),
+        ("versions", "https://github.com/scoopinstaller/versions"),
+    ]
+});
+
+/// regex to match valid Scoop cache filename:
+/// "app#version#filenamified_url"
+pub static REGEX_CACHE_FILE: Lazy<Regex> = Lazy::new(|| {
+    let pattern = r"(?P<name>[0-9a-zA-Z-_.]+)#(?P<version>[0-9a-zA-Z-.]+)#(?P<url>.*)";
+    RegexBuilder::new(pattern).build().unwrap()
+});
+
+/// Hash string validator regex. It's used to validate a deserialized string to
+/// be a valid hash string in the custom deserializing function for the hash
+/// field.
+///
+/// Currently, it could be one of the following formats:
+///
+/// - **md5**: `^md5:[a-fA-F0-9]{32}$`
+/// - **sha1**: `^sha1:[a-fA-F0-9]{40}$`
+/// - **sha256**: `^(sha256:)?[a-fA-F0-9]{64}$`
+/// - **sha512**: `^sha512:[a-fA-F0-9]{128}$`
+///
+/// See `deserialize_vertorized_hash` for details
+pub static REGEX_HASH: Lazy<Regex> = Lazy::new(|| {
+    let pattern = r"^md5:[a-fA-F0-9]{32}|sha1:[a-fA-F0-9]{40}|(sha256:)?[a-fA-F0-9]{64}|sha512:[a-fA-F0-9]{128}$";
+    RegexBuilder::new(pattern).build().unwrap()
+});
+
+pub static REGEX_ARCHIVE_7Z: Lazy<Regex> = Lazy::new(|| {
+    let pattern = r"\.((7z)|(t?gz)|(tar)|(lzma)|(bz2?)|(rar)|(iso)|(xz)|(lzh)|(nupkg))$";
+    RegexBuilder::new(pattern).build().unwrap()
+});
+
+static REGEX_ARCHIVE_ZSTD: Lazy<Regex> = Lazy::new(|| {
+    let pattern = r"\.(zst)$";
+    RegexBuilder::new(pattern).build().unwrap()
+});
+
+pub static SPDX_LIST: Lazy<HashSet<&str>> = Lazy::new(|| {
     // Reference: https://github.com/spdx/license-list-data
     const ID_LIST: [&'static str; 458] = [
         "0BSD",

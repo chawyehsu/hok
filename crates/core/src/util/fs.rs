@@ -34,7 +34,8 @@ pub fn empty_dir<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
 ///
 /// Note: this function will ignore JSON files named `package.json`, which is
 /// considered to be the config file a NPM package.
-pub fn walk_dir_json(path: &Path) -> io::Result<Vec<PathBuf>> {
+pub fn walk_dir_json<P: AsRef<Path>>(path: P) -> io::Result<Vec<PathBuf>> {
+    let path = path.as_ref();
     Ok(path
         .read_dir()?
         .par_bridge()
@@ -88,45 +89,4 @@ pub fn filenamify<S: AsRef<str>>(filename: S) -> String {
     REGEX_REPLACE
         .replace_all(filename.as_ref(), "_")
         .into_owned()
-}
-
-/// Convert bytes to KB/MB/GB representation.
-pub fn filesize(length: u64, with_unit: bool) -> String {
-    let gb: f64 = 2.0_f64.powf(30_f64);
-    let mb: f64 = 2.0_f64.powf(20_f64);
-    let kb: f64 = 2.0_f64.powf(10_f64);
-
-    let flength = length as f64;
-
-    if flength > gb {
-        let j = (flength / gb).round();
-
-        if with_unit {
-            format!("{} GB", j)
-        } else {
-            j.to_string()
-        }
-    } else if flength > mb {
-        let j = (flength / mb).round();
-
-        if with_unit {
-            format!("{} MB", j)
-        } else {
-            j.to_string()
-        }
-    } else if flength > kb {
-        let j = (flength / kb).round();
-
-        if with_unit {
-            format!("{} KB", j)
-        } else {
-            j.to_string()
-        }
-    } else {
-        if with_unit {
-            format!("{} B", flength)
-        } else {
-            flength.to_string()
-        }
-    }
 }
