@@ -1,4 +1,8 @@
-use std::io::{self, Write};
+#![allow(dead_code)]
+use std::{
+    fmt::Display,
+    io::{self, Write},
+};
 use termcolor::{BufferWriter, Color, ColorChoice, ColorSpec, WriteColor};
 
 pub fn warn<S: AsRef<str>>(text: S) -> io::Result<()> {
@@ -11,12 +15,12 @@ pub fn warn<S: AsRef<str>>(text: S) -> io::Result<()> {
     bufwtr.print(&buffer)
 }
 
-pub fn error<S: AsRef<str>>(text: S) -> io::Result<()> {
+pub fn error<T: Display>(input: &T) -> io::Result<()> {
     let bufwtr = BufferWriter::stderr(ColorChoice::Always);
     let mut buffer = bufwtr.buffer();
     buffer.set_color(ColorSpec::new().set_fg(Some(Color::Red)))?;
-    write!(&mut buffer, "Error: ")?;
+    write!(&mut buffer, "ERROR ")?;
     buffer.reset()?;
-    writeln!(&mut buffer, "{}", text.as_ref())?;
+    writeln!(&mut buffer, "{}", input)?;
     bufwtr.print(&buffer)
 }

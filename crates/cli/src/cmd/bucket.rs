@@ -1,44 +1,46 @@
 use clap::ArgMatches;
-use scoop_core::{manager::BucketManager, Config};
+use console::{style, Term};
+use scoop_core::Session;
 
-use crate::error::CliResult;
+use crate::Result;
 
-pub fn cmd_bucket(matches: &ArgMatches, config: &Config) -> CliResult<()> {
-    let bucket_manager = BucketManager::new(config);
+pub fn cmd_bucket(matches: &ArgMatches, session: &Session) -> Result<()> {
     match matches.subcommand() {
-        ("add", Some(matches)) => {
-            let name = matches.value_of("name").unwrap();
-            let repo = matches.value_of("repo");
-            match bucket_manager.add_bucket(name, repo) {
-                Ok(()) => {
-                    println!("The {} bucket was added successfully", name);
-                    return Ok(());
-                }
-                Err(e) => return Err(e),
+        ("add", Some(args)) => {
+            let name = args.value_of("name").unwrap_or_default();
+            let repo = args.value_of("repo").unwrap_or_default();
+            match session.bucket_add(name, repo) {
+                Err(e) => Err(e.into()),
+                Ok(_) => Ok(()),
             }
         }
-        ("list", Some(_)) => {
-            bucket_manager.buckets().iter().for_each(|bucket| {
-                println!("{}", bucket.name());
-            });
-        }
         ("known", Some(_)) => {
-            bucket_manager.known_buckets().iter().for_each(|name| {
-                println!("{}", name);
-            });
+            let term = Term::stdout();
+            for (name, repo) in session.bucket_known() {
+                let _ = term.write_line(format!("{:<8} {}", style(name).green(), repo).as_str());
+            }
+            return Ok(());
         }
-        ("remove", Some(matches)) => {
-            let name = matches.value_of("name").unwrap();
-            match bucket_manager.remove_bucket(name) {
-                Ok(()) => {
-                    println!("The {} bucket was removed successfully", name);
-                    return Ok(());
+        ("list", Some(_)) => match session.bucket_list() {
+            Err(e) => Err(e.into()),
+            Ok(buckets) => {
+                let term = Term::stdout();
+                for bucket in buckets {
+                    let _ = term.write_line(
+                        format!("{} {}", style(bucket.name()).green(), bucket.repository())
+                            .as_str(),
+                    );
                 }
-                Err(e) => return Err(e),
+                return Ok(());
+            }
+        },
+        ("remove", Some(args)) => {
+            let name = args.value_of("name").unwrap_or_default();
+            match session.bucket_remove(name) {
+                Err(e) => Err(e.into()),
+                Ok(_) => Ok(()),
             }
         }
         _ => unreachable!(),
     }
-
-    Ok(())
 }

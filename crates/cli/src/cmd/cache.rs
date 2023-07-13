@@ -1,61 +1,110 @@
-use crate::error::CliResult;
 use clap::ArgMatches;
-use scoop_core::manager::CacheManager;
-use scoop_core::util::filesize;
-use scoop_core::Config;
+use console::Term;
+use scoop_core::Session;
 
-pub fn cmd_cache(matches: &ArgMatches, config: &Config) -> CliResult<()> {
-    let cache_manager = CacheManager::new(config);
+use crate::Result;
+
+pub fn cmd_cache(matches: &ArgMatches, session: &Session) -> Result<()> {
     match matches.subcommand() {
-        ("remove", Some(matches)) => {
-            if let Some(app_name) = matches.value_of("app") {
-                match cache_manager.remove(app_name) {
-                    Ok(()) => {
-                        if app_name == "*" {
-                            println!("All download caches were removed.");
-                        } else {
-                            println!("All caches that match '{}' were removed.", app_name);
-                        }
-                        return Ok(());
-                    }
-                    Err(err) => return Err(err),
-                }
+        ("list", Some(matches)) => {
+            let query = matches.value_of("query").unwrap_or("*");
+            let files = session.cache_list(query)?;
+            let mut total_size: u64 = 0;
+            let total_count = files.len();
+            let term = Term::stdout();
+            for f in files.into_iter() {
+                let size = f.path().metadata()?.len();
+                total_size += size;
+                let _ = term.write_line(
+                    format!(
+                        "{:>8} {} ({}) {:>}",
+                        size_bytes(size, true),
+                        f.package_name(),
+                        f.version(),
+                        f.file_name()
+                    )
+                    .as_str(),
+                );
             }
-            if matches.is_present("all") {
-                match cache_manager.remove_all() {
-                    Ok(()) => {
-                        println!("All download caches were removed.");
-                        return Ok(());
-                    }
-                    Err(err) => return Err(err),
-                }
-            }
+            let _ = term.write_line(
+                format!(
+                    "{:>8} {} files, {}",
+                    "Total:",
+                    total_count,
+                    filesize(total_size, true)
+                )
+                .as_str(),
+            );
+
             Ok(())
         }
-        ("list", Some(matches)) => {
-            let cache_items = match matches.value_of("app") {
-                Some(app_name) => cache_manager.entries_of(app_name).unwrap(),
-                None => cache_manager.entries().unwrap(),
-            };
-            let mut total_size: u64 = 0;
-            let total_count = cache_items.len();
-            cache_items.into_iter().for_each(|file| {
-                total_size += file.size();
-                println!(
-                    "{: >6} {} ({}) {:>}",
-                    file.size_as_bytes(true),
-                    file.app_name(),
-                    file.version(),
-                    file.filename()
-                );
-            });
-            println!(
-                "Total: {} files, {}",
-                total_count,
-                filesize(total_size, true)
-            );
+        ("remove", Some(matches)) => {
+            if matches.is_present("all") {
+                match session.cache_remove("*") {
+                    Ok(_) => println!("All download caches were removed."),
+                    Err(e) => return Err(e.into()),
+                }
+            }
+            if let Some(query) = matches.value_of("query") {
+                match session.cache_remove(query) {
+                    Ok(_) => {
+                        if query == "*" {
+                            println!("All download caches were removed.");
+                        } else {
+                            println!("All caches matching '{}' were removed.", query);
+                        }
+                    }
+                    Err(e) => return Err(e.into()),
+                }
+            }
             Ok(())
         }
         _ => unreachable!(),
+    }
+}
+
+/// Get file size of this `CacheFile` in bytes
+fn size_bytes(size: u64, unit: bool) -> String {
+    filesize(size, unit)
+}
+
+/// Convert bytes to KB/MB/GB representation.
+fn filesize(length: u64, with_unit: bool) -> String {
+    let gb: f64 = 2.0_f64.powf(30_f64);
+    let mb: f64 = 2.0_f64.powf(20_f64);
+    let kb: f64 = 2.0_f64.powf(10_f64);
+
+    let flength = length as f64;
+
+    if flength > gb {
+        let j = (flength / gb).round();
+
+        if with_unit {
+            format!("{} GB", j)
+        } else {
+            j.to_string()
+        }
+    } else if flength > mb {
+        let j = (flength / mb).round();
+
+        if with_unit {
+            format!("{} MB", j)
+        } else {
+            j.to_string()
+        }
+    } else if flength > kb {
+        let j = (flength / kb).round();
+
+        if with_unit {
+            format!("{} KB", j)
+        } else {
+            j.to_string()
+        }
+    } else {
+        if with_unit {
+            format!("{} B", flength)
+        } else {
+            flength.to_string()
+        }
     }
 }

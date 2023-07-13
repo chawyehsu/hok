@@ -1,23 +1,42 @@
-use chrono::SecondsFormat;
-use chrono::Utc;
-use scoop_core::manager::BucketManager;
-use scoop_core::Config;
+use console::{style, Term};
+use scoop_core::{bucket::BucketUpdateState, Session};
+use std::{collections::HashMap, io::Write};
 
-pub fn cmd_update(_: &clap::ArgMatches, config: &mut Config) {
-    let bucket_manager = BucketManager::new(config);
+use crate::Result;
 
-    bucket_manager.buckets().iter().for_each(|bucket| {
-        print!("Updating '{}' bucket...", bucket.name());
-        match bucket.update() {
-            Ok(()) => {}
-            Err(e) => {
-                print!(" failed. ({})", e);
+pub fn cmd_update(_: &clap::ArgMatches, session: &mut Session) -> Result<()> {
+    let mut term = Term::stdout();
+    let mut collected_ctx = HashMap::new();
+
+    session
+        .bucket_update(move |ret| {
+            let last_len = collected_ctx.len();
+            collected_ctx.insert(ret.name.clone(), ret);
+
+            let mut items = collected_ctx.iter().map(|(_, ctx)| ctx).collect::<Vec<_>>();
+            items.sort_by_key(|&ctx| ctx.name.clone());
+            let mut w = vec![];
+            for item in items {
+                match &item.state {
+                    BucketUpdateState::Started => {
+                        w.push(format!("Updating '{}' bucket...\n", item.name))
+                    }
+                    BucketUpdateState::Successed => w.push(format!(
+                        "Updating '{}' bucket... {}\n",
+                        item.name,
+                        style("OK").green()
+                    )),
+                    BucketUpdateState::Failed(e) => w.push(format!(
+                        "Updating '{}' bucket... {}{}{}\n",
+                        item.name,
+                        style("ERR(").red(),
+                        e.replace("\r\n", " "),
+                        style(")").red()
+                    )),
+                }
             }
-        }
-        println!("");
-    });
-
-    // update lastupdate
-    let time = Utc::now().to_rfc3339_opts(SecondsFormat::Micros, false);
-    config.set("lastupdate", time.as_str()).unwrap().save();
+            let _ = term.clear_last_lines(last_len);
+            let _ = term.write(w.join("").as_bytes());
+        })
+        .map_err(|e| e.into())
 }

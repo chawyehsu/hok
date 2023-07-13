@@ -1,25 +1,35 @@
 use clap::ArgMatches;
-use scoop_core::Config;
+use scoop_core::Session;
+use std::process::Command;
 
-use crate::error::CliResult;
+use crate::Result;
 
-pub fn cmd_config(matches: &ArgMatches, config: &mut Config) -> CliResult<()> {
-    if matches.is_present("edit") {
-        unimplemented!();
-    } else if matches.is_present("list") {
-        println!("{}", config);
-    } else if matches.is_present("set") {
-        let vals: Vec<&str> = matches.values_of("set").unwrap().collect();
-        match config.set(vals[0], vals[1]) {
-            Ok(cfg) => cfg.save(),
-            Err(err) => eprintln!("{}", err),
+pub fn cmd_config(matches: &ArgMatches, session: &mut Session) -> Result<()> {
+    match matches.subcommand() {
+        ("edit", Some(_)) => {
+            let editor = std::env::var("EDITOR").unwrap_or_else(|_| "notepad".to_string());
+            let mut child = Command::new(editor.as_str())
+                .arg(&session.config.config_path)
+                .spawn()?;
+            child.wait()?;
+            Ok(())
         }
-    } else if matches.is_present("unset") {
-        let key = matches.value_of("unset").unwrap();
-        match config.unset(key) {
-            Ok(cfg) => cfg.save(),
-            Err(err) => eprintln!("{}", err),
+        ("list", Some(_)) => {
+            let config_json = session.config_list()?;
+            println!("{}", config_json);
+            Ok(())
         }
+        ("set", Some(args)) => {
+            let key = args.value_of("key").unwrap_or_default();
+            let value = args.value_of("value").unwrap_or_default();
+            session.config_set(key, value)?;
+            Ok(())
+        }
+        ("unset", Some(args)) => {
+            let key = args.value_of("key").unwrap_or_default();
+            session.config_unset(key)?;
+            Ok(())
+        }
+        _ => unreachable!(),
     }
-    Ok(())
 }

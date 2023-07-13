@@ -1,57 +1,48 @@
 use clap::ArgMatches;
-use scoop_core::ops::app::search_available_app;
-use scoop_core::util::leaf;
-use scoop_core::Config;
-use std::path::PathBuf;
+use scoop_core::Session;
 
-use crate::error::CliResult;
+use crate::Result;
 
-pub fn cmd_info(matches: &ArgMatches, config: &Config) -> CliResult<()> {
-    let arg_app = matches.value_of("app").unwrap();
-    let app = search_available_app(&config, arg_app)?;
+pub fn cmd_info(matches: &ArgMatches, session: &Session) -> Result<()> {
+    if let Some(query) = matches.value_of("package") {
+        let options = "explicit";
+        let packages = session.package_search(query, options)?;
+        let length = packages.len();
+        match length {
+            0 => eprintln!("Could not find package named '{}'.", query),
+            _ => {
+                println!("Found {} package(s) named '{}':", length, query);
+                for (idx, pkg) in packages.iter().enumerate() {
+                    // Ident
+                    // println!("Identity: {}/{}", pkg.bucket, pkg.name);
+                    // Name
+                    println!("Name: {}", pkg.name);
+                    // Bucket
+                    println!("Bucket: {}", pkg.bucket);
+                    // Description
+                    println!(
+                        "Description: {}",
+                        pkg.description().unwrap_or("<no description>".to_owned())
+                    );
+                    // Version
+                    println!("Version: {}", pkg.version);
+                    // Homepage
+                    println!("Homepage: {}", pkg.homepage());
+                    // License
+                    // println!("License: {}", pkg.license);
+                    // Binaries
+                    println!(
+                        "Shims: {}",
+                        pkg.shims()
+                            .map(|v| v.join(","))
+                            .unwrap_or("<no shims>".to_owned())
+                    );
 
-    // Name
-    println!("Name: {}", app.name());
-    // Bucket
-    println!("Bucket: {}", app.bucket());
-    let manifest = app.manifest();
-    // Description
-    if let Some(description) = manifest.description() {
-        println!("Description: {}", description);
-    }
-    // Version
-    println!("Version: {}", manifest.version());
-    // Homepage
-    if let Some(homepage) = manifest.homepage() {
-        println!("Website: {}", homepage);
-    }
-    // License
-    if let Some(license) = manifest.license() {
-        let identifier = license.identifier();
-
-        if license.url().is_some() {
-            let url = license.url().unwrap();
-            println!("License:\n  {} ({})", identifier, url);
-        } else {
-            println!("License: {}", identifier);
-        }
-    }
-    // Manifest
-    println!("Manifest:\n  {}", manifest.path());
-
-    // FIXME: check data.architecture.<arch>.bin
-    // Binaries
-    if let Some(bins) = manifest.bin() {
-        if bins.len() == 1 {
-            let bin = bins[0][0].as_str();
-            println!("Binary: {}", bin);
-        } else {
-            println!("Binaries:");
-            let out = bins
-                .iter()
-                .map(|b| leaf(PathBuf::from(b[0].as_str()).as_path()))
-                .collect::<Vec<String>>();
-            println!("  {}", out.join(" "));
+                    if idx != (length - 1) {
+                        println!("");
+                    }
+                }
+            }
         }
     }
     Ok(())

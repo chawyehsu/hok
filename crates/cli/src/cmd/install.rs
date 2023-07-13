@@ -1,48 +1,71 @@
-use crate::console;
-use crate::error::CliResult;
 use clap::ArgMatches;
-use scoop_core::ops::app::search_available_app;
-use scoop_core::ops::install::{install, resolve_install_order};
-use scoop_core::util::block_on;
-use scoop_core::{manager::AppManager, Config};
+use indicatif::{ProgressBar, ProgressStyle};
+use scoop_core::{
+    package::{DownloadProgressState, InstallOption},
+    Session,
+};
+use std::collections::HashSet;
 
-pub fn cmd_install(matches: &ArgMatches, config: &Config) -> CliResult<()> {
-    if let Some(arg_apps) = matches.values_of("app") {
-        let ignore_cache = matches.is_present("ignore_cache");
-        let skip_hash_validation = matches.is_present("skip_hash_validation");
+use crate::Result;
 
-        let app_manager = AppManager::new(config);
-        let apps = arg_apps.into_iter().collect::<Vec<_>>();
-        let ordered_apps = resolve_install_order(config, apps.clone())?;
-        let mut apps_to_install = vec![];
-
-        for pattern in ordered_apps {
-            let (_, app_name) = match pattern.contains("/") {
-                true => pattern.split_once("/").unwrap(),
-                false => ("", pattern.as_str()),
-            };
-
-            // check installed apps
-            let is_installed = app_manager.is_app_installed(app_name);
-            if is_installed && apps.contains(&pattern.as_str()) {
-                let msg = format!(
-                    "{} is already installed\n\
-                    To upgrade {}, run:\n  scoop upgrade {}",
-                    app_name, app_name, app_name
-                );
-                console::warn(msg.as_str())?;
-            }
-
-            if !is_installed {
-                let app = search_available_app(config, pattern)?;
-                apps_to_install.push(app);
-            }
+pub fn cmd_install(matches: &ArgMatches, session: &Session) -> Result<()> {
+    if let Some(queries) = matches.values_of("package") {
+        let query = queries.collect::<Vec<&str>>().join(" ");
+        let mut options = HashSet::new();
+        if matches.is_present("download-only") {
+            options.insert(InstallOption::DownloadOnly);
+        }
+        if matches.is_present("ignore-broken") {
+            options.insert(InstallOption::IgnoreFailure);
+        }
+        if matches.is_present("no-cache") {
+            options.insert(InstallOption::NoCache);
+        }
+        if matches.is_present("no-hash-check") {
+            options.insert(InstallOption::NoHashCheck);
         }
 
-        for app in apps_to_install {
-            println!("Installing '{}' ({})", app.name(), app.manifest().version());
-            block_on(install(config, &app, ignore_cache, skip_hash_validation))?;
-        }
+        let mut pb = None;
+        let mut throttle = 0;
+
+        session.package_install(&query, options, move |ret| match ret.state {
+            DownloadProgressState::Prepared => {
+                if pb.is_none() || ret.index == 1 {
+                    let bar = ProgressBar::new(ret.total);
+                    bar.set_style(
+                        ProgressStyle::with_template(
+                            "{msg}\n[{bar:40.cyan/blue}] {bytes}/{total_bytes} ({elapsed_precise}, {bytes_per_sec})",
+                        )
+                        .unwrap()
+                        .progress_chars("=>-"),
+                    );
+                    let msg = format!("Downloading {} {}/{}", ret.name, ret.index, ret.file_count);
+                    bar.set_message(msg);
+                    pb = Some(bar);
+                } else {
+                    let bar = pb.as_mut().unwrap();
+                    bar.set_length(ret.total);
+                    let msg = format!("Downloading {} {}/{}", ret.name, ret.index, ret.file_count);
+                    bar.set_message(msg);
+                }
+            }
+            DownloadProgressState::Downloading => {
+                if throttle == 10 {
+                    let bar = pb.as_mut().unwrap();
+                    bar.set_position(ret.position);
+                    throttle = 0;
+                } else {
+                    throttle += 1;
+                }
+            }
+            DownloadProgressState::Finished => {
+                let bar = pb.as_mut().unwrap();
+                bar.finish();
+                if ret.index != ret.file_count {
+                    bar.reset();
+                }
+            }
+        })?;
     }
     Ok(())
 }
