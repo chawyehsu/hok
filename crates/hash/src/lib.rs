@@ -3,12 +3,12 @@ mod sha1;
 mod sha256;
 mod sha512;
 
-use std::fmt;
+use core::fmt;
 
-pub use md5::Md5;
-pub use sha1::Sha1;
-pub use sha256::Sha256;
-pub use sha512::Sha512;
+pub use crate::md5::Md5;
+pub use crate::sha1::Sha1;
+pub use crate::sha256::Sha256;
+pub use crate::sha512::Sha512;
 
 trait Hasher {
     fn hash_type(&self) -> String;
@@ -72,6 +72,14 @@ impl Hasher for Sha512 {
     }
 }
 
+pub struct Error;
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unsupported hash type")
+    }
+}
+
 #[derive(Debug)]
 pub struct Checksum {
     hasher: Box<dyn Hasher>,
@@ -85,28 +93,32 @@ impl fmt::Debug for dyn Hasher {
 }
 
 impl Checksum {
-    pub fn new<S: AsRef<str>>(hash: S) -> Checksum {
-        let input_hash = hash.as_ref().to_lowercase();
-        let method = input_hash.split_once(":").unwrap_or(("sha256", "")).0;
+    pub fn new<S: AsRef<str>>(hash: S) -> Result<Checksum, Error> {
+        let hash = hash.as_ref().to_lowercase();
+        let (method, input_hash) = hash.split_once(":").unwrap_or(("sha256", ""));
+        let input_hash = input_hash.to_string();
         let hasher: Box<dyn Hasher> = match method {
             "md5" => Box::new(Md5::new()),
             "sha1" => Box::new(Sha1::new()),
             "sha256" => Box::new(Sha256::new()),
             "sha512" => Box::new(Sha512::new()),
-            _ => unreachable!(),
+            _ => return Err(Error),
         };
 
-        Checksum { hasher, input_hash }
+        Ok(Checksum { hasher, input_hash })
     }
 
+    #[inline]
     pub fn consume(&mut self, data: &[u8]) {
         self.hasher.update(data);
     }
 
+    #[inline]
     pub fn result(&mut self) -> String {
         self.hasher.sum()
     }
 
+    #[inline]
     pub fn checksum(&mut self) -> bool {
         self.result() == self.input_hash
     }

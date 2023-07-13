@@ -2,22 +2,34 @@
 name = "scoop-hash"
 description = "Hash library for scoop-rs"
 version = "0.1.0"
-authors = ["Chawye Hsu <chawyehsu@hotmail.com>"]
+authors = ["Chawye Hsu <su+cratesio@chawyehsu.com>"]
 license = "MIT OR Apache-2.0"
-edition = "2018"
+edition = "2021"
 
 [[bench]]
 name = "md5"
 path = "benches/md5.rs"
+harness = false
 
 [[bench]]
 name = "sha1"
 path = "benches/sha1.rs"
+harness = false
 
 [[bench]]
 name = "sha256"
 path = "benches/sha256.rs"
+harness = false
 
 [[bench]]
 name = "sha512"
 path = "benches/sha512.rs"
+harness = false
+
+[dev-dependencies]
+criterion = "0.4"
+md-5 = { package = "md-5", version = "0.10.4" }
+md5 = "0.7.0"
+sha1 = "0.10.4"
+sha1_smol = "1.0.0"
+sha2 = "0.10.5"
