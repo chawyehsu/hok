@@ -1,9 +1,10 @@
+#![allow(dead_code)]
 use once_cell::sync::Lazy;
 use regex::{Regex, RegexBuilder};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
-pub static USER_AGENT: &str = "Scoop/0.1.0 (RustyScoop)";
+pub static DEFAULT_USER_AGENT: &str = "Scoop/1.0 (+http://scoop.sh/)";
 
 pub static BUILTIN_BUCKET_LIST: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
     vec![

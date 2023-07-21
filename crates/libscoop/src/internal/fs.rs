@@ -3,9 +3,14 @@ use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
 use regex::Regex;
 use regex::RegexBuilder;
+use serde::Serialize;
+use std::fs::OpenOptions;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
+
+use crate::error::Context;
+use crate::error::Fallible;
 
 /// Ensure given `path` exist.
 ///
@@ -89,4 +94,22 @@ pub fn filenamify<S: AsRef<str>>(filename: S) -> String {
     REGEX_REPLACE
         .replace_all(filename.as_ref(), "_")
         .into_owned()
+}
+
+pub fn write_json<P, D>(path: P, data: D) -> Fallible<()>
+where
+    P: AsRef<Path>,
+    D: Serialize,
+{
+    let path = path.as_ref();
+    ensure_dir(path).with_context(|| format!("failed to create {}", path.display()))?;
+
+    let file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)
+        .unwrap();
+    Ok(serde_json::to_writer_pretty(file, &data)
+        .with_context(|| format!("failed to write {}", path.display()))?)
 }

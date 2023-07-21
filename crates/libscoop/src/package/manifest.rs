@@ -1,14 +1,16 @@
+use log::debug;
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use std::marker::PhantomData;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use crate::constants::{REGEX_HASH, SPDX_LIST};
+use crate::constant::{REGEX_HASH, SPDX_LIST};
 use crate::error::{Context, Fallible};
+use crate::internal;
 
 /// A [`Manifest`] basically defines a package that is available to be installed
 /// via Scoop. It's a JSON file containing all the specification needed by Scoop
@@ -22,8 +24,8 @@ use crate::error::{Context, Fallible};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Manifest {
     /// The path is used to determine the location of the manifest file.
-    path: String,
-    /// The actual manifest representation.
+    path: PathBuf,
+    /// The actual manifest specification.
     inner: ManifestSpec,
     /// The hash of the manifest.
     hash: String,
@@ -33,40 +35,67 @@ pub struct Manifest {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ManifestSpec {
     pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub homepage: String,
     pub license: License,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub depends: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub innosetup: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cookie: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub architecture: Option<Architecture>,
+    /// Architecture-independent - `noarch` download url(s).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<Vectorized<String>>,
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_vertorized_hash")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub extract_dir: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub extract_to: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub pre_install: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub installer: Option<Installer>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub post_install: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub pre_uninstall: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub uninstaller: Option<Uninstaller>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub post_uninstall: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bin: Option<Vectorized<Vectorized<String>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub env_add_path: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub env_set: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub shortcuts: Option<Vec<Vec<String>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub persist: Option<Vectorized<Vectorized<String>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub psmodule: Option<Psmodule>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub suggest: Option<HashMap<String, Vectorized<String>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub checkver: Option<Checkver>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub autoupdate: Option<Autoupdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub notes: Option<Vectorized<String>>,
 }
 
 #[derive(Clone, Debug, Serialize)]
 pub struct License {
     identifier: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     url: Option<String>,
 }
 
@@ -74,6 +103,9 @@ pub struct License {
 /// can be constructed from either an array of T **or a single T**. That means
 /// when the input is a single T, it will also be deserialized to a vector of T
 /// with the only T element.
+///
+/// Custom (De)srializers are implemented for this type to support the above
+/// behavior.
 ///
 /// There are some fields of a [`ManifestSpec`] using this type. In general,
 /// when the type of value of a field is `stringOrArrayOfStrings` defined in
@@ -84,31 +116,41 @@ pub struct License {
 /// It is also used for the `stringOrArrayOfStringsOrAnArrayOfArrayOfStrings`,
 /// a tow times wrapped vector of strings. `bin` and `persist` are these kind
 /// of fields.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug)]
 pub struct Vectorized<T>(Vec<T>);
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Architecture {
     #[serde(rename = "32bit")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ia32: Option<ArchitectureSpec>,
     #[serde(rename = "64bit")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub amd64: Option<ArchitectureSpec>,
     #[serde(rename = "arm64")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub aarch64: Option<ArchitectureSpec>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Installer {
+    #[serde(skip_serializing_if = "Option::is_none")]
     args: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     file: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     keep: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     script: Option<Vectorized<String>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Uninstaller {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub file: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub script: Option<Vectorized<String>>,
 }
 
@@ -119,6 +161,7 @@ pub struct Psmodule {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sourceforge {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub project: Option<String>,
     pub path: String,
 }
@@ -126,72 +169,112 @@ pub struct Sourceforge {
 #[derive(Clone, Debug, Serialize)]
 pub struct Checkver {
     #[serde(alias = "re")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub regex: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     #[serde(alias = "jp")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub jsonpath: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub xpath: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub reverse: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub replace: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub useragent: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub script: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sourceforge: Option<Sourceforge>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Autoupdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub architecture: Option<AutoupdateArchitecture>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub extract_dir: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<Vectorized<HashExtraction>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub notes: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<Vectorized<String>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ArchitectureSpec {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bin: Option<Vectorized<Vectorized<String>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub checkver: Option<Checkver>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub env_add_path: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub env_set: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub extract_dir: Option<Vectorized<String>>,
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_vertorized_hash")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub installer: Option<Installer>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub post_install: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub post_uninstall: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub pre_install: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub pre_uninstall: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub shortcuts: Option<Vec<Vec<String>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub uninstaller: Option<Uninstaller>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<Vectorized<String>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AutoupdateArchitecture {
     #[serde(rename = "32bit")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ia32: Option<AutoupdateArchSpec>,
     #[serde(rename = "64bit")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub amd64: Option<AutoupdateArchSpec>,
     #[serde(rename = "arm64")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub aarch64: Option<AutoupdateArchSpec>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HashExtraction {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub find: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub regex: Option<String>,
     #[serde(alias = "jp")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub jsonpath: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub xpath: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mode: Option<HashExtractionMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AutoupdateArchSpec {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub extract_dir: Option<Vectorized<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<Vectorized<HashExtraction>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<Vectorized<String>>,
 }
 
@@ -216,13 +299,10 @@ pub enum HashExtractionMode {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-//  Custom Deserializers
+//  Custom (De)serializers
 ////////////////////////////////////////////////////////////////////////////////
 
-impl<'de, T> Deserialize<'de> for Vectorized<T>
-where
-    T: Deserialize<'de>,
-{
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Vectorized<T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -279,6 +359,19 @@ where
     }
 }
 
+impl<T: Serialize> Serialize for Vectorized<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self.0.len() {
+            0 => serializer.serialize_none(),
+            1 => serializer.serialize_some(&self.0[0]),
+            _ => serializer.collect_seq(self.0.iter()),
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for License {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -309,8 +402,13 @@ impl<'de> Deserialize<'de> for License {
                     Err(de::Error::missing_field("identifier"));
                 let mut url = None;
 
-                while let Some((key, value)) = map.next_entry()? {
-                    match key {
+                // It is needed to explicitly specify types `<String, String>`
+                // of the key and value for the `next_entry` method here,
+                // otherwise the deserializer will complain about the invalid
+                // type of the key, which is basically similar to:
+                // https://github.com/influxdata/pbjson/issues/55
+                while let Some((key, value)) = map.next_entry::<String, String>()? {
+                    match key.as_str() {
                         "identifier" => identifier = Ok(value),
                         "url" => url = Some(value),
                         _ => {
@@ -361,8 +459,8 @@ impl<'de> Deserialize<'de> for Sourceforge {
                 let mut project = None;
                 let mut path: Result<String, A::Error> = Err(de::Error::missing_field("path"));
 
-                while let Some((key, value)) = map.next_entry()? {
-                    match key {
+                while let Some((key, value)) = map.next_entry::<String, String>()? {
+                    match key.as_str() {
                         "project" => project = Some(value),
                         "path" => path = Ok(value),
                         _ => {
@@ -433,10 +531,10 @@ impl<'de> Deserialize<'de> for Checkver {
                 let mut script = None;
                 let mut sourceforge = None;
 
-                while let Some(key) = map.next_key()? {
-                    match key {
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
                         "github" => {
-                            let prefix: String = map.next_value()?;
+                            let prefix = map.next_value::<String>()?;
                             url = Some(format!("{}/releases/latest", prefix));
                             regex = Some("/releases/tag/(?:v|V)?([\\d.]+)".to_owned());
                         }
@@ -482,21 +580,20 @@ fn deserialize_vertorized_hash<'de, D>(
 where
     D: Deserializer<'de>,
 {
-    let val = Option::<Vectorized<String>>::deserialize(deserializer)?;
-    if val.is_none() {
-        return Ok(None);
-    }
-    let hashes = val.unwrap();
-    // validate hashes
-    for hash in hashes.0.iter().map(|s| s.as_str()) {
-        if !REGEX_HASH.is_match(&hash) {
-            return Err(de::Error::invalid_value(
-                de::Unexpected::Str(&hash),
-                &"a valid hash string",
-            ));
+    if let Some(hashes) = Option::<Vectorized<String>>::deserialize(deserializer)? {
+        // validate hashes
+        for hash in hashes.0.iter().map(|s| s.as_str()) {
+            if !REGEX_HASH.is_match(&hash) {
+                return Err(de::Error::invalid_value(
+                    de::Unexpected::Str(&hash),
+                    &"a valid hash string",
+                ));
+            }
         }
+        Ok(Some(hashes))
+    } else {
+        Ok(None)
     }
-    Ok(Some(hashes))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -511,7 +608,7 @@ impl Manifest {
     ///
     /// ```no_run
     /// use std::path::PathBuf;
-    /// use scoop_core::types::Manifest;
+    /// use libscoop::types::Manifest;
     ///
     /// let path = PathBuf::from(r"C:\Scoop\buckets\main\bucket\unzip.json");
     /// let manifest = Manifest::parse(path);
@@ -534,18 +631,20 @@ impl Manifest {
         // Discussion in https://github.com/serde-rs/json/issues/160
         let mut bytes = Vec::new();
         File::open(path)
-            .with_context(|| format!("failed to open manifest file: {}", path.display()))?
+            .with_context(|| format!("failed to open {}", path.display()))?
             .read_to_end(&mut bytes)
-            .with_context(|| format!("failed to read manifest file: {}", path.display()))?;
+            .with_context(|| format!("failed to read {}", path.display()))?;
 
         // Parsing manifest files is the key bottleneck of the entire
         // project. We use `serde_json` because it's well documented and easy
         // to integrate. But I believe there should be an alternative to
         // `serde_json` which can parse JSON files much *faster*. Perhaps
         // `simd_json` can be the one. See https://github.com/serde-rs/json-benchmark
-        let inner: ManifestSpec = serde_json::from_slice(&bytes)
-            .with_context(|| format!("failed to parse manifest file: {}", path.display()))?;
-        let path = path.to_string_lossy().to_string();
+        let inner: ManifestSpec = serde_json::from_slice(&bytes).with_context(|| {
+            debug!("failed to parse manifest {}", path.display());
+            format!("failed to parse manifest {}", path.display())
+        })?;
+        let path = internal::normalize_path(path);
         // let mut checksum = scoop_hash::Checksum::new("sha256");
         // checksum.consume(&bytes);
         // let hash = checksum.result();
@@ -556,7 +655,7 @@ impl Manifest {
 
     /// Return the JSON file path of this manifest.
     #[inline]
-    pub fn path(&self) -> &str {
+    pub fn path(&self) -> &Path {
         &self.path
     }
 
@@ -625,6 +724,9 @@ impl Manifest {
             if arch.amd64.is_some() {
                 ret.push("amd64".to_string());
             }
+            if arch.aarch64.is_some() {
+                ret.push("aarch64".to_string());
+            }
         }
         ret
     }
@@ -665,6 +767,7 @@ impl Manifest {
         self.inner.checkver.as_ref()
     }
 
+    /// Returns `cookie` defined in this manifest.
     #[inline]
     pub fn cookie(&self) -> Option<&HashMap<String, String>> {
         self.inner.cookie.as_ref()
@@ -902,7 +1005,6 @@ impl Manifest {
         let mut ret = self.inner.shortcuts.as_ref();
 
         if let Some(arch) = self.architecture() {
-            // ia32
             if cfg!(target_arch = "x86") {
                 if let Some(spec) = &arch.ia32 {
                     if let Some(shortcuts) = spec.shortcuts.as_ref() {
@@ -910,7 +1012,7 @@ impl Manifest {
                     }
                 }
             }
-            // amd64
+
             if cfg!(target_arch = "x86_64") {
                 if let Some(spec) = &arch.amd64 {
                     if let Some(shortcuts) = spec.shortcuts.as_ref() {
@@ -932,28 +1034,40 @@ impl Manifest {
         self.version() == "nightly"
     }
 
-    /// Extract download urls from this manifest, in following order:
+    /// Extract download urls from this manifest:
     ///
-    /// 1. return "64bit" urls for amd64 arch if available;
-    /// 2. return "32bit" urls for ia32 arch if available;
-    /// 3. fallback to return common urls.
+    /// - For `amd64` return "64bit" urls if available else noarch urls;
+    /// - For `ia32` return "32bit" urls if available else noarch urls;
+    /// - For `aarch64` return "arm64" urls if available else noarch urls.
     pub fn url(&self) -> Vec<&str> {
+        // noarch urls
         let mut ret = self.inner.url.as_ref();
 
         if let Some(arch) = self.architecture() {
-            // ia32
+            // compile time arch selection
             if cfg!(target_arch = "x86") {
-                if let Some(spec) = &arch.ia32 {
-                    if let Some(url) = spec.url.as_ref() {
-                        ret = Some(url);
+                if let Some(ia32) = &arch.ia32 {
+                    let url = ia32.url.as_ref();
+                    if url.is_some() {
+                        ret = url;
                     }
                 }
             }
-            // amd64
+
             if cfg!(target_arch = "x86_64") {
-                if let Some(spec) = &arch.amd64 {
-                    if let Some(url) = spec.url.as_ref() {
-                        ret = Some(url);
+                if let Some(amd64) = &arch.amd64 {
+                    let url = amd64.url.as_ref();
+                    if url.is_some() {
+                        ret = url;
+                    }
+                }
+            }
+
+            if cfg!(target_arch = "aarch64") {
+                if let Some(aarch64) = &arch.aarch64 {
+                    let url = aarch64.url.as_ref();
+                    if url.is_some() {
+                        ret = url;
                     }
                 }
             }
@@ -973,26 +1087,37 @@ impl Manifest {
 
     /// Extract file hashes from this manifest, in following order:
     ///
-    /// 1. return "64bit" hashes for amd64 arch if available;
-    /// 2. return "32bit" hashes for ia32 arch if available;
-    /// 3. fallback to return common hashes.
+    /// - For `amd64` return "64bit" hashes if available else noarch hashes;
+    /// - For `ia32` return "32bit" hashes if available else noarch hashes;
+    /// - For `aarch64` return "arm64" hashes if available else noarch hashes.
     pub fn hash(&self) -> Vec<&str> {
+        // noarch hashes
         let mut ret = self.inner.hash.as_ref();
 
         if let Some(arch) = self.architecture() {
-            // ia32
             if cfg!(target_arch = "x86") {
-                if let Some(spec) = &arch.ia32 {
-                    if let Some(hash) = spec.hash.as_ref() {
-                        ret = Some(hash);
+                if let Some(ia32) = &arch.ia32 {
+                    let hash = ia32.hash.as_ref();
+                    if hash.is_some() {
+                        ret = hash;
                     }
                 }
             }
-            // amd64
+
             if cfg!(target_arch = "x86_64") {
-                if let Some(spec) = &arch.amd64 {
-                    if let Some(hash) = spec.hash.as_ref() {
-                        ret = Some(hash);
+                if let Some(amd64) = &arch.amd64 {
+                    let hash = amd64.hash.as_ref();
+                    if hash.is_some() {
+                        ret = hash;
+                    }
+                }
+            }
+
+            if cfg!(target_arch = "aarch64") {
+                if let Some(aarch64) = &arch.aarch64 {
+                    let hash = aarch64.hash.as_ref();
+                    if hash.is_some() {
+                        ret = hash;
                     }
                 }
             }
@@ -1002,14 +1127,8 @@ impl Manifest {
 }
 
 impl License {
-    fn new(identifier: String, mut url: Option<String>) -> License {
-        // SPDX identifier detection
-        let id = identifier.as_str();
-        let is_spdx = SPDX_LIST.contains(id);
-        if url.is_none() && is_spdx {
-            url = Some(format!("https://spdx.org/licenses/{}.html", id));
-        }
-        License { identifier, url }
+    pub fn new(identifier: String, url: Option<String>) -> License {
+        Self { identifier, url }
     }
 
     #[inline]
@@ -1018,8 +1137,21 @@ impl License {
     }
 
     #[inline]
+    pub fn is_spdx(&self) -> bool {
+        SPDX_LIST.contains(self.identifier())
+    }
+
+    #[inline]
     pub fn url(&self) -> Option<&str> {
         self.url.as_deref()
+        // if self.is_spdx() && self.url.is_none() {
+        //     Some(format!(
+        //         "https://spdx.org/licenses/{}.html",
+        //         self.identifier()
+        //     ))
+        // } else {
+        //     self.url.clone()
+        // }
     }
 }
 
@@ -1093,8 +1225,8 @@ impl From<Vectorized<Vectorized<String>>> for Vec<Vec<String>> {
 pub struct InstallInfo {
     architecture: String,
     #[serde(default)]
-    #[serde(skip_serializing_if = "String::is_empty")]
-    bucket: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bucket: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hold: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1106,16 +1238,21 @@ impl InstallInfo {
         let path = path.as_ref();
         let mut bytes = Vec::new();
         File::open(path)
-            .with_context(|| format!("failed to open install info file: {}", path.display()))?
+            .with_context(|| format!("failed to open {}", path.display()))?
             .read_to_end(&mut bytes)
-            .with_context(|| format!("failed to read install info file: {}", path.display()))?;
-        Ok(serde_json::from_slice(&bytes)
-            .with_context(|| format!("failed to parse install info file: {}", path.display()))?)
+            .with_context(|| format!("failed to read {}", path.display()))?;
+
+        let info = serde_json::from_slice(&bytes).with_context(|| {
+            debug!("failed to parse install_info {}", path.display());
+            format!("failed to parse install_info {}", path.display())
+        })?;
+
+        Ok(info)
     }
 
     #[inline]
-    pub fn bucket(&self) -> &str {
-        &self.bucket
+    pub fn bucket(&self) -> Option<&str> {
+        self.bucket.as_deref()
     }
 
     #[inline]
@@ -1124,7 +1261,17 @@ impl InstallInfo {
     }
 
     #[inline]
-    pub fn held(&self) -> bool {
+    pub fn is_held(&self) -> bool {
         self.hold.unwrap_or(false)
+    }
+
+    #[inline]
+    pub fn set_held(&mut self, flag: bool) {
+        self.hold = Some(flag);
+    }
+
+    #[inline]
+    pub fn url(&self) -> Option<&str> {
+        self.url.as_deref()
     }
 }

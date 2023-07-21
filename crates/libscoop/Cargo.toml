@@ -1,0 +1,34 @@
+[package]
+name = "libscoop"
+description = "Rust library implementation of Scoop"
+homepage = "https://github.com/chawyehsu/hok"
+version = "0.1.0-alpha.1"
+authors = ["Chawye Hsu <su+cratesio@chawyehsu.com>"]
+license = "MIT OR Apache-2.0"
+edition = "2021"
+readme = "README.md"
+
+[dependencies]
+chrono = "0.4"
+# curl = { version = "0.4", features = ["rustls", "static-curl"] }
+dirs = "5.0.1"
+futures = { version = "0.3", features = ["thread-pool"] }
+git2 = "0.17.2"
+lazycell = "1.3.0"
+log = "0.4"
+once_cell = "1.18.0"
+rayon = "1.7.0"
+regex = "1.5.3"
+remove_dir_all = "0.7.0"
+# scoop-hash = { version = "0.1.0-alpha.1", path = "../scoop_hash" }
+# rustls = "0.20.6"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tokio = { version = "1.29.1", features = ["full"] }
+tokio-stream = "0.1.14"
+ureq = "2.7.1"
+
+# Archive
+# infer = "0.9.0"
+# zip = "0.6.2"

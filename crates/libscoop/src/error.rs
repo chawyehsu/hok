@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
-use crate::package::PackageList;
-use crate::util::dag::CyclicError;
+use crate::internal::dag::CyclicError;
 
 pub type Fallible<T> = Result<T, Error>;
 
@@ -12,8 +11,10 @@ pub enum Error {
     #[error("bucket '{0}' already exists")]
     BucketAlreadyExists(String),
 
+    /// Thrown when trying to add a bucket that is not a known bucket without
+    /// specifying a remote url.
     #[error("'{0}' is not a known bucket, <repo> is required")]
-    BucketMissingRepo(String),
+    BucketAddRemoteRequired(String),
 
     #[error("bucket '{0}' does not exist")]
     BucketNotFound(String),
@@ -78,14 +79,32 @@ pub enum Error {
         source: std::io::Error,
     },
 
-    /// Thrown when multiple package records are found for a given query.
-    /// This is useful when a single record for a query is needed.
-    #[error("multiple records found for queries: {0}", records.iter().map(|r| r.0.as_str()).collect::<Vec<_>>().join(" "))]
-    PackageMultipleRecordsFound { records: Vec<(String, PackageList)> },
-
+    // /// Thrown when multiple package records are found for a given query.
+    // /// This is useful when a single record for a query is needed.
+    // #[error("multiple records found for queries: {0}", records.iter().map(|r| r.0.as_str()).collect::<Vec<_>>().join(" "))]
+    // PackageMultipleRecordsFound {
+    //     records: Vec<(String, Vec<Package>)>,
+    // },
     /// Thrown when no package is found for a given query.
-    #[error("no package found for queries: {0}", queries.join(" "))]
+    #[error("could not find package(s): {0}", queries.join(" "))]
     PackageNotFound { queries: Vec<String> },
+
+    /// Thrown when trying to perform (un)hold operation on a package that is
+    /// not installed.
+    #[error("package '{0}' is not installed")]
+    PackageHoldNotInstalled(String),
+
+    /// Thrown when trying to perform (un)hold operation on a package of which
+    /// the installation is broken.
+    #[error("package '{0}' is broken")]
+    PackageHoldBrokenInstall(String),
+
+    /// Wrapped possible [serde_json Error][1]. Throw when (de)serializing JSON
+    /// files.
+    ///
+    /// [1]: https://docs.serde.rs/serde_json/struct.Error.html
+    #[error("bad regular expression, {0}")]
+    Regex(regex::Error),
 
     /// Wrapped possible [serde_json Error][1]. Throw when (de)serializing JSON
     /// files.
@@ -139,3 +158,21 @@ impl<T> Context<T> for serde_json::Result<T> {
         })
     }
 }
+
+impl From<regex::Error> for Error {
+    fn from(source: regex::Error) -> Self {
+        Error::Regex(source)
+    }
+}
+
+// impl<T> Context<T> for Result<T, regex::Error> {
+//     fn with_context<F>(self, f: F) -> Fallible<T>
+//     where
+//         F: FnOnce() -> String,
+//     {
+//         self.map_err(|source| Error::Serde {
+//             message: f(),
+//             source,
+//         })
+//     }
+// }

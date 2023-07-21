@@ -1,14 +1,17 @@
-pub mod archive;
+#![allow(unused)]
+mod archive;
 pub mod dag;
-mod fs;
+pub mod fs;
 pub mod git;
+pub mod network;
 mod tokio_util;
 
-pub use fs::*;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use regex::RegexBuilder;
+use std::path::Component;
 use std::path::Path;
+use std::path::PathBuf;
 pub use tokio_util::*;
 
 use crate::error::{Error, Fallible};
@@ -43,6 +46,10 @@ pub fn compare_versions<S: AsRef<str>>(ver_a: S, ver_b: S) -> std::cmp::Ordering
     let ver_b = ver_b.as_ref();
     let mut ver_a_parsed = ver_a.split(&['.', '-'][..]);
     let mut ver_b_parsed = ver_b.split(&['.', '-'][..]);
+    // debug!(
+    //     "ver_a_parsed: {:?}, ver_b_parsed: {:?}",
+    //     ver_a_parsed, ver_b_parsed
+    // );
 
     loop {
         match ver_a_parsed.next() {
@@ -108,4 +115,40 @@ pub fn extract_name_and_bucket(path: &Path) -> Fallible<(String, String)> {
     }
 
     Err(Error::Custom(format!("unsupported manifest path {}", path.display())).into())
+}
+
+/// Normalize a path, removing things like `.` and `..`.
+///
+/// CAUTION: This does not resolve symlinks (unlike
+/// [`std::fs::canonicalize`]). This may cause incorrect or surprising
+/// behavior at times. This should be used carefully. Unfortunately,
+/// [`std::fs::canonicalize`] can be hard to use correctly, since it can often
+/// fail, or on Windows returns annoying device paths.
+///
+/// This function is copied from Cargo.
+pub fn normalize_path(path: &Path) -> PathBuf {
+    let mut components = path.components().peekable();
+    let mut ret = if let Some(c @ Component::Prefix(..)) = components.peek().cloned() {
+        components.next();
+        PathBuf::from(c.as_os_str())
+    } else {
+        PathBuf::new()
+    };
+
+    for component in components {
+        match component {
+            Component::Prefix(..) => unreachable!(),
+            Component::RootDir => {
+                ret.push(component.as_os_str());
+            }
+            Component::CurDir => {}
+            Component::ParentDir => {
+                ret.pop();
+            }
+            Component::Normal(c) => {
+                ret.push(c);
+            }
+        }
+    }
+    ret
 }

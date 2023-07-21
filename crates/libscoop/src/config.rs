@@ -1,10 +1,9 @@
 use std::collections::HashMap;
-use std::fs::OpenOptions;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use crate::error::{Context, Error, Fallible};
-use crate::session::Session;
+use crate::internal::fs::write_json;
 
 pub struct ConfigBuilder {
     path: PathBuf,
@@ -106,15 +105,9 @@ pub struct Config {
 }
 
 impl ConfigBuilder {
-    pub fn new() -> ConfigBuilder {
-        Self {
-            path: default::config_path(),
-        }
-    }
-
-    pub fn with_path<P: AsRef<Path>>(mut self, path: P) -> ConfigBuilder {
-        self.path = path.as_ref().to_path_buf();
-        self
+    pub fn new<P: AsRef<Path>>(path: P) -> ConfigBuilder {
+        let path = path.as_ref().to_owned();
+        Self { path }
     }
 
     pub fn build(&self) -> Fallible<Config> {
@@ -134,6 +127,11 @@ impl ConfigBuilder {
 
 impl Config {
     #[inline]
+    pub fn root_path(&self) -> &Path {
+        self.root_path.as_path()
+    }
+
+    #[inline]
     pub fn proxy(&self) -> Option<&str> {
         self.proxy.as_deref()
     }
@@ -144,7 +142,7 @@ impl Config {
     }
 
     /// Update config key with new value.
-    pub fn set(&mut self, key: &str, value: &str) -> Fallible<()> {
+    pub(crate) fn set(&mut self, key: &str, value: &str) -> Fallible<()> {
         let is_unset = value.is_empty();
         match key {
             "use_external_7zip" => match is_unset {
@@ -163,6 +161,12 @@ impl Config {
             },
             "cat_style" => {
                 self.cat_style = match is_unset {
+                    true => None,
+                    false => Some(value.to_string()),
+                }
+            }
+            "gh_token" => {
+                self.gh_token = match is_unset {
                     true => None,
                     false => Some(value.to_string()),
                 }
@@ -191,26 +195,18 @@ impl Config {
     }
 
     /// Commit config changes and save to the config file
-    pub fn commit(&self) -> Fallible<()> {
-        crate::util::ensure_dir(self.config_path.parent().unwrap()).with_context(|| {
-            format!(
-                "failed to create config directory: {}",
-                self.config_path.display()
-            )
-        })?;
-        let file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(self.config_path.as_path())
-            .unwrap();
-        Ok(serde_json::to_writer_pretty(file, self).with_context(|| {
-            format!(
-                "failed to write config file: {}",
-                self.config_path.display()
-            )
-        })?)
+    pub(crate) fn commit(&self) -> Fallible<()> {
+        write_json(&self.config_path, self)
     }
+
+    pub(crate) fn pretty(&self) -> Fallible<String> {
+        Ok(serde_json::to_string_pretty(self)
+            .with_context(|| format!("failed to parse {}", self.config_path.display()))?)
+    }
+}
+
+pub(crate) fn default_config_path() -> PathBuf {
+    default::config_path()
 }
 
 /// This private module contains functions of constructing default paths used
@@ -259,30 +255,19 @@ mod default {
 
     /// Check if the given `path` is equal to the `default` Scoop root path.
     #[inline]
-    pub(super) fn is_default_root_path<P: AsRef<Path>>(path: &P) -> bool {
+    pub(super) fn is_default_root_path<P: AsRef<Path>>(path: P) -> bool {
         is_default(root_path().as_path(), path.as_ref())
     }
 
     /// Check if the given `path` is equal to the `default` Scoop cache path.
     #[inline]
-    pub(super) fn is_default_cache_path<P: AsRef<Path>>(path: &P) -> bool {
+    pub(super) fn is_default_cache_path<P: AsRef<Path>>(path: P) -> bool {
         is_default(cache_path().as_path(), path.as_ref())
     }
 
     /// Check if the given `path` is equal to the `default` Scoop global path.
     #[inline]
-    pub(super) fn is_default_global_path<P: AsRef<Path>>(path: &P) -> bool {
+    pub(super) fn is_default_global_path<P: AsRef<Path>>(path: P) -> bool {
         is_default(global_path().as_path(), path.as_ref())
     }
-}
-
-pub fn config_list(session: &Session) -> Fallible<String> {
-    Ok(
-        serde_json::to_string_pretty(&session.config).with_context(|| {
-            format!(
-                "failed to parse config file: {}",
-                session.config.root_path.display()
-            )
-        })?,
-    )
 }
