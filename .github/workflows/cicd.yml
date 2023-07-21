@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - main
+permissions:
+  contents: write
+  pull-requests: write
 jobs:
   # Check code format
   check_cargo_fmt:
@@ -25,7 +28,7 @@ jobs:
     name: Release Please
     needs: check_cargo_fmt
     runs-on: ubuntu-latest
-    if: github.repository == 'chawyehsu/hok' && github.ref == 'refs/heads/main' && github.event_name == 'push' && contains(toJSON(github.event.commits.*.message), 'chore(release)')
+    if: github.repository == 'chawyehsu/hok' && github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - uses: google-github-actions/release-please-action@v3
         id: release
