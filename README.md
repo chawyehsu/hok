@@ -1,26 +1,15 @@
-# scoop-rs
+# hok
 
-[![](https://img.shields.io/badge/Telegram-Group-0067B8.svg?style=flat-square&logo=telegram&color=0088cc&labelColor=282c34&longCache=true)](https://t.me/scoop_rs)
+> Hok is a CLI implementation of Scoop in Rust
 
-The Scoop Windows command line installer rewritten in Rust
+## Install
 
-🚧 **Under heavy development, things may change without notice. Do NOT use it for production. Take care of your data!**
+🚧 **CAVEAT**: Under heavy development. Interfaces may change without notice, do NOT use it for production!
 
-## Roadmap
-
-**structure**: two parts, 1) Scoop API rust library and 2) Scoop CLI binary
-
-**core features** implementation priority
-
-- [x] bucket management (bucket)
-- [x] cache management (cache)
-- [x] config management (config)
-- [x] manifest manipulation (home/info)
-- [x] search functionality (search)
-- [x] status subcommand (status)
-- [ ] app management (list/install/uninstall/update/upgrade/cleanup/hold/unhold)
-- [ ] shimming feature
-- [ ] other subcommands (checkup/prefix/reset/which/virustotal/etc.)
+```sh
+scoop bucket add dorado https://github.com/chawyehsu/dorado
+scoop install dorado/hok
+```
 
 ## Development
 
@@ -28,25 +17,21 @@ Prerequisites: Git, Rust
 
 ```sh
 # clone the repo
-git clone https://github.com/chawyehsu/scoop-rs
-cd scoop-rs
+git clone https://github.com/chawyehsu/hok
+cd hok
 # build
 cargo build
 # run and test
-.\target\debug\scoop.exe
+cargo run -- help
 ```
 
-#### License
+## Roadmap
 
-<sup>
-Licensed under either of <a href="LICENSE-APACHE">Apache License, Version
-2.0</a> or <a href="LICENSE-MIT">MIT license</a> at your option.
-</sup>
+TBD
 
-<br>
+## License
 
-<sub>
-Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in this project by you, as defined in the Apache-2.0 license,
-shall be dual licensed as above, without any additional terms or conditions.
-</sub>
+**hok** © [Chawye Hsu](https://github.com/chawyehsu). Released under the [Apache-2.0](LICENSE) license.
+For licenses of sub crates, see [COPYING](COPYING).
+
+> [Blog](https://chawyehsu.com) · GitHub [@chawyehsu](https://github.com/chawyehsu) · Twitter [@chawyehsu](https://twitter.com/chawyehsu)
