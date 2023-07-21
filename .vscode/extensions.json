@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "bungcip.better-toml",
+    "editorconfig.editorconfig",
+    "rust-lang.rust-analyzer",
+    "github.vscode-github-actions"
+  ]
+}
