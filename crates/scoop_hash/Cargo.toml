@@ -1,7 +1,8 @@
 [package]
 name = "scoop-hash"
-description = "Hash library for scoop-rs"
-version = "0.1.0"
+description = "Hashing library for libscoop"
+homepage = "https://github.com/chawyehsu/hok"
+version = "0.1.0-alpha.1"
 authors = ["Chawye Hsu <su+cratesio@chawyehsu.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2021"
