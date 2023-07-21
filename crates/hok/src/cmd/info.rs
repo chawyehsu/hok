@@ -1,17 +1,18 @@
 use clap::ArgMatches;
-use scoop_core::Session;
+use libscoop::{operation, Session};
 
 use crate::Result;
 
 pub fn cmd_info(matches: &ArgMatches, session: &Session) -> Result<()> {
-    if let Some(query) = matches.value_of("package") {
-        let options = "explicit";
-        let packages = session.package_search(query, options)?;
+    if let Some(query) = matches.get_one::<String>("package") {
+        let queries = vec![query.as_str()];
+        let options = vec![];
+        let packages = operation::package_search(session, queries, options)?;
         let length = packages.len();
         match length {
             0 => eprintln!("Could not find package named '{}'.", query),
             _ => {
-                println!("Found {} package(s) named '{}':", length, query);
+                println!("Found {} package(s) for query '{}':", length, query);
                 for (idx, pkg) in packages.iter().enumerate() {
                     // Ident
                     // println!("Identity: {}/{}", pkg.bucket, pkg.name);
@@ -22,10 +23,10 @@ pub fn cmd_info(matches: &ArgMatches, session: &Session) -> Result<()> {
                     // Description
                     println!(
                         "Description: {}",
-                        pkg.description().unwrap_or("<no description>".to_owned())
+                        pkg.description().unwrap_or("<no description>")
                     );
                     // Version
-                    println!("Version: {}", pkg.version);
+                    println!("Version: {}", pkg.version());
                     // Homepage
                     println!("Homepage: {}", pkg.homepage());
                     // License

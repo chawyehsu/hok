@@ -1,52 +1,50 @@
 use clap::ArgMatches;
-use console::Term;
-use scoop_core::Session;
+use libscoop::{operation, Session};
 
 use crate::Result;
 
 pub fn cmd_cache(matches: &ArgMatches, session: &Session) -> Result<()> {
     match matches.subcommand() {
-        ("list", Some(matches)) => {
-            let query = matches.value_of("query").unwrap_or("*");
-            let files = session.cache_list(query)?;
+        Some(("list", args)) => {
+            let query = args
+                .get_one::<String>("query")
+                .map(|s| s.as_ref())
+                .unwrap_or("*");
+            let files = operation::cache_list(session, query)?;
             let mut total_size: u64 = 0;
             let total_count = files.len();
-            let term = Term::stdout();
+
             for f in files.into_iter() {
                 let size = f.path().metadata()?.len();
                 total_size += size;
-                let _ = term.write_line(
-                    format!(
-                        "{:>8} {} ({}) {:>}",
-                        size_bytes(size, true),
-                        f.package_name(),
-                        f.version(),
-                        f.file_name()
-                    )
-                    .as_str(),
+
+                println!(
+                    "{:>8} {} ({}) {:>}",
+                    size_bytes(size, true),
+                    f.package_name(),
+                    f.version(),
+                    f.file_name()
                 );
             }
-            let _ = term.write_line(
-                format!(
-                    "{:>8} {} files, {}",
-                    "Total:",
-                    total_count,
-                    filesize(total_size, true)
-                )
-                .as_str(),
+
+            println!(
+                "{:>8} {} files, {}",
+                "Total:",
+                total_count,
+                filesize(total_size, true)
             );
 
             Ok(())
         }
-        ("remove", Some(matches)) => {
-            if matches.is_present("all") {
-                match session.cache_remove("*") {
+        Some(("remove", args)) => {
+            if args.get_flag("all") {
+                match operation::cache_remove(session, "*") {
                     Ok(_) => println!("All download caches were removed."),
                     Err(e) => return Err(e.into()),
                 }
             }
-            if let Some(query) = matches.value_of("query") {
-                match session.cache_remove(query) {
+            if let Some(query) = args.get_one::<String>("query").map(|s| s.as_ref()) {
+                match operation::cache_remove(session, query) {
                     Ok(_) => {
                         if query == "*" {
                             println!("All download caches were removed.");
