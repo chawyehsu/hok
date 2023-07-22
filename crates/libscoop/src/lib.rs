@@ -31,18 +31,20 @@ extern crate log;
 #[macro_use]
 extern crate serde;
 
+mod bucket;
+mod cache;
+mod config;
 mod constant;
+mod error;
+mod event;
 mod internal;
+mod package;
 mod session;
 
-pub mod bucket;
-pub mod cache;
-pub mod config;
-pub mod error;
-pub mod event;
 pub mod operation;
-pub mod package;
 
+pub use error::Error;
+pub use event::Event;
 pub use package::QueryOption;
 pub use session::Session;
 pub use tokio;

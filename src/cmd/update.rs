@@ -1,9 +1,8 @@
 use crossterm::{cursor, style::Stylize, ExecutableCommand};
 use libscoop::{
-    event::Event,
     operation,
     tokio::{self, sync::mpsc::UnboundedReceiver},
-    Session,
+    Event, Session,
 };
 use std::{
     cmp::Ordering,
