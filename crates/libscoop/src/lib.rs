@@ -1,5 +1,5 @@
 //! This crate aims to provide a full-featured, practical, and efficient Rust
-//! reimplementation of Scoop, the Windows command-line installer. It is a
+//! reimplementation of [Scoop], the Windows command-line installer. It is a
 //! library crate providing the core functionality of interacting with Scoop,
 //! and is not intended to be used directly by end users. Developers who wish
 //! to implement a Scoop frontend or make use of Scoop's functionality in their
@@ -26,6 +26,7 @@
 //! println!("{}", config.root_path().display());
 //! ```
 //!
+//! [Scoop]: https://scoop.sh/
 //! [Hok]: https://github.com/chawyehsu/hok
 extern crate log;
 #[macro_use]
