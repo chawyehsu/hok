@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
 use crate::constant::{REGEX_HASH, SPDX_LIST};
-use crate::error::{Context, Fallible};
+use crate::error::Fallible;
 use crate::internal;
 
 /// A [`Manifest`] basically defines a package that is available to be installed
@@ -630,19 +630,16 @@ impl Manifest {
         //
         // Discussion in https://github.com/serde-rs/json/issues/160
         let mut bytes = Vec::new();
-        File::open(path)
-            .with_context(|| format!("failed to open {}", path.display()))?
-            .read_to_end(&mut bytes)
-            .with_context(|| format!("failed to read {}", path.display()))?;
+        File::open(path)?.read_to_end(&mut bytes)?;
 
         // Parsing manifest files is the key bottleneck of the entire
         // project. We use `serde_json` because it's well documented and easy
         // to integrate. But I believe there should be an alternative to
         // `serde_json` which can parse JSON files much *faster*. Perhaps
         // `simd_json` can be the one. See https://github.com/serde-rs/json-benchmark
-        let inner: ManifestSpec = serde_json::from_slice(&bytes).with_context(|| {
+        let inner: ManifestSpec = serde_json::from_slice(&bytes).map_err(|e| {
             debug!("failed to parse manifest {}", path.display());
-            format!("failed to parse manifest {}", path.display())
+            e
         })?;
         let path = internal::normalize_path(path);
         // let mut checksum = scoop_hash::Checksum::new("sha256");
@@ -1237,14 +1234,11 @@ impl InstallInfo {
     pub fn parse<P: AsRef<Path>>(path: P) -> Fallible<InstallInfo> {
         let path = path.as_ref();
         let mut bytes = Vec::new();
-        File::open(path)
-            .with_context(|| format!("failed to open {}", path.display()))?
-            .read_to_end(&mut bytes)
-            .with_context(|| format!("failed to read {}", path.display()))?;
+        File::open(path)?.read_to_end(&mut bytes)?;
 
-        let info = serde_json::from_slice(&bytes).with_context(|| {
+        let info = serde_json::from_slice(&bytes).map_err(|e| {
             debug!("failed to parse install_info {}", path.display());
-            format!("failed to parse install_info {}", path.display())
+            e
         })?;
 
         Ok(info)

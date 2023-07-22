@@ -5,7 +5,7 @@ use std::{collections::HashSet, vec};
 
 use crate::{
     bucket::Bucket,
-    error::{Context, Fallible},
+    error::Fallible,
     internal::compare_versions,
     package::manifest::{InstallInfo, Manifest},
     Session,
@@ -47,8 +47,7 @@ pub(crate) fn query_installed(
     }
 
     let mut packages = apps_dir
-        .read_dir()
-        .with_context(|| format!("failed to read dir {}", apps_dir.display()))?
+        .read_dir()?
         .into_iter()
         .par_bridge()
         .filter_map(|item| {

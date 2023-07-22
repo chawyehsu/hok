@@ -9,7 +9,6 @@ use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
-use crate::error::Context;
 use crate::error::Fallible;
 
 /// Ensure given `path` exist.
@@ -102,7 +101,7 @@ where
     D: Serialize,
 {
     let path = path.as_ref();
-    ensure_dir(path).with_context(|| format!("failed to create {}", path.display()))?;
+    ensure_dir(path)?;
 
     let file = OpenOptions::new()
         .write(true)
@@ -110,6 +109,5 @@ where
         .truncate(true)
         .open(path)
         .unwrap();
-    Ok(serde_json::to_writer_pretty(file, &data)
-        .with_context(|| format!("failed to write {}", path.display()))?)
+    Ok(serde_json::to_writer_pretty(file, &data)?)
 }

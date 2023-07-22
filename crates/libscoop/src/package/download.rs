@@ -16,7 +16,7 @@ use ureq::{AgentBuilder, Request};
 use crate::{
     cache::CacheFile,
     constant,
-    error::{Context, Error, Fallible},
+    error::{Error, Fallible},
     internal::fs,
     Session,
 };
@@ -99,13 +99,11 @@ fn setup_working_dir(session: &Session, package: &Package) -> Fallible<(PathBuf,
         .get_config()
         .root_path
         .join(format!("apps/{}/{}", package.name, version));
-    fs::ensure_dir(&working_dir)
-        .with_context(|| format!("failed to create working dir: {}", working_dir.display()))?;
+    fs::ensure_dir(&working_dir)?;
 
     for src in files.iter() {
         let dst = working_dir.join(src.file_name().unwrap());
-        std::fs::copy(&src, &dst)
-            .with_context(|| format!("failed to copy file: {}", src.display()))?;
+        std::fs::copy(&src, &dst)?;
     }
 
     let ret = (working_dir, files);
@@ -140,8 +138,7 @@ where
     let config = session.get_config();
     if config.proxy().is_some() {
         let proxy = config.proxy().unwrap();
-        let proxy = ureq::Proxy::new(proxy)
-            .with_context(|| format!("failed to parse proxy url: {}", proxy))?;
+        let proxy = ureq::Proxy::new(proxy)?;
         client = client.proxy(proxy);
     }
     let client = client.build();
@@ -181,18 +178,14 @@ where
                 request = request.set("Cookie", &cookie);
             }
 
-            let response = request
-                .call()
-                .with_context(|| format!("failed to fetch {}", url))?;
+            let response = request.call()?;
 
             if response.status() != 200 {
-                let message = format!(
-                    "failed to fetch {} (status code: {})",
+                return Err(Error::Custom(format!(
+                    "failed to fetch {} (status code: {}",
                     url,
                     response.status()
-                );
-                let source = None;
-                return Err(Error::Http { message, source });
+                )));
             }
 
             let content_length = response
@@ -218,10 +211,7 @@ where
             let (tx, rx) = mpsc::channel::<ChunkedRange>();
             let mut tasks = vec![];
             if !accept_ranges {
-                let pool = ThreadPool::builder()
-                    .pool_size(2)
-                    .create()
-                    .with_context(|| "failed to create thread pool".into())?;
+                let pool = ThreadPool::builder().pool_size(2).create()?;
 
                 let write_task = pool
                     .spawn_with_handle(do_write(cache_file, ctx, rx, callback.clone()))
@@ -255,10 +245,7 @@ where
                 }
 
                 let pool_size = connections + 1;
-                let pool = ThreadPool::builder()
-                    .pool_size(pool_size)
-                    .create()
-                    .with_context(|| "failed to create thread pool".into())?;
+                let pool = ThreadPool::builder().pool_size(pool_size).create()?;
 
                 let write_task = pool
                     .spawn_with_handle(do_write(cache_file, ctx, rx, callback.clone()))
@@ -299,22 +286,13 @@ where
         .truncate(true)
         .create(true)
         .write(true)
-        .open(cache_file.path())
-        .with_context(|| format!("failed to open cache file: {}", cache_file.path().display()))?;
+        .open(cache_file.path())?;
 
     // emit
     callback(ctx.clone());
 
     while let Ok(chunk) = rx.recv() {
-        let _ = fd
-            .seek_write(&chunk.data[..chunk.length as usize], chunk.offset)
-            .with_context(|| {
-                format!(
-                    "failed to write to cache file: {}",
-                    cache_file.path().display()
-                )
-            })
-            .unwrap();
+        let _ = fd.seek_write(&chunk.data[..chunk.length as usize], chunk.offset)?;
 
         ctx.position = ctx.position + chunk.length;
         if ctx.state != DownloadProgressState::Downloading {
@@ -336,10 +314,7 @@ async fn do_read(response: ureq::Response, tx: Sender<ChunkedRange>) -> Fallible
     let mut reader = response.into_reader();
 
     loop {
-        match reader
-            .read(&mut chunk)
-            .with_context(|| "failed to read response stream".into())?
-        {
+        match reader.read(&mut chunk)? {
             0 => break,
             len => {
                 let chunk = ChunkedRange {
@@ -360,11 +335,12 @@ async fn do_read_range(
     range: (u64, u64),
     tx: Sender<ChunkedRange>,
 ) -> Fallible<()> {
-    let response = request.call().with_context(|| "failed to fetch".into())?;
+    let response = request.call()?;
     if !(response.status() >= 200 && response.status() <= 299) {
-        let message = format!("failed to fetch (status code: {})", response.status());
-        let source = None;
-        return Err(Error::Http { message, source });
+        return Err(Error::Custom(format!(
+            "failed to fetch (status code: {})",
+            response.status()
+        )));
     }
 
     let mut chunk = [0; 4096];
@@ -372,10 +348,7 @@ async fn do_read_range(
     let mut reader = BufReader::new(response.into_reader());
 
     loop {
-        match reader
-            .read(&mut chunk)
-            .with_context(|| "failed to read response stream".into())?
-        {
+        match reader.read(&mut chunk)? {
             0 => break,
             length => {
                 let chunked_range = ChunkedRange {

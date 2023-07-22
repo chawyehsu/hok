@@ -20,7 +20,7 @@ use std::{
 use crate::{
     bucket::Bucket,
     cache::CacheFile,
-    error::{Context, Error, Fallible},
+    error::{Error, Fallible},
     event::{BucketUpdateFailedCtx, Event},
     internal::{fs, git},
     package::{self, manifest::InstallInfo, Package, QueryOption},
@@ -59,8 +59,7 @@ pub fn bucket_list(session: &Session) -> Fallible<Vec<Bucket>> {
 
     if buckets_dir.exists() {
         let entries = buckets_dir
-            .read_dir()
-            .with_context(|| format!("failed to read {}", buckets_dir.display()))?
+            .read_dir()?
             .filter_map(Result::ok)
             .filter(|entry| entry.file_type().unwrap().is_dir());
         for entry in entries {
@@ -88,9 +87,7 @@ pub fn bucket_update(session: &Session) -> Fallible<()> {
 
     let any_bucket_updated = Arc::new(Mutex::new(false));
     let mut tasks = Vec::new();
-    let pool = ThreadPool::builder()
-        .create()
-        .with_context(|| "failed to create thread pool".into())?;
+    let pool = ThreadPool::builder().create()?;
     let proxy = session.get_config().proxy().map(|s| s.to_owned());
 
     for bucket in buckets.iter() {
@@ -150,8 +147,7 @@ pub fn bucket_remove(session: &Session, name: &str) -> Fallible<()> {
         return Err(Error::BucketNotFound(name.to_owned()));
     }
 
-    Ok(remove_dir_all::remove_dir_all(path.as_path())
-        .with_context(|| format!("failed to remove bucket {}", path.display()))?)
+    Ok(remove_dir_all::remove_dir_all(path.as_path())?)
 }
 
 /// Get a list of downloaded cache files.
@@ -159,13 +155,7 @@ pub fn cache_list(session: &Session, query: &str) -> Fallible<Vec<CacheFile>> {
     let mut entires = session
         .get_config()
         .cache_path
-        .read_dir()
-        .with_context(|| {
-            format!(
-                "failed to read cache dir: {}",
-                session.get_config().cache_path.display()
-            )
-        })?
+        .read_dir()?
         .filter_map(Result::ok)
         .filter(|e| e.file_type().unwrap().is_file())
         .filter_map(|de| CacheFile::from(de.path()).ok())
@@ -185,20 +175,11 @@ pub fn cache_list(session: &Session, query: &str) -> Fallible<Vec<CacheFile>> {
 /// Remove cache files by query.
 pub fn cache_remove(session: &Session, query: &str) -> Fallible<()> {
     match query {
-        "*" => Ok(
-            fs::empty_dir(&session.get_config().cache_path).with_context(|| {
-                format!(
-                    "failed to empty cache dir: {}",
-                    session.get_config().cache_path.display()
-                )
-            })?,
-        ),
+        "*" => Ok(fs::empty_dir(&session.get_config().cache_path)?),
         query => {
             let files = cache_list(session, query)?;
             for f in files.into_iter() {
-                std::fs::remove_file(f.path()).with_context(|| {
-                    format!("failed to remove cache file: {}", f.path().display())
-                })?;
+                std::fs::remove_file(f.path())?;
             }
             Ok(())
         }

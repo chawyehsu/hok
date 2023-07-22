@@ -25,11 +25,6 @@ pub enum Error {
     #[error("{0}")]
     Custom(String),
 
-    #[error(transparent)]
-    CyclicDependencies(#[from] CyclicError),
-
-    #[error("error")]
-    Db,
     /// Thrown when there was an [I/O error][1] opening the config file
     ///
     /// [1]: std::io::Error
@@ -41,17 +36,10 @@ pub enum Error {
     #[error("error")]
     ParseConfigError(PathBuf),
 
-    #[error(transparent)]
-    Git(#[from] git2::Error),
-
     #[error("error")]
     HashMismatch,
 
-    /// Thrown when constructing a [`CacheFile`][1] from a given path with a
-    /// filename that does not match the [`REGEX_CACHE_FILE`][2] format.
-    ///
-    /// [1]: crate::types::CacheFile
-    /// [2]: crate::constants::REGEX_CACHE_FILE
+    /// Invalid cache file error
     #[error("error")]
     InvalidCacheFile { path: PathBuf },
 
@@ -62,22 +50,6 @@ pub enum Error {
 
     #[error("error")]
     InvalidHashValue(String),
-
-    #[error("http {message}")]
-    Http {
-        message: String,
-        source: Option<ureq::Error>,
-    },
-
-    /// Wrapped [std I/O error][1]. Throw when doing I/O operations, such as
-    /// reading or writing files or directories.
-    ///
-    /// [1]: std::io::Error
-    #[error("{message}")]
-    Io {
-        message: String,
-        source: std::io::Error,
-    },
 
     // /// Thrown when multiple package records are found for a given query.
     // /// This is useful when a single record for a query is needed.
@@ -99,80 +71,27 @@ pub enum Error {
     #[error("package '{0}' is broken")]
     PackageHoldBrokenInstall(String),
 
-    /// Wrapped possible [serde_json Error][1]. Throw when (de)serializing JSON
-    /// files.
-    ///
-    /// [1]: https://docs.serde.rs/serde_json/struct.Error.html
-    #[error("bad regular expression, {0}")]
-    Regex(regex::Error),
+    /// Cycle dependency error
+    #[error(transparent)]
+    CyclicDependency(#[from] CyclicError),
 
-    /// Wrapped possible [serde_json Error][1]. Throw when (de)serializing JSON
-    /// files.
-    ///
-    /// [1]: https://docs.serde.rs/serde_json/struct.Error.html
-    #[error("{message}")]
-    Serde {
-        message: String,
-        source: serde_json::Error,
-    },
+    /// Git error
+    #[error(transparent)]
+    Git(#[from] git2::Error),
+
+    /// I/O error
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+
+    /// Network error
+    #[error(transparent)]
+    Network(#[from] ureq::Error),
+
+    /// Regular expression error
+    #[error(transparent)]
+    Regex(#[from] regex::Error),
+
+    /// Serde error
+    #[error(transparent)]
+    Serde(#[from] serde_json::Error),
 }
-
-pub(super) trait Context<T> {
-    fn with_context<F>(self, f: F) -> Fallible<T>
-    where
-        F: FnOnce() -> String;
-}
-
-impl<T> Context<T> for std::io::Result<T> {
-    fn with_context<F>(self, f: F) -> Fallible<T>
-    where
-        F: FnOnce() -> String,
-    {
-        self.map_err(|source| Error::Io {
-            message: f(),
-            source,
-        })
-    }
-}
-
-impl<T> Context<T> for Result<T, ureq::Error> {
-    fn with_context<F>(self, f: F) -> Fallible<T>
-    where
-        F: FnOnce() -> String,
-    {
-        self.map_err(|source| Error::Http {
-            message: f(),
-            source: Some(source),
-        })
-    }
-}
-
-impl<T> Context<T> for serde_json::Result<T> {
-    fn with_context<F>(self, f: F) -> Fallible<T>
-    where
-        F: FnOnce() -> String,
-    {
-        self.map_err(|source| Error::Serde {
-            message: f(),
-            source,
-        })
-    }
-}
-
-impl From<regex::Error> for Error {
-    fn from(source: regex::Error) -> Self {
-        Error::Regex(source)
-    }
-}
-
-// impl<T> Context<T> for Result<T, regex::Error> {
-//     fn with_context<F>(self, f: F) -> Fallible<T>
-//     where
-//         F: FnOnce() -> String,
-//     {
-//         self.map_err(|source| Error::Serde {
-//             message: f(),
-//             source,
-//         })
-//     }
-// }

@@ -2,7 +2,7 @@ use rayon::prelude::{ParallelBridge, ParallelIterator};
 use std::path::{Path, PathBuf};
 
 use crate::{
-    error::{Context, Error, Fallible},
+    error::{Error, Fallible},
     internal::git,
 };
 
@@ -56,9 +56,7 @@ impl Bucket {
             false => BucketDirectoryType::V1,
             true => {
                 let mut dtype = BucketDirectoryType::V2;
-                let entries = nested_dir
-                    .read_dir()
-                    .with_context(|| format!("failed to read {}", nested_dir.display()))?;
+                let entries = nested_dir.read_dir()?;
 
                 for entry in entries {
                     if let Ok(entry) = entry {
@@ -132,8 +130,7 @@ impl Bucket {
             BucketDirectoryType::V1 => {
                 let path = self.path.as_path();
                 let entries = path
-                    .read_dir()
-                    .with_context(|| format!("failed to read dir: {}", path.display()))?
+                    .read_dir()?
                     .par_bridge()
                     .filter_map(std::io::Result::ok)
                     .filter(|de| {
@@ -149,8 +146,7 @@ impl Bucket {
             BucketDirectoryType::V2 => {
                 let path = self.path.join("bucket");
                 let entries = path
-                    .read_dir()
-                    .with_context(|| format!("failed to read dir: {}", path.display()))?
+                    .read_dir()?
                     .par_bridge()
                     .filter_map(std::io::Result::ok)
                     .filter(|de| {
@@ -165,8 +161,7 @@ impl Bucket {
             BucketDirectoryType::V3 => {
                 let path = self.path.join("bucket");
                 let entries = path
-                    .read_dir()
-                    .with_context(|| format!("failed to read dir: {}", path.display()))?
+                    .read_dir()?
                     .par_bridge()
                     .filter_map(std::io::Result::ok)
                     .filter(|de| {
@@ -174,12 +169,10 @@ impl Bucket {
                         let name = path.file_name().unwrap().to_str().unwrap();
                         path.is_dir() && !name.starts_with('.')
                     })
-                    .flat_map(|de| {
+                    .flat_map(|de| -> Fallible<Vec<PathBuf>> {
                         let path = de.path();
                         let entries = path
-                            .read_dir()
-                            .with_context(|| format!("failed to read dir: {}", path.display()))
-                            .unwrap()
+                            .read_dir()?
                             .par_bridge()
                             .filter_map(std::io::Result::ok)
                             .filter(|de| {
@@ -189,8 +182,9 @@ impl Bucket {
                             })
                             .map(|de| de.path())
                             .collect::<Vec<_>>();
-                        entries
+                        Ok(entries)
                     })
+                    .flatten()
                     .collect::<Vec<_>>();
                 entries
             }

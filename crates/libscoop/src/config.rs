@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use crate::error::{Context, Error, Fallible};
+use crate::error::{Error, Fallible};
 use crate::internal::fs::write_json;
 
 pub struct ConfigBuilder {
@@ -112,16 +112,13 @@ impl ConfigBuilder {
 
     pub fn build(&self) -> Fallible<Config> {
         let mut buf = vec![];
-        std::fs::File::open(self.path.as_path())
-            .with_context(|| format!("failed to open config file: {}", self.path.display()))?
+        std::fs::File::open(self.path.as_path())?
             .read_to_end(&mut buf)
-            .with_context(|| format!("failed to read config file: {}", self.path.display()))
             .unwrap_or_else(|_| -> usize {
                 buf = "{}".as_bytes().to_vec();
                 0
             });
-        Ok(serde_json::from_slice(&buf)
-            .with_context(|| format!("failed to parse config file: {}", self.path.display()))?)
+        Ok(serde_json::from_slice(&buf)?)
     }
 }
 
@@ -200,8 +197,7 @@ impl Config {
     }
 
     pub(crate) fn pretty(&self) -> Fallible<String> {
-        Ok(serde_json::to_string_pretty(self)
-            .with_context(|| format!("failed to parse {}", self.config_path.display()))?)
+        Ok(serde_json::to_string_pretty(self)?)
     }
 }
 
