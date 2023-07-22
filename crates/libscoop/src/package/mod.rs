@@ -89,6 +89,7 @@ pub enum InstallOption {
     OnlyUpgrade,
 }
 
+/// Options that may be used to query Scoop packages.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum QueryOption {

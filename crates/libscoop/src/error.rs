@@ -4,7 +4,7 @@ use crate::internal::dag::CyclicError;
 
 pub type Fallible<T> = Result<T, Error>;
 
-/// Enum representing all possible errors that can occur in Scoop
+/// Error that may occur during performing operations.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {

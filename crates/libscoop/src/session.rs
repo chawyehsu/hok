@@ -9,7 +9,7 @@ use crate::{
     event::Event,
 };
 
-/// Session handle of the global state of libscoop.
+/// A handle representing a Scoop session.
 #[derive(Debug)]
 pub struct Session {
     pub(crate) config: RefCell<Config>,

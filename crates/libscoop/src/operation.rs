@@ -1,3 +1,13 @@
+//! Operations that can be performed on a Scoop instance.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use libscoop::{Session, operation};
+//! let (session, _) = Session::init().expect("failed to create session");
+//! let buckets = operation::bucket_list(&session).expect("failed to get buckets");
+//! println!("{} bucket(s)", buckets.len());
+//! ```
 use chrono::{SecondsFormat, Utc};
 use futures::{executor::ThreadPool, task::SpawnExt};
 use log::{debug, warn};
@@ -17,6 +27,7 @@ use crate::{
     Session,
 };
 
+/// Add a bucket to Scoop.
 pub fn bucket_add(session: &Session, name: &str, remote_url: &str) -> Fallible<()> {
     let mut path = session.get_config().root_path.clone();
 
@@ -41,6 +52,7 @@ pub fn bucket_add(session: &Session, name: &str, remote_url: &str) -> Fallible<(
     git::clone_repo(remote_url, path, proxy)
 }
 
+/// Get a list of added buckets.
 pub fn bucket_list(session: &Session) -> Fallible<Vec<Bucket>> {
     let mut buckets = Vec::new();
     let buckets_dir = session.get_config().root_path.join("buckets");
@@ -62,11 +74,12 @@ pub fn bucket_list(session: &Session) -> Fallible<Vec<Bucket>> {
     Ok(buckets)
 }
 
-/// Return a list of built-in buckets, per result in form of `(name, repo)`.
+/// Get a list of known (built-in) buckets.
 pub fn bucket_list_known() -> Vec<(&'static str, &'static str)> {
     crate::constant::BUILTIN_BUCKET_LIST.to_vec()
 }
 
+/// Update all added buckets.
 pub fn bucket_update(session: &Session) -> Fallible<()> {
     let buckets = bucket_list(session)?;
     if buckets.is_empty() {
@@ -127,6 +140,7 @@ pub fn bucket_update(session: &Session) -> Fallible<()> {
     Ok(())
 }
 
+/// Remove a bucket from Scoop.
 pub fn bucket_remove(session: &Session, name: &str) -> Fallible<()> {
     let mut path = session.get_config().root_path.clone();
     path.push("buckets");
@@ -140,6 +154,7 @@ pub fn bucket_remove(session: &Session, name: &str) -> Fallible<()> {
         .with_context(|| format!("failed to remove bucket {}", path.display()))?)
 }
 
+/// Get a list of downloaded cache files.
 pub fn cache_list(session: &Session, query: &str) -> Fallible<Vec<CacheFile>> {
     let mut entires = session
         .get_config()
@@ -167,6 +182,7 @@ pub fn cache_list(session: &Session, query: &str) -> Fallible<Vec<CacheFile>> {
     Ok(entires)
 }
 
+/// Remove cache files by query.
 pub fn cache_remove(session: &Session, query: &str) -> Fallible<()> {
     match query {
         "*" => Ok(
@@ -189,15 +205,18 @@ pub fn cache_remove(session: &Session, query: &str) -> Fallible<()> {
     }
 }
 
+/// Get the configuation list.
 pub fn config_list(session: &Session) -> Fallible<String> {
     let config = session.config.borrow();
     config.pretty()
 }
 
+/// Set a configuation key.
 pub fn config_set(session: &Session, key: &str, value: &str) -> Fallible<()> {
     session.config.borrow_mut().set(key, value)
 }
 
+/// Hold or unhold a package.
 pub fn package_hold(session: &Session, name: &str, flag: bool) -> Fallible<()> {
     let mut path = session.get_config().root_path.clone();
     path.push("apps");

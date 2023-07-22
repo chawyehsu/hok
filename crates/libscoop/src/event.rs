@@ -1,5 +1,6 @@
 use crate::bucket::Bucket;
 
+/// Event that may be emitted during the execution of operations.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum Event {
