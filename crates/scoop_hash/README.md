@@ -18,7 +18,7 @@ in the future when it is ready.
 
 ```toml
 [dependencies]
-scoop-hash = "0.1.0-alpha.1"
+scoop-hash = "0.1"
 ```
 
 ## Bench

@@ -16,7 +16,7 @@ This crate provides manipulation of [Scoop](https://scoop.sh/) from Rust.
 
 ```toml
 [dependencies]
-libscoop = "0.1.0-alpha.1"
+libscoop = "0.1"
 ```
 
 ## License
