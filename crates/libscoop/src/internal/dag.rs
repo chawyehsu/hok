@@ -16,7 +16,7 @@ pub struct DepGraph<T: Hash + Eq + Clone + Display> {
     /// the DepGraph.
     nodes: Nodes<T>,
 }
-/// Cyclic dependencies error.
+/// Cyclic dependency error.
 #[derive(Debug, Clone)]
 pub struct CyclicError(String);
 /// Wrapper of std Result with the [`CyclicError`] failure.
@@ -26,7 +26,7 @@ impl Error for CyclicError {}
 
 impl Display for CyclicError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "cyclic dependencies detected: {}", self.0)
+        write!(f, "cyclic dependency: {}", self.0)
     }
 }
 
@@ -139,7 +139,7 @@ where
     /// Pop a node which does not have any dependency and can be resolved.
     /// `None` will be returned if all nodes have dependencies.
     ///
-    /// If `None` is returned and graph size is not 0, there's cyclic dependencies.
+    /// If `None` is returned and graph size is not 0, there's cyclic dependency.
     pub fn pop(&mut self) -> Option<T> {
         let node = self
             .nodes
@@ -164,7 +164,7 @@ where
         Self::__step(&mut self.nodes)
     }
 
-    /// Check if cyclic dependencies exist in the graph. This method does not
+    /// Check if cyclic dependency exist in the graph. This method does not
     /// remove any nodes from the graph, instead it manipulates a clone of the
     /// graph.
     pub fn check(&self) -> Result<()> {
@@ -179,7 +179,7 @@ where
     }
 
     /// Walk the whole graph and pop all of the resolved nodes. An error will
-    /// be returned when cyclic dependencies is detected.
+    /// be returned when cyclic dependency is detected.
     pub fn walk(&mut self) -> Result<Vec<Vec<T>>> {
         let mut res = vec![];
         while self.nodes.len() > 0 {
@@ -220,19 +220,13 @@ where
             Entry::Vacant(e) => {
                 let mut dep = Dependencies::new();
                 if let Some(dep_node) = &dep_node {
-                    // Avoid self cyclic dependencies
-                    if node.ne(dep_node) {
-                        drop(dep.insert(dep_node.clone()));
-                    }
+                    drop(dep.insert(dep_node.clone()));
                 }
                 drop(e.insert(dep));
             }
             Entry::Occupied(e) => {
                 if let Some(dep_node) = &dep_node {
-                    // Avoid self cyclic dependencies
-                    if node.ne(dep_node) {
-                        drop(e.into_mut().insert(dep_node.clone()));
-                    }
+                    drop(e.into_mut().insert(dep_node.clone()));
                 }
             }
         }
@@ -351,6 +345,13 @@ mod test {
         graph.register_dep("Death's End", "The Dark Forest");
         graph.register_dep("The Dark Forest", "The Three-Body Problem");
         graph.register_dep("The Three-Body Problem", "Death's End");
+        assert!(graph.walk().is_err());
+    }
+
+    #[test]
+    fn test_self_cyclic() {
+        let mut graph = DepGraph::<String>::new();
+        graph.register_dep("self", "self");
         assert!(graph.walk().is_err());
     }
 }
