@@ -600,6 +600,43 @@ where
 //  Implementations for types
 ////////////////////////////////////////////////////////////////////////////////
 
+/// Macro to generate architecture-specific fields.
+macro_rules! arch_specific_field {
+    ($self:ident, $field:ident) => {{
+        let mut ret = $self.inner.$field.as_ref();
+
+        if let Some(arch) = $self.inner.architecture.as_ref() {
+            if cfg!(target_arch = "x86") {
+                if let Some(ia32) = &arch.ia32 {
+                    let $field = ia32.$field.as_ref();
+                    if $field.is_some() {
+                        ret = $field;
+                    }
+                }
+            }
+
+            if cfg!(target_arch = "x86_64") {
+                if let Some(amd64) = &arch.amd64 {
+                    let $field = amd64.$field.as_ref();
+                    if $field.is_some() {
+                        ret = $field;
+                    }
+                }
+            }
+
+            if cfg!(target_arch = "aarch64") {
+                if let Some(aarch64) = &arch.aarch64 {
+                    let $field = aarch64.$field.as_ref();
+                    if $field.is_some() {
+                        ret = $field;
+                    }
+                }
+            }
+        }
+        ret
+    }};
+}
+
 impl Manifest {
     /// Create a [`Manifest`] representation of a manfest JSON file with the
     /// given path.
@@ -660,6 +697,11 @@ impl Manifest {
     #[inline]
     pub fn version(&self) -> &str {
         self.inner.version.as_str()
+    }
+
+    #[inline]
+    pub fn is_nightly(&self) -> bool {
+        self.version() == "nightly"
     }
 
     /// Return the `description` of this manifest.
@@ -735,27 +777,7 @@ impl Manifest {
 
     #[inline]
     pub fn bin(&self) -> Option<Vec<Vec<&str>>> {
-        let mut ret = self.inner.bin.as_ref();
-
-        if let Some(arch) = self.architecture() {
-            // ia32
-            if cfg!(target_arch = "x86") {
-                if let Some(spec) = &arch.ia32 {
-                    if let Some(bin) = spec.bin.as_ref() {
-                        ret = Some(bin);
-                    }
-                }
-            }
-            // amd64
-            if cfg!(target_arch = "x86_64") {
-                if let Some(spec) = &arch.amd64 {
-                    if let Some(bin) = spec.bin.as_ref() {
-                        ret = Some(bin);
-                    }
-                }
-            }
-        }
-
+        let ret = arch_specific_field!(self, bin);
         ret.map(|v| v.devectorize())
     }
 
@@ -781,55 +803,47 @@ impl Manifest {
         }
 
         if self.innosetup() {
-            deps.insert("innounp".to_owned());
+            deps.insert("main/innounp".to_owned());
         }
 
-        [self.pre_install(), self.post_install()]
-            .iter()
-            .for_each(|hook| {
-                if let Some(script_block) = hook {
-                    let s = script_block.join("\r\n");
+        let hook_scripts = [
+            self.pre_install(),
+            self.post_install(),
+            self.installer().map(|i| i.script().unwrap_or_default()),
+            self.uninstaller().map(|i| i.script().unwrap_or_default()),
+            self.pre_uninstall(),
+            self.post_uninstall(),
+        ];
 
-                    if s.contains("Expand-7zipArchive") {
-                        deps.insert("7zip".to_owned());
-                    }
-                    if s.contains("Expand-MsiArchive") {
-                        deps.insert("lessmsi".to_owned());
-                    }
-                    if s.contains("Expand-InnoArchive") {
-                        deps.insert("innounp".to_owned());
-                    }
-                    if s.contains("Expand-DarkArchive") {
-                        deps.insert("dark".to_owned());
-                    }
+        hook_scripts.into_iter().for_each(|s| {
+            if let Some(script_block) = s {
+                let s = script_block.join("\r\n");
+
+                if s.contains("Expand-7zipArchive") {
+                    deps.remove("main/7zip");
+                    deps.insert("7zip".to_owned());
                 }
-            });
+                if s.contains("Expand-MsiArchive") {
+                    deps.remove("lessmsi");
+                    deps.insert("main/lessmsi".to_owned());
+                }
+                if s.contains("Expand-InnoArchive") {
+                    deps.remove("innounp");
+                    deps.insert("main/innounp".to_owned());
+                }
+                if s.contains("Expand-DarkArchive") {
+                    deps.remove("dark");
+                    deps.insert("main/dark".to_owned());
+                }
+            }
+        });
 
         deps.into_iter().collect()
     }
 
     #[inline]
     pub fn extract_dir(&self) -> Option<Vec<&str>> {
-        let mut ret = self.inner.extract_dir.as_ref();
-
-        if let Some(arch) = self.architecture() {
-            // ia32
-            if cfg!(target_arch = "x86") {
-                if let Some(spec) = &arch.ia32 {
-                    if let Some(extract_dir) = spec.extract_dir.as_ref() {
-                        ret = Some(extract_dir);
-                    }
-                }
-            }
-            // amd64
-            if cfg!(target_arch = "x86_64") {
-                if let Some(spec) = &arch.amd64 {
-                    if let Some(extract_dir) = spec.extract_dir.as_ref() {
-                        ret = Some(extract_dir);
-                    }
-                }
-            }
-        }
+        let ret = arch_specific_field!(self, extract_dir);
         ret.map(|v| v.devectorize())
     }
 
@@ -844,191 +858,47 @@ impl Manifest {
     }
 
     #[inline]
-    pub fn pre_install(&self) -> Option<Vec<&str>> {
-        let mut ret = self.inner.pre_install.as_ref();
-
-        if let Some(arch) = self.architecture() {
-            // ia32
-            if cfg!(target_arch = "x86") {
-                if let Some(spec) = &arch.ia32 {
-                    if let Some(pre_install) = spec.pre_install.as_ref() {
-                        ret = Some(pre_install);
-                    }
-                }
-            }
-            // amd64
-            if cfg!(target_arch = "x86_64") {
-                if let Some(spec) = &arch.amd64 {
-                    if let Some(pre_install) = spec.pre_install.as_ref() {
-                        ret = Some(pre_install);
-                    }
-                }
-            }
-        }
-
-        ret.map(|v| v.devectorize())
-    }
-
-    #[inline]
-    pub fn post_install(&self) -> Option<Vec<&str>> {
-        let mut ret = self.inner.post_install.as_ref();
-
-        if let Some(arch) = self.architecture() {
-            // ia32
-            if cfg!(target_arch = "x86") {
-                if let Some(spec) = &arch.ia32 {
-                    if let Some(post_install) = spec.post_install.as_ref() {
-                        ret = Some(post_install);
-                    }
-                }
-            }
-            // amd64
-            if cfg!(target_arch = "x86_64") {
-                if let Some(spec) = &arch.amd64 {
-                    if let Some(post_install) = spec.post_install.as_ref() {
-                        ret = Some(post_install);
-                    }
-                }
-            }
-        }
-
-        ret.map(|v| v.devectorize())
-    }
-
-    #[inline]
-    pub fn pre_uninstall(&self) -> Option<Vec<&str>> {
-        let mut ret = self.inner.pre_uninstall.as_ref();
-
-        if let Some(arch) = self.architecture() {
-            // ia32
-            if cfg!(target_arch = "x86") {
-                if let Some(spec) = &arch.ia32 {
-                    if let Some(pre_uninstall) = spec.pre_uninstall.as_ref() {
-                        ret = Some(pre_uninstall);
-                    }
-                }
-            }
-            // amd64
-            if cfg!(target_arch = "x86_64") {
-                if let Some(spec) = &arch.amd64 {
-                    if let Some(pre_uninstall) = spec.pre_uninstall.as_ref() {
-                        ret = Some(pre_uninstall);
-                    }
-                }
-            }
-        }
-
-        ret.map(|v| v.devectorize())
-    }
-
-    #[inline]
-    pub fn post_uninstall(&self) -> Option<Vec<&str>> {
-        let mut ret = self.inner.post_uninstall.as_ref();
-
-        if let Some(arch) = self.architecture() {
-            // ia32
-            if cfg!(target_arch = "x86") {
-                if let Some(spec) = &arch.ia32 {
-                    if let Some(post_uninstall) = spec.post_uninstall.as_ref() {
-                        ret = Some(post_uninstall);
-                    }
-                }
-            }
-            // amd64
-            if cfg!(target_arch = "x86_64") {
-                if let Some(spec) = &arch.amd64 {
-                    if let Some(post_uninstall) = spec.post_uninstall.as_ref() {
-                        ret = Some(post_uninstall);
-                    }
-                }
-            }
-        }
-
-        ret.map(|v| v.devectorize())
-    }
-
-    #[inline]
-    pub fn installer(&self) -> Option<&Installer> {
-        let mut ret = self.inner.installer.as_ref();
-
-        if let Some(arch) = self.architecture() {
-            // ia32
-            if cfg!(target_arch = "x86") {
-                if let Some(spec) = &arch.ia32 {
-                    if let Some(installer) = spec.installer.as_ref() {
-                        ret = Some(installer);
-                    }
-                }
-            }
-            // amd64
-            if cfg!(target_arch = "x86_64") {
-                if let Some(spec) = &arch.amd64 {
-                    if let Some(installer) = spec.installer.as_ref() {
-                        ret = Some(installer);
-                    }
-                }
-            }
-        }
-        ret
-    }
-
-    #[inline]
-    pub fn uninstaller(&self) -> Option<&Uninstaller> {
-        let mut ret = self.inner.uninstaller.as_ref();
-
-        if let Some(arch) = self.architecture() {
-            // ia32
-            if cfg!(target_arch = "x86") {
-                if let Some(spec) = &arch.ia32 {
-                    if let Some(uninstaller) = spec.uninstaller.as_ref() {
-                        ret = Some(uninstaller);
-                    }
-                }
-            }
-            // amd64
-            if cfg!(target_arch = "x86_64") {
-                if let Some(spec) = &arch.amd64 {
-                    if let Some(uninstaller) = spec.uninstaller.as_ref() {
-                        ret = Some(uninstaller);
-                    }
-                }
-            }
-        }
-        ret
-    }
-
-    #[inline]
-    pub fn shortcuts(&self) -> Option<&Vec<Vec<String>>> {
-        let mut ret = self.inner.shortcuts.as_ref();
-
-        if let Some(arch) = self.architecture() {
-            if cfg!(target_arch = "x86") {
-                if let Some(spec) = &arch.ia32 {
-                    if let Some(shortcuts) = spec.shortcuts.as_ref() {
-                        ret = Some(shortcuts);
-                    }
-                }
-            }
-
-            if cfg!(target_arch = "x86_64") {
-                if let Some(spec) = &arch.amd64 {
-                    if let Some(shortcuts) = spec.shortcuts.as_ref() {
-                        ret = Some(shortcuts);
-                    }
-                }
-            }
-        }
-        ret
-    }
-
-    #[inline]
     pub fn suggest(&self) -> Option<&HashMap<String, Vectorized<String>>> {
         self.inner.suggest.as_ref()
     }
 
     #[inline]
-    pub fn is_nightly(&self) -> bool {
-        self.version() == "nightly"
+    pub fn pre_install(&self) -> Option<Vec<&str>> {
+        let ret = arch_specific_field!(self, pre_install);
+        ret.map(|v| v.devectorize())
+    }
+
+    #[inline]
+    pub fn post_install(&self) -> Option<Vec<&str>> {
+        let ret = arch_specific_field!(self, post_install);
+        ret.map(|v| v.devectorize())
+    }
+
+    #[inline]
+    pub fn pre_uninstall(&self) -> Option<Vec<&str>> {
+        let ret = arch_specific_field!(self, pre_uninstall);
+        ret.map(|v| v.devectorize())
+    }
+
+    #[inline]
+    pub fn post_uninstall(&self) -> Option<Vec<&str>> {
+        let ret = arch_specific_field!(self, post_uninstall);
+        ret.map(|v| v.devectorize())
+    }
+
+    #[inline]
+    pub fn installer(&self) -> Option<&Installer> {
+        arch_specific_field!(self, installer)
+    }
+
+    #[inline]
+    pub fn uninstaller(&self) -> Option<&Uninstaller> {
+        arch_specific_field!(self, uninstaller)
+    }
+
+    #[inline]
+    pub fn shortcuts(&self) -> Option<&Vec<Vec<String>>> {
+        arch_specific_field!(self, shortcuts)
     }
 
     /// Extract download urls from this manifest:
@@ -1037,41 +907,10 @@ impl Manifest {
     /// - For `ia32` return "32bit" urls if available else noarch urls;
     /// - For `aarch64` return "arm64" urls if available else noarch urls.
     pub fn url(&self) -> Vec<&str> {
-        // noarch urls
-        let mut ret = self.inner.url.as_ref();
-
-        if let Some(arch) = self.architecture() {
-            // compile time arch selection
-            if cfg!(target_arch = "x86") {
-                if let Some(ia32) = &arch.ia32 {
-                    let url = ia32.url.as_ref();
-                    if url.is_some() {
-                        ret = url;
-                    }
-                }
-            }
-
-            if cfg!(target_arch = "x86_64") {
-                if let Some(amd64) = &arch.amd64 {
-                    let url = amd64.url.as_ref();
-                    if url.is_some() {
-                        ret = url;
-                    }
-                }
-            }
-
-            if cfg!(target_arch = "aarch64") {
-                if let Some(aarch64) = &arch.aarch64 {
-                    let url = aarch64.url.as_ref();
-                    if url.is_some() {
-                        ret = url;
-                    }
-                }
-            }
-        }
-
-        // The unwrap is safe, according to the manifest schema at least one of
-        // noarch url or amd64/ia32 url is required
+        let ret = arch_specific_field!(self, url);
+        // The unwrap is safe, according to the manifest schema, for a valid
+        // manifest, at least one of the noarch url field or arch-specific url
+        // field is required to be provided.
         ret.map(|v| v.devectorize()).unwrap_or_default()
     }
 
@@ -1088,37 +927,7 @@ impl Manifest {
     /// - For `ia32` return "32bit" hashes if available else noarch hashes;
     /// - For `aarch64` return "arm64" hashes if available else noarch hashes.
     pub fn hash(&self) -> Vec<&str> {
-        // noarch hashes
-        let mut ret = self.inner.hash.as_ref();
-
-        if let Some(arch) = self.architecture() {
-            if cfg!(target_arch = "x86") {
-                if let Some(ia32) = &arch.ia32 {
-                    let hash = ia32.hash.as_ref();
-                    if hash.is_some() {
-                        ret = hash;
-                    }
-                }
-            }
-
-            if cfg!(target_arch = "x86_64") {
-                if let Some(amd64) = &arch.amd64 {
-                    let hash = amd64.hash.as_ref();
-                    if hash.is_some() {
-                        ret = hash;
-                    }
-                }
-            }
-
-            if cfg!(target_arch = "aarch64") {
-                if let Some(aarch64) = &arch.aarch64 {
-                    let hash = aarch64.hash.as_ref();
-                    if hash.is_some() {
-                        ret = hash;
-                    }
-                }
-            }
-        }
+        let ret = arch_specific_field!(self, hash);
         ret.map(|v| v.devectorize()).unwrap_or_default()
     }
 }
