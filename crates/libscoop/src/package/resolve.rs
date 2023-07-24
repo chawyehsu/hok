@@ -73,7 +73,7 @@ pub(crate) fn resolve_dependencies(session: &Session, packages: &mut Vec<Package
 
 pub(crate) fn resolve_dependents(session: &Session, packages: &mut Vec<Package>) -> Fallible<()> {
     let mut to_resolve = packages.clone();
-    let installed = query::query_installed(session, "*", &vec![QueryOption::Explicit])?;
+    let installed = query::query_installed(session, "*", &[QueryOption::Explicit])?;
     loop {
         if to_resolve.is_empty() {
             break;

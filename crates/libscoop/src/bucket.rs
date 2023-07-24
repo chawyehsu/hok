@@ -43,7 +43,7 @@ impl Bucket {
             .map(|n| n.to_str().unwrap().to_string())
             .unwrap();
         if !path.exists() {
-            return Err(Error::BucketNotFound(name.clone()));
+            return Err(Error::BucketNotFound(name));
         }
 
         let mut remote_url = None;
@@ -58,12 +58,10 @@ impl Bucket {
                 let mut dtype = BucketDirectoryType::V2;
                 let entries = nested_dir.read_dir()?;
 
-                for entry in entries {
-                    if let Ok(entry) = entry {
-                        if entry.path().is_dir() {
-                            dtype = BucketDirectoryType::V3;
-                            break;
-                        }
+                for entry in entries.flatten() {
+                    if entry.path().is_dir() {
+                        dtype = BucketDirectoryType::V3;
+                        break;
                     }
                 }
                 dtype
@@ -129,8 +127,7 @@ impl Bucket {
         let json_files = match self.dtype {
             BucketDirectoryType::V1 => {
                 let path = self.path.as_path();
-                let entries = path
-                    .read_dir()?
+                path.read_dir()?
                     .par_bridge()
                     .filter_map(std::io::Result::ok)
                     .filter(|de| {
@@ -140,13 +137,11 @@ impl Bucket {
                         path.is_file() && name.ends_with(".json") && name != "package.json"
                     })
                     .map(|de| de.path())
-                    .collect::<Vec<_>>();
-                entries
+                    .collect::<Vec<_>>()
             }
             BucketDirectoryType::V2 => {
                 let path = self.path.join("bucket");
-                let entries = path
-                    .read_dir()?
+                path.read_dir()?
                     .par_bridge()
                     .filter_map(std::io::Result::ok)
                     .filter(|de| {
@@ -155,13 +150,11 @@ impl Bucket {
                         path.is_file() && name.ends_with(".json")
                     })
                     .map(|de| de.path())
-                    .collect::<Vec<_>>();
-                entries
+                    .collect::<Vec<_>>()
             }
             BucketDirectoryType::V3 => {
                 let path = self.path.join("bucket");
-                let entries = path
-                    .read_dir()?
+                path.read_dir()?
                     .par_bridge()
                     .filter_map(std::io::Result::ok)
                     .filter(|de| {
@@ -185,8 +178,7 @@ impl Bucket {
                         Ok(entries)
                     })
                     .flatten()
-                    .collect::<Vec<_>>();
-                entries
+                    .collect::<Vec<_>>()
             }
         };
         Ok(json_files)

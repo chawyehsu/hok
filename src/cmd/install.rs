@@ -42,8 +42,7 @@ pub fn cmd_install(matches: &ArgMatches, session: &Session) -> Result<()> {
                         let mut input = String::new();
                         std::io::stdin().read_line(&mut input).unwrap();
                         let parsed = input.trim().parse::<usize>();
-                        if parsed.is_ok() {
-                            index = parsed.unwrap();
+                        if let Ok(index) = parsed {
                             if index < pkgs.len() {
                                 break;
                             }

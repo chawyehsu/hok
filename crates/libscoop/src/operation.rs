@@ -52,9 +52,9 @@ pub fn bucket_add(session: &Session, name: &str, remote_url: &str) -> Fallible<(
     }
 
     let proxy = config.proxy();
-    let remote_url = match "" != remote_url {
-        true => remote_url,
-        false => crate::constant::BUILTIN_BUCKET_LIST
+    let remote_url = match remote_url.is_empty() {
+        false => remote_url,
+        true => crate::constant::BUILTIN_BUCKET_LIST
             .iter()
             .find(|&&(n, _)| n == name)
             .map(|&(_, remote)| remote)
@@ -110,7 +110,7 @@ pub fn bucket_update(session: &Session) -> Fallible<()> {
     for bucket in buckets.iter() {
         let repo = bucket.path().to_owned();
 
-        if repo.join(".git").exists() != true {
+        if !repo.join(".git").exists() {
             debug!("ignored non-git bucket {}", bucket.name());
             continue;
         }
@@ -130,14 +130,12 @@ pub fn bucket_update(session: &Session) -> Fallible<()> {
                 match git::reset_head(repo, proxy) {
                     Ok(_) => {
                         *flag.lock().unwrap() = true;
-                        if emitter.is_some() {
-                            let tx = emitter.unwrap();
+                        if let Some(tx) = emitter {
                             let _ = tx.send(Event::BucketUpdateSuccessed(name));
                         }
                     }
                     Err(err) => {
-                        if emitter.is_some() {
-                            let tx = emitter.unwrap();
+                        if let Some(tx) = emitter {
                             let ctx: BucketUpdateFailedCtx = BucketUpdateFailedCtx {
                                 name: name.clone(),
                                 err_msg: err.to_string(),
@@ -160,8 +158,7 @@ pub fn bucket_update(session: &Session) -> Fallible<()> {
         config.set("last_update", time.as_str())?;
     }
 
-    if emitter.is_some() {
-        let tx = emitter.unwrap();
+    if let Some(tx) = emitter {
         let _ = tx.send(Event::BucketUpdateFinished);
     }
     Ok(())
@@ -294,8 +291,7 @@ pub fn package_sync(
     let queries = HashSet::<&str>::from_iter(queries);
 
     let emitter = session.emitter();
-    if emitter.is_some() {
-        let tx = emitter.clone().unwrap();
+    if let Some(tx) = emitter.clone() {
         let _ = tx.send(Event::PackageResolveStart);
     }
 
@@ -321,32 +317,26 @@ pub fn package_sync(
                 continue;
             }
 
-            let emitter = session.emitter();
-
-            if emitter.is_some() {
+            if let Some(tx) = emitter.clone() {
                 println!(
                     "{}",
                     pkg.iter().map(|p| p.ident()).collect::<Vec<_>>().join(" ")
                 );
                 let question = pkg.iter().map(|p| p.ident()).collect::<Vec<_>>();
-                let tx = emitter.unwrap();
                 if tx.send(Event::SelectPackage(question)).is_ok() {
                     let rx = session.event_bus().inner_receiver();
                     while let Ok(answer) = rx.recv() {
-                        match answer {
-                            Event::SelectPackageAnswer(idx) => {
-                                println!("{}", idx);
-                                if idx < pkg.len() {
-                                    pkg = vec![pkg[idx].clone()];
-                                    break;
-                                } else {
-                                    return Err(Error::Custom(format!(
-                                        "Invalid package index: {}",
-                                        idx
-                                    )));
-                                }
+                        if let Event::SelectPackageAnswer(idx) = answer {
+                            println!("{}", idx);
+                            if idx < pkg.len() {
+                                pkg = vec![pkg[idx].clone()];
+                                break;
+                            } else {
+                                return Err(Error::Custom(format!(
+                                    "Invalid package index: {}",
+                                    idx
+                                )));
                             }
-                            _ => {}
                         }
                     }
                 }
@@ -378,7 +368,7 @@ pub fn package_sync(
             .filter(|p| !p.is_strictly_installed())
             .collect::<Vec<_>>();
 
-        if packages.len() == 0 {
+        if packages.is_empty() {
             return Ok(());
         }
 
@@ -394,8 +384,7 @@ pub fn package_sync(
             println!("  {}", pkg.ident());
         }
 
-        if emitter.is_some() {
-            let tx = emitter.unwrap();
+        if let Some(tx) = emitter {
             let _ = tx.send(Event::PackageDownloadSizingStart);
         }
 
@@ -425,8 +414,8 @@ pub fn package_sync(
             }
 
             for (mut url, _) in urls_mapped_files.into_iter() {
-                if url.contains("#") {
-                    url = url.split_once("#").unwrap().0;
+                if url.contains('#') {
+                    url = url.split_once('#').unwrap().0;
                 }
 
                 let size = internal::network::get_content_length(url, proxy);

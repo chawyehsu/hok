@@ -71,7 +71,7 @@ static REGEX_ARCHIVE_ZSTD: Lazy<Regex> = Lazy::new(|| {
 
 pub static SPDX_LIST: Lazy<HashSet<&str>> = Lazy::new(|| {
     // Reference: https://github.com/spdx/license-list-data
-    const ID_LIST: [&'static str; 458] = [
+    const ID_LIST: [&str; 458] = [
         "0BSD",
         "AAL",
         "ADSL",

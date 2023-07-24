@@ -83,7 +83,6 @@ fn running_apps(path: &Path) -> Vec<String> {
     let mut proc_names = system
         .processes()
         .values()
-        .into_iter()
         .filter_map(|p| match p.exe().starts_with(path) {
             false => None,
             true => Some(p.name().to_owned()),

@@ -60,7 +60,7 @@ pub struct InstallStateInstalled {
 impl InstallStateInstalled {
     #[inline]
     pub fn bucket(&self) -> Option<&str> {
-        self.bucket.as_ref().map(|s| s.as_str())
+        self.bucket.as_deref()
     }
 
     #[inline]
@@ -70,7 +70,7 @@ impl InstallStateInstalled {
 
     #[inline]
     pub fn url(&self) -> Option<&str> {
-        self.url.as_ref().map(|s| s.as_str())
+        self.url.as_deref()
     }
 
     #[inline]
@@ -197,13 +197,10 @@ impl Package {
     pub fn upgradable(&self) -> Option<&str> {
         let origin_pkg = self.upgradable.borrow();
 
-        match origin_pkg {
-            None => None,
-            Some(inner) => match inner {
-                None => None,
-                Some(pkg) => Some(pkg.version()),
-            },
+        if let Some(Some(pkg)) = origin_pkg {
+            return Some(pkg.version());
         }
+        None
     }
 
     /// Get the version of this package.

@@ -98,11 +98,9 @@ fn filesize(length: u64, with_unit: bool) -> String {
         } else {
             j.to_string()
         }
+    } else if with_unit {
+        format!("{} B", flength)
     } else {
-        if with_unit {
-            format!("{} B", flength)
-        } else {
-            flength.to_string()
-        }
+        flength.to_string()
     }
 }

@@ -60,7 +60,7 @@ impl Matcher for RegexMatcher {
 pub(crate) fn query_installed(
     session: &Session,
     query: &str,
-    options: &Vec<QueryOption>,
+    options: &[QueryOption],
 ) -> Fallible<Vec<Package>> {
     let is_explicit_mode = options.contains(&QueryOption::Explicit);
     let is_wildcard_query = query.eq("*") || query.is_empty();
@@ -70,8 +70,8 @@ pub(crate) fn query_installed(
     let mut matcher: Vec<(Option<String>, Box<dyn Matcher + Send + Sync>)> = vec![];
 
     if !is_wildcard_query {
-        if query.contains("/") {
-            let (bucket_prefix, name) = query.split_once("/").unwrap();
+        if query.contains('/') {
+            let (bucket_prefix, name) = query.split_once('/').unwrap();
 
             if is_explicit_mode {
                 matcher.push((
@@ -85,22 +85,19 @@ pub(crate) fn query_installed(
                     .build()?;
                 matcher.push((Some(bucket_prefix.to_owned()), Box::new(RegexMatcher(re))));
             }
+        } else if is_explicit_mode {
+            matcher.push((None, Box::new(ExplicitMatcher(query))));
         } else {
-            if is_explicit_mode {
-                matcher.push((None, Box::new(ExplicitMatcher(query))));
-            } else {
-                let re = RegexBuilder::new(query)
-                    .case_insensitive(true)
-                    .multi_line(true)
-                    .build()?;
-                matcher.push((None, Box::new(RegexMatcher(re))));
-            }
+            let re = RegexBuilder::new(query)
+                .case_insensitive(true)
+                .multi_line(true)
+                .build()?;
+            matcher.push((None, Box::new(RegexMatcher(re))));
         }
     }
 
     let packages = apps_dir
         .read_dir()?
-        .into_iter()
         .par_bridge()
         .filter_map(|item| {
             if let Ok(e) = item {
@@ -212,7 +209,7 @@ pub(crate) fn query_installed(
                             }
 
                             let mut bucket_path = root_path.join("buckets");
-                            bucket_path.push(&bucket);
+                            bucket_path.push(bucket);
 
                             if let Ok(origin_bucket) = Bucket::from(&bucket_path) {
                                 let origin_manifest_path = origin_bucket.path_of_manifest(name);
@@ -266,7 +263,7 @@ pub(crate) fn query_installed(
 pub(crate) fn query_synced(
     session: &Session,
     query: &str,
-    options: &Vec<QueryOption>,
+    options: &[QueryOption],
 ) -> Fallible<Vec<Package>> {
     let is_explicit_mode = options.contains(&QueryOption::Explicit);
     let is_wildcard_query = query.eq("*") || query.is_empty();
@@ -276,8 +273,8 @@ pub(crate) fn query_synced(
     let mut matcher: Vec<(Option<String>, Box<dyn Matcher + Send + Sync>)> = vec![];
 
     if !is_wildcard_query {
-        if query.contains("/") {
-            let (bucket_prefix, name) = query.split_once("/").unwrap();
+        if query.contains('/') {
+            let (bucket_prefix, name) = query.split_once('/').unwrap();
 
             if is_explicit_mode {
                 matcher.push((
@@ -291,16 +288,14 @@ pub(crate) fn query_synced(
                     .build()?;
                 matcher.push((Some(bucket_prefix.to_owned()), Box::new(RegexMatcher(re))));
             }
+        } else if is_explicit_mode {
+            matcher.push((None, Box::new(ExplicitMatcher(query))));
         } else {
-            if is_explicit_mode {
-                matcher.push((None, Box::new(ExplicitMatcher(query))));
-            } else {
-                let re = RegexBuilder::new(query)
-                    .case_insensitive(true)
-                    .multi_line(true)
-                    .build()?;
-                matcher.push((None, Box::new(RegexMatcher(re))));
-            }
+            let re = RegexBuilder::new(query)
+                .case_insensitive(true)
+                .multi_line(true)
+                .build()?;
+            matcher.push((None, Box::new(RegexMatcher(re))));
         }
     }
 

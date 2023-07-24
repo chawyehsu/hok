@@ -10,7 +10,7 @@ fn fetch_options(proxy: Option<&str>) -> FetchOptions<'static> {
     cb.credentials(
         move |url, username, cred| -> Result<git2::Cred, git2::Error> {
             let user = username.unwrap_or("git");
-            let ref cfg = git2::Config::open_default()?;
+            let cfg = &(git2::Config::open_default()?);
 
             if cred.contains(CredentialType::USERNAME) {
                 git2::Cred::username(user)
@@ -26,8 +26,8 @@ fn fetch_options(proxy: Option<&str>) -> FetchOptions<'static> {
 
     fo.remote_callbacks(cb);
 
-    if proxy.is_some() {
-        let mut proxy = proxy.unwrap().to_owned();
+    if let Some(proxy) = proxy {
+        let mut proxy = proxy.to_owned();
 
         if !(proxy.starts_with("http") || proxy.starts_with("socks")) {
             proxy.insert_str(0, "http://");

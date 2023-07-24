@@ -349,7 +349,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Vectorized<T> {
                 }
                 T::deserialize(serde_json::Value::Object(remap))
                     .map(|val| vec![val])
-                    .map_err(|e| de::Error::custom(e))
+                    .map_err(de::Error::custom)
             }
         }
 
@@ -413,7 +413,7 @@ impl<'de> Deserialize<'de> for License {
                         "url" => url = Some(value),
                         _ => {
                             // skip invalid fields
-                            let _ = map.next_value()?;
+                            map.next_value()?;
                             continue;
                         }
                     }
@@ -423,7 +423,7 @@ impl<'de> Deserialize<'de> for License {
             }
         }
 
-        Ok(deserializer.deserialize_any(LicenseVisitor)?)
+        deserializer.deserialize_any(LicenseVisitor)
     }
 }
 
@@ -445,7 +445,7 @@ impl<'de> Deserialize<'de> for Sourceforge {
             where
                 E: de::Error,
             {
-                let (project, path) = match s.split_once("/") {
+                let (project, path) = match s.split_once('/') {
                     Some((a, b)) => (Some(a.to_owned()), b.to_owned()),
                     None => (None, s.to_owned()),
                 };
@@ -465,7 +465,7 @@ impl<'de> Deserialize<'de> for Sourceforge {
                         "path" => path = Ok(value),
                         _ => {
                             // skip invalid fields
-                            let _ = map.next_value()?;
+                            map.next_value()?;
                             continue;
                         }
                     }
@@ -478,7 +478,7 @@ impl<'de> Deserialize<'de> for Sourceforge {
             }
         }
 
-        Ok(deserializer.deserialize_any(SourceforgeVisitor)?)
+        deserializer.deserialize_any(SourceforgeVisitor)
     }
 }
 
@@ -549,7 +549,7 @@ impl<'de> Deserialize<'de> for Checkver {
                         "sourceforge" => sourceforge = Some(map.next_value()?),
                         _ => {
                             // skip invalid fields
-                            let _ = map.next_value()?;
+                            map.next_value()?;
                             continue;
                         }
                     }
@@ -569,7 +569,7 @@ impl<'de> Deserialize<'de> for Checkver {
             }
         }
 
-        Ok(deserializer.deserialize_any(CheckverVisitor)?)
+        deserializer.deserialize_any(CheckverVisitor)
     }
 }
 
@@ -583,9 +583,9 @@ where
     if let Some(hashes) = Option::<Vectorized<String>>::deserialize(deserializer)? {
         // validate hashes
         for hash in hashes.0.iter().map(|s| s.as_str()) {
-            if !REGEX_HASH.is_match(&hash) {
+            if !REGEX_HASH.is_match(hash) {
                 return Err(de::Error::invalid_value(
-                    de::Unexpected::Str(&hash),
+                    de::Unexpected::Str(hash),
                     &"a valid hash string",
                 ));
             }
@@ -754,9 +754,7 @@ impl Manifest {
 
     pub fn supported_arch(&self) -> Vec<String> {
         let mut ret = vec![];
-        let arch = self.architecture();
-        if arch.is_some() {
-            let arch = arch.unwrap();
+        if let Some(arch) = self.architecture() {
             if arch.ia32.is_some() {
                 ret.push("ia32".to_string());
             }
@@ -969,7 +967,7 @@ impl Installer {
 
     #[inline]
     pub fn file(&self) -> Option<&str> {
-        self.file.as_ref().map(|s| s.as_str())
+        self.file.as_deref()
     }
 
     #[inline]
@@ -991,7 +989,7 @@ impl Uninstaller {
 
     #[inline]
     pub fn file(&self) -> Option<&str> {
-        self.file.as_ref().map(|s| s.as_str())
+        self.file.as_deref()
     }
 
     #[inline]

@@ -30,7 +30,7 @@ pub fn cmd_cat(matches: &ArgMatches, session: &Session) -> Result<()> {
                 let mut child = Command::new("cmd")
                     .arg("/C")
                     .arg(cat)
-                    .arg(&package.manfest_path())
+                    .arg(package.manfest_path())
                     .args(cat_args)
                     .spawn()?;
                 child.wait()?;
@@ -56,7 +56,7 @@ pub fn cmd_cat(matches: &ArgMatches, session: &Session) -> Result<()> {
 /// Check if a given executable is available on the system
 fn is_program_available(exe: &str) -> bool {
     if let Ok(path) = std::env::var("PATH") {
-        for p in path.split(";") {
+        for p in path.split(';') {
             let path = Path::new(p).join(exe);
             if std::fs::metadata(path).is_ok() {
                 return true;

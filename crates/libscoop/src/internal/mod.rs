@@ -27,7 +27,7 @@ pub fn os_is_arch64() -> bool {
 /// Check if a given executable is available on the system.
 pub fn is_program_available(exe: &str) -> bool {
     if let Ok(path) = std::env::var("PATH") {
-        for p in path.split(";") {
+        for p in path.split(';') {
             let path = Path::new(p).join(exe);
             if std::fs::metadata(path).is_ok() {
                 return true;
@@ -51,46 +51,41 @@ pub fn compare_versions<S: AsRef<str>>(ver_a: S, ver_b: S) -> std::cmp::Ordering
     //     ver_a_parsed, ver_b_parsed
     // );
 
-    loop {
-        match ver_a_parsed.next() {
-            Some(a_part) => {
-                match ver_b_parsed.next() {
-                    Some(b_part) => {
-                        if a_part.parse::<u32>().is_ok() {
-                            if b_part.parse::<u32>().is_ok() {
-                                let a_part_num = a_part.parse::<u32>().unwrap();
-                                let b_part_num = b_part.parse::<u32>().unwrap();
+    for a_part in ver_a_parsed {
+        match ver_b_parsed.next() {
+            Some(b_part) => {
+                if a_part.parse::<u32>().is_ok() {
+                    if b_part.parse::<u32>().is_ok() {
+                        let a_part_num = a_part.parse::<u32>().unwrap();
+                        let b_part_num = b_part.parse::<u32>().unwrap();
 
-                                match a_part_num {
-                                    n if n < b_part_num => return std::cmp::Ordering::Less,
-                                    n if n > b_part_num => return std::cmp::Ordering::Greater,
-                                    _ => continue,
-                                }
-                            }
-
-                            // I guess this should be ok for cases like: 1.2.0 vs. 1.2-rc4
-                            // num to text comparsion is an interesting branch.
-                            return std::cmp::Ordering::Greater;
+                        match a_part_num {
+                            n if n < b_part_num => return std::cmp::Ordering::Less,
+                            n if n > b_part_num => return std::cmp::Ordering::Greater,
+                            _ => continue,
                         }
-
-                        // FIXME: text to text comparsion is the hardest part,
-                        // I just return `Ordering::Equal` currently...
                     }
-                    None => {
-                        if a_part.parse::<u32>().is_ok() {
-                            let a_part_num = a_part.parse::<u32>().unwrap();
-                            if 0 == a_part_num {
-                                continue;
-                            }
-                        } else {
-                            return std::cmp::Ordering::Less;
-                        }
 
-                        return std::cmp::Ordering::Greater;
-                    }
+                    // I guess this should be ok for cases like: 1.2.0 vs. 1.2-rc4
+                    // num to text comparsion is an interesting branch.
+                    return std::cmp::Ordering::Greater;
                 }
+
+                // FIXME: text to text comparsion is the hardest part,
+                // I just return `Ordering::Equal` currently...
             }
-            None => break,
+            None => {
+                if a_part.parse::<u32>().is_ok() {
+                    let a_part_num = a_part.parse::<u32>().unwrap();
+                    if 0 == a_part_num {
+                        continue;
+                    }
+                } else {
+                    return std::cmp::Ordering::Less;
+                }
+
+                return std::cmp::Ordering::Greater;
+            }
         }
     }
 
@@ -108,13 +103,18 @@ pub fn extract_name_and_bucket(path: &Path) -> Fallible<(String, String)> {
         Some(caps) => {
             let name = caps.name("name").map(|m| m.as_str().to_string());
             let bucket = caps.name("bucket").map(|m| m.as_str().to_string());
-            if name.is_some() && bucket.is_some() {
-                return Ok((name.unwrap(), bucket.unwrap()));
+            if let Some(name) = name {
+                if let Some(bucket) = bucket {
+                    return Ok((name, bucket));
+                }
             }
         }
     }
 
-    Err(Error::Custom(format!("unsupported manifest path {}", path.display())).into())
+    Err(Error::Custom(format!(
+        "unsupported manifest path {}",
+        path.display()
+    )))
 }
 
 /// Normalize a path, removing things like `.` and `..`.

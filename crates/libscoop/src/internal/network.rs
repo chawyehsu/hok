@@ -5,8 +5,8 @@ pub fn get_content_length(url: &str, proxy: Option<&str>) -> Option<f64> {
     let mut easy = Easy::new();
     easy.get(true).unwrap();
     easy.url(url).unwrap();
-    if proxy.is_some() {
-        easy.proxy(proxy.unwrap()).unwrap();
+    if let Some(proxy) = proxy {
+        easy.proxy(proxy).unwrap();
     }
     easy.nobody(true).unwrap();
     easy.follow_location(true).unwrap();

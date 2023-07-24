@@ -52,6 +52,12 @@ impl EventBus {
     }
 }
 
+impl Default for EventBus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Event that may be emitted during the execution of operations.
 #[derive(Debug, Clone)]
 #[non_exhaustive]

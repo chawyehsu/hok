@@ -1,7 +1,7 @@
 use clap::{crate_description, crate_name, crate_version, Arg, ArgAction, Command};
 
 pub fn build() -> Command {
-    let app = Command::new(crate_name!())
+    Command::new(crate_name!())
         .version(crate_version!())
         .about(crate_description!())
         .after_help(format!(
@@ -271,7 +271,7 @@ pub fn build() -> Command {
                         .short('e')
                         .long("explicit")
                         .action(ArgAction::SetTrue)
-                        .conflicts_with_all(&["with-description", "with-binary"]),
+                        .conflicts_with_all(["with-description", "with-binary"]),
                 )
                 .arg(
                     Arg::new("with-binary")
@@ -317,7 +317,5 @@ pub fn build() -> Command {
             Command::new("upgrade")
                 .about("Upgrade installed package(s)")
                 .arg(Arg::new("package").help("Specified package(s) to be upgraded")),
-        );
-
-    app
+        )
 }

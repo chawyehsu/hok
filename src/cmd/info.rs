@@ -40,7 +40,7 @@ pub fn cmd_info(matches: &ArgMatches, session: &Session) -> Result<()> {
                     );
 
                     if idx != (length - 1) {
-                        println!("");
+                        println!();
                     }
                 }
             }

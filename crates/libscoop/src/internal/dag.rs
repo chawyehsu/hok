@@ -147,7 +147,7 @@ where
             .filter(|(_, deps)| deps.len() == 0)
             .map(|(node, _)| node)
             .next()
-            .map(|node| node.clone());
+            .cloned();
         if node.is_some() {
             Self::__unregister(&mut self.nodes, node.as_ref().unwrap());
         }
@@ -169,9 +169,9 @@ where
     /// graph.
     pub fn check(&self) -> Result<()> {
         let mut nodes = self.nodes.clone();
-        while nodes.len() > 0 {
+        while !nodes.is_empty() {
             let step = Self::__step(&mut nodes);
-            if step.len() == 0 {
+            if step.is_empty() {
                 return Err(CyclicError::from(&nodes));
             }
         }
@@ -182,9 +182,9 @@ where
     /// be returned when cyclic dependency is detected.
     pub fn walk(&mut self) -> Result<Vec<Vec<T>>> {
         let mut res = vec![];
-        while self.nodes.len() > 0 {
+        while !self.nodes.is_empty() {
             let step = self.step();
-            if step.len() == 0 {
+            if step.is_empty() {
                 return Err(CyclicError::from(&self.nodes));
             }
             res.push(step);
@@ -216,17 +216,17 @@ where
     #[inline]
     fn __register(nodes: &mut Nodes<T>, node: T, dep_node: Option<T>) {
         // register node
-        match nodes.entry(node.clone()) {
+        match nodes.entry(node) {
             Entry::Vacant(e) => {
                 let mut dep = Dependencies::new();
                 if let Some(dep_node) = &dep_node {
-                    drop(dep.insert(dep_node.clone()));
+                    dep.insert(dep_node.clone());
                 }
-                drop(e.insert(dep));
+                e.insert(dep);
             }
             Entry::Occupied(e) => {
                 if let Some(dep_node) = &dep_node {
-                    drop(e.into_mut().insert(dep_node.clone()));
+                    e.into_mut().insert(dep_node.clone());
                 }
             }
         }
@@ -234,7 +234,7 @@ where
         if let Some(dep_node) = dep_node {
             match nodes.entry(dep_node) {
                 Entry::Vacant(e) => {
-                    drop(e.insert(Dependencies::new()));
+                    e.insert(Dependencies::new());
                 }
                 Entry::Occupied(_) => {
                     // no-op
@@ -245,9 +245,9 @@ where
 
     #[inline]
     fn __unregister(nodes: &mut Nodes<T>, node: &T) {
-        drop(nodes.remove(node));
+        nodes.remove(node);
         nodes.iter_mut().for_each(|(_, deps)| {
-            drop(deps.remove(node));
+            deps.remove(node);
         });
     }
 }

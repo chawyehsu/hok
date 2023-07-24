@@ -13,7 +13,7 @@ impl CacheFile {
     pub fn from(path: PathBuf) -> Fallible<CacheFile> {
         let text = path.file_name().unwrap().to_str().unwrap();
         match REGEX_CACHE_FILE.is_match(text) {
-            false => Err(Error::InvalidCacheFile { path }.into()),
+            false => Err(Error::InvalidCacheFile { path }),
             true => Ok(CacheFile { path }),
         }
     }
@@ -27,19 +27,19 @@ impl CacheFile {
     /// Get file name of this cache file
     #[inline]
     pub fn file_name(&self) -> &str {
-        &self.path.file_name().unwrap().to_str().unwrap()
+        self.path.file_name().unwrap().to_str().unwrap()
     }
 
     /// Get package name of this cache file
     #[inline]
     pub fn package_name(&self) -> &str {
-        self.file_name().split_once("#").map(|s| s.0).unwrap()
+        self.file_name().split_once('#').map(|s| s.0).unwrap()
     }
 
     /// Get version of this cache file
     #[inline]
     pub fn version(&self) -> &str {
-        self.file_name().splitn(3, "#").collect::<Vec<_>>()[1]
+        self.file_name().splitn(3, '#').collect::<Vec<_>>()[1]
     }
 
     /// Get the tmp path of this cache file
