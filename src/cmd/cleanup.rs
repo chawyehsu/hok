@@ -12,7 +12,7 @@ use sysinfo::{ProcessExt, System, SystemExt};
 use crate::Result;
 
 pub fn cmd_cleanup(matches: &ArgMatches, session: &Session) -> Result<()> {
-    let config = session.get_config();
+    let config = session.config();
     let apps_path = config.root_path.join("apps");
     // let running_apps = running_apps(&apps_path);
 

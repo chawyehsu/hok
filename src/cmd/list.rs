@@ -1,30 +1,32 @@
 use clap::ArgMatches;
 use crossterm::style::Stylize;
-use libscoop::{operation, Session};
+use libscoop::{operation, QueryOption, Session};
 
 use crate::Result;
 
 pub fn cmd_list(matches: &ArgMatches, session: &Session) -> Result<()> {
-    let query = matches
-        .get_many::<String>("package")
-        .map(|v| v.map(|s| s.to_owned()).collect::<Vec<_>>())
+    let queries = matches
+        .get_many::<String>("query")
         .unwrap_or_default()
-        .join(" ");
-    let flag_upgradable = matches.get_flag("upgradable");
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>();
+    let mut options = vec![];
 
-    match operation::package_list(session, &query, flag_upgradable) {
+    if matches.get_flag("explicit") {
+        options.push(QueryOption::Explicit);
+    }
+
+    if matches.get_flag("upgradable") {
+        options.push(QueryOption::Upgradable);
+    }
+
+    match operation::package_query(session, queries, options, true) {
         Err(e) => Err(e.into()),
         Ok(packages) => {
             for pkg in packages {
                 let mut output = String::new();
                 output.push_str(
-                    format!(
-                        "{}/{} {}",
-                        pkg.name,
-                        pkg.bucket.as_str().green(),
-                        pkg.version()
-                    )
-                    .as_str(),
+                    format!("{}/{} {}", pkg.name(), pkg.bucket().green(), pkg.version()).as_str(),
                 );
 
                 let held = pkg.is_held();

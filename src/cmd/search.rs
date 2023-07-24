@@ -8,32 +8,30 @@ pub fn cmd_search(matches: &ArgMatches, session: &Session) -> Result<()> {
     if let Some(queries) = matches.get_many::<String>("query") {
         let queries = queries.map(|s| s.as_str()).collect::<Vec<_>>();
         let mut options = vec![];
+        let with_binary = matches.get_flag("with-binary");
+        let with_description = matches.get_flag("with-description");
 
-        if matches.get_flag("with-binary") {
+        if with_binary {
             options.push(QueryOption::Binary);
         }
 
-        if matches.get_flag("with-description") {
+        if with_description {
             options.push(QueryOption::Description);
         }
 
-        // Sort the results by name.
-        let mut packages = operation::package_search(session, queries, options.clone())?;
-        packages.sort_by_key(|pkg| pkg.name.clone());
+        if matches.get_flag("explicit") {
+            options.push(QueryOption::Explicit);
+        }
+
+        let packages = operation::package_query(session, queries, options, false)?;
 
         for pkg in packages {
             let mut output = String::new();
             output.push_str(
-                format!(
-                    "{}/{} {}",
-                    pkg.name,
-                    pkg.bucket.as_str().green(),
-                    pkg.version()
-                )
-                .as_str(),
+                format!("{}/{} {}", pkg.name(), pkg.bucket().green(), pkg.version()).as_str(),
             );
 
-            if pkg.installed() {
+            if pkg.is_strictly_installed() {
                 let manifest_version = pkg.version();
                 let installed_version = pkg.installed_version().unwrap();
                 if manifest_version != installed_version {
@@ -48,12 +46,12 @@ pub fn cmd_search(matches: &ArgMatches, session: &Session) -> Result<()> {
                 }
             }
 
-            if options.contains(&QueryOption::Description) {
+            if with_description {
                 let description = pkg.description().unwrap_or("<no description>");
                 output.push_str(format!("\n  {}", description).as_str());
             }
 
-            if options.contains(&QueryOption::Binary) {
+            if with_binary {
                 let shims = match pkg.shims() {
                     None => "<no shims>".to_owned(),
                     Some(shims) => shims.join(","),

@@ -1,9 +1,5 @@
 use crossterm::{cursor, style::Stylize, ExecutableCommand};
-use libscoop::{
-    operation,
-    tokio::{self, sync::mpsc::UnboundedReceiver},
-    Event, Session,
-};
+use libscoop::{operation, Event, Session};
 use std::{
     cmp::Ordering,
     io::{stdout, Write},
@@ -11,15 +7,29 @@ use std::{
 
 use crate::Result;
 
-pub fn cmd_update(
-    _: &clap::ArgMatches,
-    session: &Session,
-    rx: UnboundedReceiver<Event>,
-) -> Result<()> {
+pub fn cmd_update(_: &clap::ArgMatches, session: &Session) -> Result<()> {
     let mut stdout = std::io::stdout();
     println!("Updating buckets");
     let _ = stdout.execute(cursor::Hide);
-    let handle = std::thread::spawn(move || event_handler(rx));
+    let rx = session.event_bus().receiver();
+    let handle = std::thread::spawn(move || {
+        let mut ctx = Context::new();
+
+        while let Ok(event) = rx.recv() {
+            match event {
+                Event::BucketUpdateStarted(name) => ctx.add(&name),
+                Event::BucketUpdateSuccessed(name) => ctx.succeed(&name),
+                Event::BucketUpdateFailed(c) => ctx.fail(&c.name),
+                Event::BucketUpdateFinished => break,
+                _ => {}
+            }
+        }
+
+        // move cursor to the end
+        let mut stdout = std::io::stdout();
+        let step = (ctx.data.len() - ctx.cursor) as u16;
+        let _ = stdout.execute(cursor::MoveToNextLine(step)).unwrap();
+    });
     operation::bucket_update(session)?;
     handle.join().unwrap();
     let _ = stdout.execute(cursor::Show);
@@ -107,24 +117,4 @@ impl Context {
 
         std::io::stdout().flush().unwrap();
     }
-}
-
-#[tokio::main]
-async fn event_handler(mut rx: UnboundedReceiver<Event>) {
-    let mut ctx = Context::new();
-
-    while let Some(event) = rx.recv().await {
-        match event {
-            Event::BucketUpdateStarted(name) => ctx.add(&name),
-            Event::BucketUpdateSuccessed(name) => ctx.succeed(&name),
-            Event::BucketUpdateFailed(c) => ctx.fail(&c.name),
-            Event::BucketUpdateFinished => break,
-            _ => {}
-        }
-    }
-
-    // move cursor to the end
-    let mut stdout = stdout();
-    let step = (ctx.data.len() - ctx.cursor) as u16;
-    let _ = stdout.execute(cursor::MoveToNextLine(step)).unwrap();
 }

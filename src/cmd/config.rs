@@ -9,7 +9,7 @@ pub fn cmd_config(matches: &ArgMatches, session: &Session) -> Result<()> {
         Some(("edit", _)) => {
             let editor = std::env::var("EDITOR").unwrap_or_else(|_| "notepad".to_string());
             let mut child = Command::new(editor.as_str())
-                .arg(&session.get_config().config_path)
+                .arg(&session.config().config_path)
                 .spawn()?;
             child.wait()?;
             Ok(())

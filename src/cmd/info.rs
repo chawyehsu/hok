@@ -7,19 +7,19 @@ pub fn cmd_info(matches: &ArgMatches, session: &Session) -> Result<()> {
     if let Some(query) = matches.get_one::<String>("package") {
         let queries = vec![query.as_str()];
         let options = vec![];
-        let packages = operation::package_search(session, queries, options)?;
+        let packages = operation::package_query(session, queries, options, false)?;
         let length = packages.len();
         match length {
-            0 => eprintln!("Could not find package named '{}'.", query),
+            0 => eprintln!("Could not find package for query '{}'.", query),
             _ => {
                 println!("Found {} package(s) for query '{}':", length, query);
                 for (idx, pkg) in packages.iter().enumerate() {
                     // Ident
                     // println!("Identity: {}/{}", pkg.bucket, pkg.name);
                     // Name
-                    println!("Name: {}", pkg.name);
+                    println!("Name: {}", pkg.name());
                     // Bucket
-                    println!("Bucket: {}", pkg.bucket);
+                    println!("Bucket: {}", pkg.bucket());
                     // Description
                     println!(
                         "Description: {}",

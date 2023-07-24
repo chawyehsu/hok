@@ -173,10 +173,11 @@ pub fn build() -> Command {
         .subcommand(
             Command::new("install")
                 .about("Install package(s)")
+                .alias("i")
                 .arg_required_else_help(true)
                 .arg(
                     Arg::new("package")
-                        .help("The package(s) to be installed")
+                        .help("The package(s) to install")
                         .required(true)
                         .action(ArgAction::Append),
                 )
@@ -188,31 +189,30 @@ pub fn build() -> Command {
                 // )
                 .arg(
                     Arg::new("download-only")
-                        .help("Download packages without performing installation")
+                        .help("Download package(s) without performing installation")
                         .short('D')
                         .long("download-only")
                         .action(ArgAction::SetTrue),
+                ) // .arg(
+                //     Arg::new("ignore-broken")
+                //         .long_help(
+                //             "Ignore broken packages while performing installation.\n\
+                //             By default, install will be interrupted when a package \
+                //             fails during the install workflow, including download \
+                //             errors, hash mismatch, scripting errors. Turning this \
+                //             option on will ignore failures and ensure a complete install transaction.",
+                //         )
+                //         .short('e')
+                //         .long("ignore-broken")
+                //         .action(ArgAction::SetTrue)
+                // )
+                .arg(
+                    Arg::new("ignore-cache")
+                        .help("Ignore cache and yet perform download")
+                        .short('F')
+                        .long("ignore-cache")
+                        .action(ArgAction::SetTrue),
                 ), // .arg(
-                   //     Arg::new("ignore-broken")
-                   //         .long_help(
-                   //             "Ignore broken packages while performing installation.\n\
-                   //             By default, install will be interrupted when a package \
-                   //             fails during the install workflow, including download \
-                   //             errors, hash mismatch, scripting errors. Turning this \
-                   //             option on will ignore failures and ensure a complete install transaction.",
-                   //         )
-                   //         .short('e')
-                   //         .long("ignore-broken")
-                   //         .action(ArgAction::SetTrue)
-                   // )
-                   // .arg(
-                   //     Arg::new("ignore-cache")
-                   //         .help("Perform a fresh download despite local caches")
-                   //         .short('F')
-                   //         .long("ignore-cache")
-                   //         .action(ArgAction::SetTrue)
-                   // )
-                   // .arg(
                    //     Arg::new("no-hash-check")
                    //         .help("Skip package integrity check, USE WITH CAUTION!")
                    //         .long("no-hash-check")
@@ -222,9 +222,18 @@ pub fn build() -> Command {
         .subcommand(
             Command::new("list")
                 .about("List installed package(s)")
-                .arg(Arg::new("package").help(
-                    "Specify package(s) to be listed, bucket prefix can be used to narrow results",
-                ))
+                .arg(
+                    Arg::new("query")
+                        .help("The query string (regex supported by default)")
+                        .action(ArgAction::Append),
+                )
+                .arg(
+                    Arg::new("explicit")
+                        .help("Turn regex off and use explicit matching")
+                        .short('e')
+                        .long("explicit")
+                        .action(ArgAction::SetTrue),
+                )
                 .arg(
                     Arg::new("upgradable")
                         .help("List upgradable package(s)")
@@ -252,9 +261,17 @@ pub fn build() -> Command {
                 .arg_required_else_help(true)
                 .arg(
                     Arg::new("query")
-                        .help("The query string")
+                        .help("The query string (regex supported by default)")
                         .required(true)
                         .action(ArgAction::Append),
+                )
+                .arg(
+                    Arg::new("explicit")
+                        .help("Turn regex off and use explicit matching")
+                        .short('e')
+                        .long("explicit")
+                        .action(ArgAction::SetTrue)
+                        .conflicts_with_all(&["with-description", "with-binary"]),
                 )
                 .arg(
                     Arg::new("with-binary")
@@ -278,6 +295,19 @@ pub fn build() -> Command {
                 .arg(
                     Arg::new("package")
                         .help("The package(s) to be unheld")
+                        .required(true)
+                        .action(ArgAction::Append),
+                ),
+        )
+        .subcommand(
+            Command::new("uninstall")
+                .about("Uninstall package(s)")
+                .alias("rm")
+                .alias("remove")
+                .arg_required_else_help(true)
+                .arg(
+                    Arg::new("package")
+                        .help("The package(s) to uninstall")
                         .required(true)
                         .action(ArgAction::Append),
                 ),
