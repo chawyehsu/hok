@@ -10,6 +10,7 @@ mod install;
 mod list;
 mod search;
 mod unhold;
+mod uninstall;
 mod update;
 mod upgrade;
 
@@ -25,5 +26,6 @@ pub(super) use install::cmd_install;
 pub(super) use list::cmd_list;
 pub(super) use search::cmd_search;
 pub(super) use unhold::cmd_unhold;
+pub(super) use uninstall::cmd_uninstall;
 pub(super) use update::cmd_update;
 pub(super) use upgrade::cmd_upgrade;
