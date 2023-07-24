@@ -5,10 +5,11 @@
 [![cicd][cicd-badge]][cicd]
 [![release][release-badge]][releases]
 [![license][license-badge]](LICENSE)
+[![downloads][downloads-badge]][releases]
 
 ## Install
 
-🚧 **CAVEAT**: Under heavy development. Interfaces may change without notice, do NOT use it for production!
+🚧 **CAVEAT**: Under heavy development, interfaces may change without notice.
 
 Assuming you have the original Scoop installed, simply run:
 
@@ -28,21 +29,22 @@ Hok is a CLI implementation of Scoop in Rust
 Usage: hok.exe <COMMAND>
 
 Commands:
-  bucket   Manage manifest buckets
-  cache    List or remove download caches
-  cat      Display manifest content of a package
-  cleanup  Cleanup apps by removing old versions
-  config   Configuration manipulations
-  hold     Hold package(s) to disable updates
-  home     Open the homepage of given package
-  info     Display information about a package
-  install  Install package(s)
-  list     List installed package(s)
-  search   Search available package(s)
-  unhold   Unhold package(s) to enable updates
-  update   Fetch and update all buckets
-  upgrade  Upgrade installed package(s)
-  help     Print this message or the help of the given subcommand(s)
+  bucket     Manage manifest buckets
+  cache      List or remove download caches
+  cat        Display manifest content of a package
+  cleanup    Cleanup apps by removing old versions
+  config     Configuration manipulations
+  hold       Hold package(s) to disable updates
+  home       Open the homepage of given package
+  info       Display information about a package
+  install    Install package(s)
+  list       List installed package(s)
+  search     Search available package(s)
+  unhold     Unhold package(s) to enable updates
+  uninstall  Uninstall package(s)
+  update     Fetch and update all buckets
+  upgrade    Upgrade installed package(s)
+  help       Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help     Print help
@@ -81,3 +83,4 @@ For licenses of sub crates, see [COPYING](COPYING).
 [release-badge]: https://img.shields.io/github/v/release/chawyehsu/hok
 [releases]: https://github.com/chawyehsu/hok/releases/latest
 [license-badge]: https://img.shields.io/github/license/chawyehsu/hok
+[downloads-badge]: https://img.shields.io/github/downloads/chawyehsu/hok/total

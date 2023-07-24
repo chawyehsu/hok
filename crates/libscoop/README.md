@@ -2,17 +2,23 @@
 
 [![crates-svg]][crates-url]
 [![docs-svg]][docs-url]
+[![crates-license-svg]][crates-url]
+[![crates-download-svg]][crates-url]
 
 [crates-svg]: https://img.shields.io/crates/v/libscoop.svg
 [crates-url]: https://crates.io/crates/libscoop
 [docs-svg]: https://docs.rs/libscoop/badge.svg
 [docs-url]: https://docs.rs/libscoop
+[crates-license-svg]: https://img.shields.io/crates/l/libscoop
+[crates-download-svg]: https://img.shields.io/crates/d/libscoop.svg
 
 > Rust library implementation of Scoop
 
 This crate provides manipulation of [Scoop](https://scoop.sh/) from Rust.
 
 ## Install
+
+🚧 **CAVEAT**: Under heavy development, interfaces may change without notice.
 
 ```toml
 [dependencies]
