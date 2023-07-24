@@ -46,6 +46,6 @@ pub mod operation;
 
 pub use error::Error;
 pub use event::Event;
-pub use package::QueryOption;
+pub use package::{QueryOption, SyncOption};
 pub use session::Session;
 pub use tokio;

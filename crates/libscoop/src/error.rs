@@ -22,19 +22,16 @@ pub enum Error {
     #[error("bare bucket '{0}' is no longer supported")]
     BareBucketFound(String),
 
+    /// A custom error.
     #[error("{0}")]
     Custom(String),
 
-    /// Thrown when there was an [I/O error][1] opening the config file
-    ///
-    /// [1]: std::io::Error
-    #[error("error")]
-    ReadConfigError(PathBuf),
-    /// Thrown when there was an [serde_json error][1] parsing the config file
-    ///
-    /// [1]: serde_json::Error
-    #[error("error")]
-    ParseConfigError(PathBuf),
+    #[error("Could not alter config because it is in use.")]
+    ConfigInUse,
+
+    /// Thrown when trying to set the user agent twice.
+    #[error("User agent already set")]
+    UserAgentAlreadySet,
 
     #[error("error")]
     HashMismatch,
@@ -51,15 +48,10 @@ pub enum Error {
     #[error("error")]
     InvalidHashValue(String),
 
-    // /// Thrown when multiple package records are found for a given query.
-    // /// This is useful when a single record for a query is needed.
-    // #[error("multiple records found for queries: {0}", records.iter().map(|r| r.0.as_str()).collect::<Vec<_>>().join(" "))]
-    // PackageMultipleRecordsFound {
-    //     records: Vec<(String, Vec<Package>)>,
-    // },
-    /// Thrown when no package is found for a given query.
-    #[error("could not find package(s): {0}", queries.join(" "))]
-    PackageNotFound { queries: Vec<String> },
+    /// Package not found error, this may occur when doing an explicit lookup
+    /// for a package and no record with the given query was found.
+    #[error("Could not find package named '{0}'")]
+    PackageNotFound(String),
 
     /// Thrown when trying to perform (un)hold operation on a package that is
     /// not installed.
@@ -82,10 +74,6 @@ pub enum Error {
     /// I/O error
     #[error(transparent)]
     Io(#[from] std::io::Error),
-
-    /// Network error
-    #[error(transparent)]
-    Network(#[from] ureq::Error),
 
     /// Regular expression error
     #[error(transparent)]

@@ -1,7 +1,6 @@
 use log::debug;
 use rayon::prelude::{ParallelBridge, ParallelIterator};
 use regex::{Regex, RegexBuilder};
-use std::{collections::HashSet, vec};
 
 use crate::{
     bucket::Bucket,
@@ -11,42 +10,95 @@ use crate::{
     Session,
 };
 
-use super::{InstallState, InstallStateInstalled, Package, QueryOption};
+use super::{InstallState, InstallStateInstalled, Package};
+
+/// Options that may be used to query Scoop packages.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum QueryOption {
+    /// Enable query through package binaries.
+    Binary,
+
+    /// Enable query through package description.
+    Description,
+
+    /// Explicit mode. Regex is disabled in this mode.
+    ///
+    /// Query will be performed through the package name only. `Description`
+    /// and `Binary` options will be ignored.
+    Explicit,
+
+    /// Additionally check if the matched package is upgradable.
+    ///
+    /// This option only takes effect on querying installed packages.
+    Upgradable,
+}
+
+/// A trait represents a matcher that can be used to do string matching.
+trait Matcher {
+    fn is_match(&self, s: &str) -> bool;
+}
+
+/// A matcher that does explicit match.
+struct ExplicitMatcher<'a>(&'a str);
+
+/// A matcher that does regex match.
+struct RegexMatcher(Regex);
+
+impl Matcher for ExplicitMatcher<'_> {
+    fn is_match(&self, s: &str) -> bool {
+        self.0 == s
+    }
+}
+
+impl Matcher for RegexMatcher {
+    fn is_match(&self, s: &str) -> bool {
+        self.0.is_match(s)
+    }
+}
 
 pub(crate) fn query_installed(
     session: &Session,
-    queries: HashSet<&str>,
-    options: Vec<QueryOption>,
+    query: &str,
+    options: &Vec<QueryOption>,
 ) -> Fallible<Vec<Package>> {
-    let root_path = session.get_config().root_path.clone();
-    let is_wildcard_query = queries.contains("*") || queries.is_empty();
+    let is_explicit_mode = options.contains(&QueryOption::Explicit);
+    let is_wildcard_query = query.eq("*") || query.is_empty();
+    let root_path = session.config().root_path.clone();
     let apps_dir = root_path.join("apps");
-    // build regex queries
-    let mut regex_queries: Vec<(Option<String>, Regex)> = vec![];
+    // build matchers
+    let mut matcher: Vec<(Option<String>, Box<dyn Matcher + Send + Sync>)> = vec![];
 
     if !is_wildcard_query {
-        for q in queries.into_iter() {
-            match q.contains("/") {
-                false => {
-                    let re = RegexBuilder::new(q)
-                        .case_insensitive(true)
-                        .multi_line(true)
-                        .build()?;
-                    regex_queries.push((None, re));
-                }
-                true => {
-                    let (bucket_prefix, name) = q.split_once("/").unwrap();
-                    let re = RegexBuilder::new(name)
-                        .case_insensitive(true)
-                        .multi_line(true)
-                        .build()?;
-                    regex_queries.push((Some(bucket_prefix.to_owned()), re));
-                }
+        if query.contains("/") {
+            let (bucket_prefix, name) = query.split_once("/").unwrap();
+
+            if is_explicit_mode {
+                matcher.push((
+                    Some(bucket_prefix.to_owned()),
+                    Box::new(ExplicitMatcher(name)),
+                ));
+            } else {
+                let re = RegexBuilder::new(name)
+                    .case_insensitive(true)
+                    .multi_line(true)
+                    .build()?;
+                matcher.push((Some(bucket_prefix.to_owned()), Box::new(RegexMatcher(re))));
+            }
+        } else {
+            if is_explicit_mode {
+                matcher.push((None, Box::new(ExplicitMatcher(query))));
+            } else {
+                let re = RegexBuilder::new(query)
+                    .case_insensitive(true)
+                    .multi_line(true)
+                    .build()?;
+                matcher.push((None, Box::new(RegexMatcher(re))));
             }
         }
     }
 
-    let mut packages = apps_dir
+    let packages = apps_dir
         .read_dir()?
         .into_iter()
         .par_bridge()
@@ -71,7 +123,12 @@ pub(crate) fn query_installed(
                 // time by avoiding parsing manifest and install info files.
                 let extra_query = options.contains(&QueryOption::Binary)
                     || options.contains(&QueryOption::Description);
-                let name_matched = regex_queries.iter().any(|(_, re)| re.is_match(name));
+                let name_matched = if is_wildcard_query {
+                    // name is always matched for wildcard query
+                    true
+                } else {
+                    matcher.iter().any(|(_, m)| m.is_match(name))
+                };
 
                 if !is_wildcard_query && !extra_query && !name_matched {
                     return None;
@@ -90,9 +147,9 @@ pub(crate) fn query_installed(
                         if is_wildcard_query {
                             unmatched = false;
                         } else {
-                            let prefixed_name_matched = regex_queries
+                            let prefixed_name_matched = matcher
                                 .iter()
-                                .filter(|&(_, re)| re.is_match(name))
+                                .filter(|&(_, m)| m.is_match(name))
                                 .any(|(prefix, _)| {
                                     prefix.is_none() || prefix.as_deref().unwrap() == bucket
                                 });
@@ -101,12 +158,11 @@ pub(crate) fn query_installed(
                                 unmatched = false;
                             }
 
-                            if unmatched {
+                            if unmatched && !is_explicit_mode {
                                 if options.contains(&QueryOption::Description) {
                                     let description = manifest.description().unwrap_or_default();
-                                    let description_matched = regex_queries
-                                        .iter()
-                                        .any(|(_, re)| re.is_match(description));
+                                    let description_matched =
+                                        matcher.iter().any(|(_, m)| m.is_match(description));
                                     if description_matched {
                                         unmatched = false;
                                     }
@@ -114,9 +170,9 @@ pub(crate) fn query_installed(
 
                                 if options.contains(&QueryOption::Binary) {
                                     let binaries = manifest.executables().unwrap_or_default();
-                                    let binary_matched = regex_queries
+                                    let binary_matched = matcher
                                         .iter()
-                                        .any(|(_, re)| binaries.iter().any(|&b| re.is_match(b)));
+                                        .any(|(_, m)| binaries.iter().any(|&b| m.is_match(b)));
                                     if binary_matched {
                                         unmatched = false;
                                     }
@@ -150,8 +206,8 @@ pub(crate) fn query_installed(
                             if bucket == "__isolated__" {
                                 debug!("ignore isolated package '{}'", name);
                                 // isolated packages are not upgradable currently,
-                                // we may support it by checking the origin
-                                // manifest via the path/url in install info.
+                                // we may support it by live checking the origin
+                                // manifest via the path/url in install_info.
                                 return None;
                             }
 
@@ -204,45 +260,51 @@ pub(crate) fn query_installed(
         })
         .collect::<Vec<_>>();
 
-    packages.sort_by_key(|p| p.name.clone());
-
     Ok(packages)
 }
 
 pub(crate) fn query_synced(
     session: &Session,
-    queries: HashSet<&str>,
-    options: Vec<QueryOption>,
+    query: &str,
+    options: &Vec<QueryOption>,
 ) -> Fallible<Vec<Package>> {
-    let is_wildcard_query = queries.contains("*") || queries.is_empty();
+    let is_explicit_mode = options.contains(&QueryOption::Explicit);
+    let is_wildcard_query = query.eq("*") || query.is_empty();
     let buckets = crate::operation::bucket_list(session)?;
-    let apps_dir = session.get_config().root_path.join("apps");
-    // build regex queries
-    let mut regex_queries: Vec<(Option<String>, Regex)> = vec![];
+    let apps_dir = session.config().root_path.join("apps");
+    // build matchers
+    let mut matcher: Vec<(Option<String>, Box<dyn Matcher + Send + Sync>)> = vec![];
 
     if !is_wildcard_query {
-        for q in queries.into_iter() {
-            match q.contains("/") {
-                false => {
-                    let re = RegexBuilder::new(q)
-                        .case_insensitive(true)
-                        .multi_line(true)
-                        .build()?;
-                    regex_queries.push((None, re));
-                }
-                true => {
-                    let (bucket_prefix, name) = q.split_once("/").unwrap();
-                    let re = RegexBuilder::new(name)
-                        .case_insensitive(true)
-                        .multi_line(true)
-                        .build()?;
-                    regex_queries.push((Some(bucket_prefix.to_owned()), re));
-                }
+        if query.contains("/") {
+            let (bucket_prefix, name) = query.split_once("/").unwrap();
+
+            if is_explicit_mode {
+                matcher.push((
+                    Some(bucket_prefix.to_owned()),
+                    Box::new(ExplicitMatcher(name)),
+                ));
+            } else {
+                let re = RegexBuilder::new(name)
+                    .case_insensitive(true)
+                    .multi_line(true)
+                    .build()?;
+                matcher.push((Some(bucket_prefix.to_owned()), Box::new(RegexMatcher(re))));
+            }
+        } else {
+            if is_explicit_mode {
+                matcher.push((None, Box::new(ExplicitMatcher(query))));
+            } else {
+                let re = RegexBuilder::new(query)
+                    .case_insensitive(true)
+                    .multi_line(true)
+                    .build()?;
+                matcher.push((None, Box::new(RegexMatcher(re))));
             }
         }
     }
 
-    let mut packages = buckets
+    let packages = buckets
         .iter()
         .par_bridge()
         .filter_map(|bucket| {
@@ -260,7 +322,12 @@ pub(crate) fn query_synced(
                         // time by avoiding parsing manifest and install info files.
                         let extra_query = options.contains(&QueryOption::Binary)
                             || options.contains(&QueryOption::Description);
-                        let name_matched = regex_queries.iter().any(|(_, re)| re.is_match(name));
+                        let name_matched = if is_wildcard_query {
+                            // name is always matched for wildcard query
+                            true
+                        } else {
+                            matcher.iter().any(|(_, m)| m.is_match(name))
+                        };
 
                         if !is_wildcard_query && !extra_query && !name_matched {
                             return None;
@@ -274,9 +341,9 @@ pub(crate) fn query_synced(
                             if is_wildcard_query {
                                 unmatched = false;
                             } else {
-                                let prefixed_name_matched = regex_queries
+                                let prefixed_name_matched = matcher
                                     .iter()
-                                    .filter(|&(_, re)| re.is_match(name))
+                                    .filter(|&(_, m)| m.is_match(name))
                                     .any(|(prefix, _)| {
                                         prefix.is_none() || prefix.as_deref().unwrap() == bucket
                                     });
@@ -285,13 +352,12 @@ pub(crate) fn query_synced(
                                     unmatched = false;
                                 }
 
-                                if unmatched {
+                                if unmatched && !is_explicit_mode {
                                     if options.contains(&QueryOption::Description) {
                                         let description =
                                             manifest.description().unwrap_or_default();
-                                        let description_matched = regex_queries
-                                            .iter()
-                                            .any(|(_, re)| re.is_match(description));
+                                        let description_matched =
+                                            matcher.iter().any(|(_, m)| m.is_match(description));
                                         if description_matched {
                                             unmatched = false;
                                         }
@@ -299,9 +365,9 @@ pub(crate) fn query_synced(
 
                                     if options.contains(&QueryOption::Binary) {
                                         let binaries = manifest.executables().unwrap_or_default();
-                                        let binary_matched = regex_queries.iter().any(|(_, re)| {
-                                            binaries.iter().any(|&b| re.is_match(b))
-                                        });
+                                        let binary_matched = matcher
+                                            .iter()
+                                            .any(|(_, m)| binaries.iter().any(|&b| m.is_match(b)));
                                         if binary_matched {
                                             unmatched = false;
                                         }
@@ -316,31 +382,24 @@ pub(crate) fn query_synced(
                             let package = Package::from(name, bucket, manifest);
 
                             // The query has finished, the package has been found,
-                            // the last step is to check if the package's install
-                            // state.
+                            // the last step is to check if the package is installed.
                             let mut path = apps_dir.join(name);
                             if path.exists() {
                                 path.push("current");
                                 path.push("install.json");
                                 if let Ok(install_info) = InstallInfo::parse(&path) {
-                                    // Will not be considered as installed if
-                                    // the bucket name is not matched.
-                                    if install_info.bucket().unwrap_or_default() == bucket {
-                                        path.pop();
-                                        path.push("manifest.json");
-                                        if let Ok(install_manifest) = Manifest::parse(path) {
-                                            let state =
-                                                InstallState::Installed(InstallStateInstalled {
-                                                    version: install_manifest.version().to_owned(),
-                                                    bucket: install_info
-                                                        .bucket()
-                                                        .map(|s| s.to_owned()),
-                                                    arch: install_info.arch().to_owned(),
-                                                    held: install_info.is_held(),
-                                                    url: install_info.url().map(|s| s.to_owned()),
-                                                });
-                                            package.fill_install_state(state);
-                                        }
+                                    path.pop();
+                                    path.push("manifest.json");
+                                    if let Ok(install_manifest) = Manifest::parse(path) {
+                                        let state =
+                                            InstallState::Installed(InstallStateInstalled {
+                                                version: install_manifest.version().to_owned(),
+                                                bucket: install_info.bucket().map(|s| s.to_owned()),
+                                                arch: install_info.arch().to_owned(),
+                                                held: install_info.is_held(),
+                                                url: install_info.url().map(|s| s.to_owned()),
+                                            });
+                                        package.fill_install_state(state);
                                     }
                                 }
                             } else {
@@ -359,8 +418,6 @@ pub(crate) fn query_synced(
         })
         .flatten()
         .collect::<Vec<_>>();
-
-    packages.sort_by_key(|p| p.name.clone());
 
     Ok(packages)
 }

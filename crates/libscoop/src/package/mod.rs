@@ -1,32 +1,36 @@
-// #![allow(unused)]
-pub(super) mod download;
-pub(super) mod manifest;
+mod manifest;
 pub(super) mod query;
 pub(super) mod resolve;
+mod sync;
 
 use lazycell::LazyCell;
 use std::path::Path;
 
-use manifest::{License, Manifest};
+pub use manifest::{InstallInfo, License, Manifest};
+pub use query::QueryOption;
+pub use sync::SyncOption;
 
+/// A Scoop package.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Package {
-    pub bucket: String,
-    pub name: String,
-    pub manifest_hash: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dependencies: Option<Vec<String>>,
+    /// The bucket name of this package.
+    bucket: String,
+
+    /// The name of this package.
+    name: String,
+
+    /// The manifest of this package.
     pub manifest: Manifest,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    upgradable_version: Option<String>,
 
     #[serde(skip)]
     origin: LazyCell<OriginateFrom>,
 
+    /// The install state of the package.
     #[serde(skip)]
     install_state: LazyCell<InstallState>,
 
     /// The upgradable package, if any.
+    ///
     /// This field is never serialized.
     #[serde(skip)]
     upgradable: LazyCell<Option<Box<Package>>>,
@@ -75,54 +79,12 @@ impl InstallStateInstalled {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[non_exhaustive]
-pub enum InstallOption {
-    AssumeNo,
-    AssumeYes,
-    DownloadOnly,
-    IgnoreFailure,
-    IgnoreHold,
-    IgnoreCache,
-    NoHashCheck,
-    NoUpgrade,
-    OnlyUpgrade,
-}
-
-/// Options that may be used to query Scoop packages.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[non_exhaustive]
-pub enum QueryOption {
-    /// With Binaries. Enable query on package binaries.
-    Binary,
-
-    /// With Descriptions. Enable query on package descriptions.
-    Description,
-
-    /// Explicit mode. With this flag, an exact match query will be performed
-    /// through the package name. Regex will be disabled, `Description` and
-    /// `Binary` flags will be ignored.
-    Explicit,
-
-    Upgradable,
-}
-
 impl Package {
     pub fn from(name: &str, bucket: &str, manifest: Manifest) -> Package {
-        let manifest_hash = 0u64;
-        let dependencies = manifest
-            .raw_dependencies()
-            .map(|v| v.into_iter().map(|s| s.to_owned()).collect());
-
         Package {
             bucket: bucket.to_owned(),
-            dependencies,
-            // shims,
-            manifest_hash,
             name: name.to_owned(),
-            // state,
             manifest,
-            upgradable_version: None,
             origin: LazyCell::new(),
             install_state: LazyCell::new(),
             upgradable: LazyCell::new(),
@@ -136,30 +98,46 @@ impl Package {
         format!("{}/{}", self.bucket, self.name)
     }
 
+    /// Get the bucket name of this package.
+    #[inline]
+    pub fn bucket(&self) -> &str {
+        self.bucket.as_str()
+    }
+
+    /// Get the name of this package.
+    #[inline]
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    /// Get the description of this package.
     #[inline]
     pub fn description(&self) -> Option<&str> {
         self.manifest.description()
     }
 
+    /// Get the homepage of this package.
     #[inline]
     pub fn homepage(&self) -> &str {
         self.manifest.homepage()
     }
 
+    /// Get the license of this package.
     #[inline]
     pub fn license(&self) -> &License {
         self.manifest.license()
     }
 
+    /// Get the dependencies of this package.
     #[inline]
-    pub fn installed(&self) -> bool {
-        match self.install_state.borrow() {
-            None => false,
-            Some(state) => match state {
-                InstallState::NotInstalled => false,
-                InstallState::Installed(_) => true,
-            },
-        }
+    pub fn dependencies(&self) -> Vec<String> {
+        self.manifest.dependencies()
+    }
+
+    /// Get download urls of this package.
+    #[inline]
+    pub fn url(&self) -> Vec<&str> {
+        self.manifest.url()
     }
 
     #[inline]
@@ -173,6 +151,7 @@ impl Package {
         }
     }
 
+    /// Check if the package is held.
     #[inline]
     pub fn is_held(&self) -> bool {
         match self.install_state.borrow() {
@@ -184,6 +163,29 @@ impl Package {
         }
     }
 
+    /// Check if the package is installed.
+    #[inline]
+    pub fn is_installed(&self) -> bool {
+        self.installed_version().is_some()
+    }
+
+    /// Check if the package is strictly installed, which means the package is
+    /// installed from the bucket it belongs to rather than from other buckets.
+    #[inline]
+    pub fn is_strictly_installed(&self) -> bool {
+        match self.install_state.borrow() {
+            None => false,
+            Some(state) => match state {
+                InstallState::NotInstalled => false,
+                InstallState::Installed(info) => match info.bucket() {
+                    Some(bucket) => bucket == self.bucket(),
+                    None => false,
+                },
+            },
+        }
+    }
+
+    /// Get the path of the manifest file of this package.
     #[inline]
     pub fn manfest_path(&self) -> &Path {
         self.manifest.path()
@@ -204,6 +206,7 @@ impl Package {
         }
     }
 
+    /// Get the version of this package.
     #[inline]
     pub fn version(&self) -> &str {
         self.manifest.version()
@@ -232,5 +235,11 @@ impl Package {
     pub(crate) fn fill_upgradable(&self, upgradable: Package) {
         let upgradable = Some(Box::new(upgradable));
         let _ = self.upgradable.fill(upgradable);
+    }
+}
+
+impl PartialEq for Package {
+    fn eq(&self, other: &Package) -> bool {
+        self.name() == other.name()
     }
 }

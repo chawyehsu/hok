@@ -4,16 +4,34 @@ use regex::{Regex, RegexBuilder};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
+pub static EVENT_BUS_CAPACITY: usize = 20;
+
 pub static DEFAULT_USER_AGENT: &str = "Scoop/1.0 (+http://scoop.sh/)";
 
 pub static BUILTIN_BUCKET_LIST: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
     vec![
-        ("main", "https://github.com/scoopinstaller/main"),
-        ("extras", "https://github.com/scoopinstaller/extras"),
+        ("main", "https://github.com/ScoopInstaller/Main"),
+        ("extras", "https://github.com/ScoopInstaller/Extras"),
         ("games", "https://github.com/calinou/scoop-games"),
-        ("java", "https://github.com/scoopinstaller/java"),
-        ("php", "https://github.com/scoopinstaller/php"),
-        ("versions", "https://github.com/scoopinstaller/versions"),
+        ("java", "https://github.com/ScoopInstaller/Java"),
+        ("php", "https://github.com/ScoopInstaller/PHP"),
+        ("versions", "https://github.com/ScoopInstaller/Versions"),
+        (
+            "nonportable",
+            "https://github.com/ScoopInstaller/Nonportable",
+        ),
+    ]
+});
+
+pub static BUCKET_PRIORITY: Lazy<Vec<&'static str>> = Lazy::new(|| {
+    vec![
+        "main",
+        "extras",
+        "versions",
+        "java",
+        "php",
+        "games",
+        "nonportable",
     ]
 });
 
