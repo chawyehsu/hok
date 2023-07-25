@@ -10,15 +10,11 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use crate::error::Fallible;
+use crate::Error;
 
 /// Ensure given `path` exist.
-///
-/// Will call [`std::fs::create_dir_all`] if `path` doesn't exist.
 pub fn ensure_dir<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
-    match path.as_ref().exists() {
-        false => std::fs::create_dir_all(path.as_ref()),
-        true => Ok(()),
-    }
+    std::fs::create_dir_all(path.as_ref())
 }
 
 pub fn remove_dir<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
@@ -95,19 +91,21 @@ pub fn filenamify<S: AsRef<str>>(filename: S) -> String {
         .into_owned()
 }
 
+/// Write given serializable data to a JSON file at given path.
+///
+/// This function will create the file if it does not exist, and truncate it.
 pub fn write_json<P, D>(path: P, data: D) -> Fallible<()>
 where
     P: AsRef<Path>,
     D: Serialize,
 {
     let path = path.as_ref();
-    ensure_dir(path)?;
+    ensure_dir(path.parent().unwrap())?;
 
     let file = OpenOptions::new()
         .write(true)
         .create(true)
         .truncate(true)
-        .open(path)
-        .unwrap();
+        .open(path)?;
     Ok(serde_json::to_writer_pretty(file, &data)?)
 }
