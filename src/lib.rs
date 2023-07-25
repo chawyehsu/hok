@@ -43,7 +43,7 @@ fn report(err: anyhow::Error) {
 pub fn create_app(args: Vec<String>) -> bool {
     let _ = create_logger();
     let app = clap_app::build();
-    let session = Session::new();
+    let session = Session::default();
     let _ = session.set_user_agent("Scoop/1.0 (+http://scoop.sh/) Hok/0.1.0");
 
     let ret = match app.try_get_matches_from(args) {

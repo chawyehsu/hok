@@ -24,6 +24,12 @@ pub struct Session {
     pub(crate) user_agent: LazyCell<String>,
 }
 
+impl Default for Session {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Session {
     /// Create a new session.
     ///
