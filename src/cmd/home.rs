@@ -8,7 +8,7 @@ pub fn cmd_home(matches: &ArgMatches, session: &Session) -> Result<()> {
     if let Some(query) = matches.get_one::<String>("package") {
         let queries = vec![query.as_str()];
         let options = vec![QueryOption::Explicit];
-        let result = operation::package_query(session, queries, options, false)?;
+        let mut result = operation::package_query(session, queries, options, false)?;
 
         match result.len() {
             0 => eprintln!("Could not find package named '{}'.", query),
@@ -22,6 +22,8 @@ pub fn cmd_home(matches: &ArgMatches, session: &Session) -> Result<()> {
                     .spawn()?;
             }
             _ => {
+                result.sort_by_key(|p| p.ident());
+
                 println!("Found multiple packages named '{}':\n", query);
                 for (idx, pkg) in result.iter().enumerate() {
                     println!(

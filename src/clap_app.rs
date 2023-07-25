@@ -232,6 +232,7 @@ pub fn build() -> Command {
                         .help("Turn regex off and use explicit matching")
                         .short('e')
                         .long("explicit")
+                        .requires("query")
                         .action(ArgAction::SetTrue),
                 )
                 .arg(
