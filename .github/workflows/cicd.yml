@@ -13,7 +13,6 @@ jobs:
   check_cargo_style:
     name: Check Code Style
     runs-on: ubuntu-latest
-    if: '! contains(toJSON(github.event.commits.*.message), "[ci skip]")'
     steps:
       - name: Checkout Source
         uses: actions/checkout@v3
