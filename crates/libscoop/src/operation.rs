@@ -1,3 +1,4 @@
+#![allow(unused)]
 //! Operations that can be performed on a Scoop instance.
 //!
 //! This module contains publicly available operations that can be executed on
@@ -328,7 +329,8 @@ pub fn package_hold(session: &Session, name: &str, flag: bool) -> Fallible<()> {
 /// Query packages.
 ///
 /// # Note
-/// Set `installed` to `true` to query installed packages.
+/// Set `installed` to `true` to query installed packages. The returned list
+/// will be sorted by package name.
 ///
 /// # Returns
 ///
@@ -398,7 +400,7 @@ pub fn package_sync(
     let queries = HashSet::<&str>::from_iter(queries);
 
     let emitter = session.emitter();
-    if let Some(tx) = emitter.clone() {
+    if let Some(tx) = emitter {
         let _ = tx.send(Event::PackageResolveStart);
     }
 
@@ -423,10 +425,10 @@ pub fn package_sync(
     if is_op_remove {
         resolve::resolve_dependents(session, &mut packages)?;
 
-        println!("The following packages will be removed:");
-        for pkg in packages.iter() {
-            println!("  {}", pkg.name());
-        }
+        // println!("The following packages will be removed:");
+        // for pkg in packages.iter() {
+        //     println!("  {}", pkg.name());
+        // }
     } else {
         resolve::resolve_dependencies(session, &mut packages)?;
 
@@ -440,64 +442,64 @@ pub fn package_sync(
             return Ok(());
         }
 
-        let download_only = options.contains(&SyncOption::DownloadOnly);
-        let ignore_cache = options.contains(&SyncOption::IgnoreCache);
+        // let download_only = options.contains(&SyncOption::DownloadOnly);
+        // let ignore_cache = options.contains(&SyncOption::IgnoreCache);
 
-        if download_only {
-            println!("The following packages will be downloaded:");
-        } else {
-            println!("The following packages will be installed:");
-        }
-        for pkg in packages.iter() {
-            println!("  {}", pkg.ident());
-        }
+        // if download_only {
+        //     println!("The following packages will be downloaded:");
+        // } else {
+        //     println!("The following packages will be installed:");
+        // }
+        // for pkg in packages.iter() {
+        //     println!("  {}", pkg.ident());
+        // }
 
-        if let Some(tx) = emitter {
-            let _ = tx.send(Event::PackageDownloadSizingStart);
-        }
+        // if let Some(tx) = emitter {
+        //     let _ = tx.send(Event::PackageDownloadSizingStart);
+        // }
 
-        let mut total_size = 0f64;
-        let mut size_estimated = false;
+        // let mut total_size = 0f64;
+        // let mut size_estimated = false;
 
-        let config = session.config();
-        let cache_root = config.cache_path.clone();
-        let proxy = config.proxy();
+        // let config = session.config();
+        // let cache_root = config.cache_path.clone();
+        // let proxy = config.proxy();
 
-        for pkg in packages.iter() {
-            let mut urls_mapped_files = pkg
-                .url()
-                .into_iter()
-                .map(|url| {
-                    let fname = format!("{}#{}#{}", pkg.name(), pkg.version(), filenamify(url));
-                    let path = cache_root.join(fname);
-                    (url, path)
-                })
-                .collect::<Vec<_>>();
+        // for pkg in packages.iter() {
+        //     let mut urls_mapped_files = pkg
+        //         .url()
+        //         .into_iter()
+        //         .map(|url| {
+        //             let fname = format!("{}#{}#{}", pkg.name(), pkg.version(), filenamify(url));
+        //             let path = cache_root.join(fname);
+        //             (url, path)
+        //         })
+        //         .collect::<Vec<_>>();
 
-            if !ignore_cache {
-                urls_mapped_files = urls_mapped_files
-                    .into_iter()
-                    .filter(|(_, path)| !path.exists())
-                    .collect::<Vec<_>>();
-            }
+        //     if !ignore_cache {
+        //         urls_mapped_files = urls_mapped_files
+        //             .into_iter()
+        //             .filter(|(_, path)| !path.exists())
+        //             .collect::<Vec<_>>();
+        //     }
 
-            for (mut url, _) in urls_mapped_files.into_iter() {
-                if url.contains('#') {
-                    url = url.split_once('#').unwrap().0;
-                }
+        //     for (mut url, _) in urls_mapped_files.into_iter() {
+        //         if url.contains('#') {
+        //             url = url.split_once('#').unwrap().0;
+        //         }
 
-                let size = internal::network::get_content_length(url, proxy);
-                if size.is_none() {
-                    size_estimated = true;
-                }
-                total_size += size.unwrap_or(1f64);
-            }
-        }
-        if size_estimated {
-            println!("  Total download size: {} (estimated)", total_size);
-        } else {
-            println!("  Total download size: {}", total_size);
-        }
+        //         let size = internal::network::get_content_length(url, proxy);
+        //         if size.is_none() {
+        //             size_estimated = true;
+        //         }
+        //         total_size += size.unwrap_or(1f64);
+        //     }
+        // }
+        // if size_estimated {
+        //     println!("  Total download size: {} (estimated)", total_size);
+        // } else {
+        //     println!("  Total download size: {}", total_size);
+        // }
     }
 
     Ok(())
