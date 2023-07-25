@@ -6,6 +6,7 @@
 [![release][release-badge]][releases]
 [![license][license-badge]](LICENSE)
 [![downloads][downloads-badge]][releases]
+[![docs-svg]][docs-url]
 
 ## Install
 
@@ -84,3 +85,5 @@ For licenses of sub crates, see [COPYING](COPYING).
 [releases]: https://github.com/chawyehsu/hok/releases/latest
 [license-badge]: https://img.shields.io/github/license/chawyehsu/hok
 [downloads-badge]: https://img.shields.io/github/downloads/chawyehsu/hok/total
+[docs-svg]: https://docs.rs/libscoop/badge.svg
+[docs-url]: https://docs.rs/libscoop

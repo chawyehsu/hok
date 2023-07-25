@@ -19,6 +19,7 @@ This crate provides manipulation of [Scoop](https://scoop.sh/) from Rust.
 ## Install
 
 🚧 **CAVEAT**: Under heavy development, interfaces may change without notice.
+Please refer to the repository homepage for the changelog.
 
 ```toml
 [dependencies]

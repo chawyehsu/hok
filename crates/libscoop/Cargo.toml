@@ -2,8 +2,10 @@
 name = "libscoop"
 description = "Rust library implementation of Scoop"
 homepage = "https://github.com/chawyehsu/hok"
+documentation = "https://docs.rs/libscoop"
 version = "0.1.0-alpha.3"
 authors = ["Chawye Hsu <su+cratesio@chawyehsu.com>"]
+categories = ["package-manager", "windows"]
 license = "MIT OR Apache-2.0"
 edition = "2021"
 readme = "README.md"
