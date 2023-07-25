@@ -1,4 +1,5 @@
 use clap::ArgMatches;
+use crossterm::style::Stylize;
 use libscoop::{operation, Session};
 use std::process::Command;
 
@@ -9,13 +10,14 @@ pub fn cmd_config(matches: &ArgMatches, session: &Session) -> Result<()> {
         Some(("edit", _)) => {
             let editor = std::env::var("EDITOR").unwrap_or_else(|_| "notepad".to_string());
             let mut child = Command::new(editor.as_str())
-                .arg(&session.config().config_path)
+                .arg(&session.config().path)
                 .spawn()?;
             child.wait()?;
             Ok(())
         }
         Some(("list", _)) => {
             let config_json = operation::config_list(session)?;
+            println!("{}:", &session.config().path.display().to_string().green());
             println!("{}", config_json);
             Ok(())
         }
