@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.1.0-alpha.2](https://github.com/chawyehsu/hok/compare/v0.1.0-alpha.1...v0.1.0-alpha.2) (2023-07-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **libscoop:** APIs of operations and Session changed.
+* **libscoop:** exposed modules of libscoop changed.
+
+### Features
+
+* **hok|cat,home:** support candidate selection ([28b56c5](https://github.com/chawyehsu/hok/commit/28b56c5ade13e1edceb04fa7c0fc7554dcc0c6a9))
+* **hok:** add uninstall cmd placeholder ([c13e8be](https://github.com/chawyehsu/hok/commit/c13e8be627ab0bfb91aedfebc10ee89dc2ee8675))
+* **hok:** support list held packages ([a2acb22](https://github.com/chawyehsu/hok/commit/a2acb2210bf0586f6d839d61773b1dac7d2f96f1))
+* **libscoop|manifest:** support aarch64 specific fields ([639d092](https://github.com/chawyehsu/hok/commit/639d092e22dc32decc98950532614da75489dbe6))
+* **libscoop|resolve:** added fn `select_candidate` ([0e296ea](https://github.com/chawyehsu/hok/commit/0e296ea5b0cb2ab884c74ccea42df86ca05840e0))
+* **libscoop:** add package resolving and event bus ([434eebe](https://github.com/chawyehsu/hok/commit/434eebe3d464edb48a1d034d4e746810ba41d274))
+* **libscoop:** replace ureq with libcurl ([7d3df7c](https://github.com/chawyehsu/hok/commit/7d3df7c3e954187318d46958f07d6e4b4ce9fe31))
+* move to v0.1.0-alpha.2 ([24e354a](https://github.com/chawyehsu/hok/commit/24e354a7514d74878c550e25457d323e6251ee4b))
+
+
+### Bug Fixes
+
+* **hok|cat,home:** sort candidates ([c90f3f9](https://github.com/chawyehsu/hok/commit/c90f3f94367dae75cabd2dd0a562f38c924f6dbd))
+* **libscoop:** dag should check self cyclic ([a5bbb0b](https://github.com/chawyehsu/hok/commit/a5bbb0bb5f57ef6d8d326e6eca9bb828f6ff6ec9))
+
+
+### Miscellaneous Chores
+
+* **libscoop:** tweak exposed modules ([f31cb64](https://github.com/chawyehsu/hok/commit/f31cb64d3794edf01b55757bb3ecdc19d4878932))
+
 ## 0.1.0-alpha.1 (2023-07-21)
 
 
