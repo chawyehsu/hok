@@ -11,6 +11,7 @@ pub fn cmd_list(matches: &ArgMatches, session: &Session) -> Result<()> {
         .map(|s| s.as_str())
         .collect::<Vec<_>>();
     let mut options = vec![];
+    let flag_held = matches.get_flag("held");
 
     if matches.get_flag("explicit") {
         options.push(QueryOption::Explicit);
@@ -30,13 +31,17 @@ pub fn cmd_list(matches: &ArgMatches, session: &Session) -> Result<()> {
                 );
 
                 let held = pkg.is_held();
-                let upgradable = pkg.upgradable();
+                if flag_held && !held {
+                    continue;
+                }
 
+                let upgradable = pkg.upgradable();
                 if upgradable.is_some() {
                     output.push_str(format!(" -> {}", upgradable.unwrap().blue()).as_str());
-                    if held {
-                        output.push_str(format!(" [{}]", "held".magenta()).as_str());
-                    }
+                }
+
+                if held {
+                    output.push_str(format!(" [{}]", "held".magenta()).as_str());
                 }
 
                 println!("{}", output);
