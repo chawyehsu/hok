@@ -12,7 +12,7 @@ jobs:
   # Check code style
   check_cargo_style:
     name: Check Code Style
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Checkout Source
         uses: actions/checkout@v3
