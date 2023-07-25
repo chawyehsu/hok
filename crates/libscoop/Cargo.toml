@@ -2,7 +2,7 @@
 name = "libscoop"
 description = "Rust library implementation of Scoop"
 homepage = "https://github.com/chawyehsu/hok"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.3"
 authors = ["Chawye Hsu <su+cratesio@chawyehsu.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2021"
@@ -21,7 +21,7 @@ once_cell = "1.18.0"
 rayon = "1.7.0"
 regex = "1.5.3"
 remove_dir_all = "0.7.0"
-# scoop-hash = { version = "0.1.0-alpha.1", path = "../scoop_hash" }
+# scoop-hash = { version = "0.1.0-alpha.3", path = "../scoop_hash" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "1.0"
