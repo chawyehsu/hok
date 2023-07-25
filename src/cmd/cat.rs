@@ -1,6 +1,6 @@
 use clap::ArgMatches;
 use libscoop::{operation, QueryOption, Session};
-use std::{path::Path, process::Command};
+use std::{io::Write, path::Path, process::Command};
 
 use crate::Result;
 
@@ -10,44 +10,65 @@ pub fn cmd_cat(matches: &ArgMatches, session: &Session) -> Result<()> {
         let options = vec![QueryOption::Explicit];
         let result = operation::package_query(session, queries, options, false)?;
 
-        match result.len() {
-            0 => eprintln!("Could not find package named '{}'.", query),
-            1 => {
-                let package = &result[0];
-                let cat = match is_program_available("bat.exe") {
-                    true => "bat.exe",
-                    false => "type",
-                };
-                let config = session.config();
-                let cat_args = match cat == "bat.exe" {
-                    false => vec![],
-                    true => {
-                        let cat_style = config.cat_style();
-                        vec!["--no-paging", "--style", cat_style, "--language", "json"]
-                    }
-                };
-
-                let mut child = Command::new("cmd")
-                    .arg("/C")
-                    .arg(cat)
-                    .arg(package.manfest_path())
-                    .args(cat_args)
-                    .spawn()?;
-                child.wait()?;
-            }
-            _ => {
-                eprintln!("Found multiple packages named '{}':\n", query);
+        if result.is_empty() {
+            eprintln!("Could not find package named '{}'.", query)
+        } else {
+            let length = result.len();
+            let package = if length == 1 {
+                &result[0]
+            } else {
+                println!("Found multiple packages named '{}':\n", query);
                 for (idx, pkg) in result.iter().enumerate() {
                     println!(
                         "  {}. {}/{} ({})",
-                        idx + 1,
+                        idx,
                         pkg.bucket(),
                         pkg.name(),
                         pkg.homepage()
                     );
                 }
-                eprintln!("\nUse bucket prefix to narrow results.");
+                print!("\nPlease select one, enter the number to continue: ");
+                std::io::stdout().flush().unwrap();
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input).unwrap();
+                let parsed = input.trim().parse::<usize>();
+                if parsed.is_err() {
+                    eprintln!("Invalid input.");
+                    return Ok(());
+                }
+
+                let num = parsed.unwrap();
+                if num >= result.len() {
+                    eprintln!("Invalid input.");
+                    return Ok(());
+                }
+                &result[num]
+            };
+
+            let cat = match is_program_available("bat.exe") {
+                true => "bat.exe",
+                false => "type",
+            };
+            let config = session.config();
+            let cat_args = match cat == "bat.exe" {
+                false => vec![],
+                true => {
+                    let cat_style = config.cat_style();
+                    vec!["--no-paging", "--style", cat_style, "--language", "json"]
+                }
+            };
+
+            if length > 1 {
+                println!();
             }
+
+            let mut child = Command::new("cmd")
+                .arg("/C")
+                .arg(cat)
+                .arg(package.manfest_path())
+                .args(cat_args)
+                .spawn()?;
+            child.wait()?;
         }
     }
     Ok(())

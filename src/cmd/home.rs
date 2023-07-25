@@ -1,6 +1,6 @@
 use clap::ArgMatches;
 use libscoop::{operation, QueryOption, Session};
-use std::process::Command;
+use std::{io::Write, process::Command};
 
 use crate::Result;
 
@@ -22,17 +22,34 @@ pub fn cmd_home(matches: &ArgMatches, session: &Session) -> Result<()> {
                     .spawn()?;
             }
             _ => {
-                eprintln!("Found multiple packages named '{}':\n", query);
+                println!("Found multiple packages named '{}':\n", query);
                 for (idx, pkg) in result.iter().enumerate() {
                     println!(
                         "  {}. {}/{} ({})",
-                        idx + 1,
+                        idx,
                         pkg.bucket(),
                         pkg.name(),
                         pkg.homepage()
                     );
                 }
-                eprintln!("\nUse bucket prefix to narrow results.");
+                print!("\nPlease select one, enter the number to continue: ");
+                std::io::stdout().flush().unwrap();
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input).unwrap();
+                let parsed = input.trim().parse::<usize>();
+                if let Ok(num) = parsed {
+                    if num < result.len() {
+                        let package = &result[num];
+                        let url = std::ffi::OsStr::new(package.homepage());
+                        Command::new("cmd")
+                            .arg("/C")
+                            .arg("start")
+                            .arg(url)
+                            .spawn()?;
+                        return Ok(());
+                    }
+                }
+                eprintln!("Invalid input.");
             }
         }
     }
