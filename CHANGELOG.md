@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.1.0-alpha.3](https://github.com/chawyehsu/hok/compare/v0.1.0-alpha.2...v0.1.0-alpha.3) (2023-07-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **libscoop:** `Session::new()` is now infallible.
+
+### Features
+
+* **hok|config:** config-list shows the path ([679c177](https://github.com/chawyehsu/hok/commit/679c1771c036982941bce62e6db55e9098b4e739))
+* **libscoop:** impl Default for Session ([d91177a](https://github.com/chawyehsu/hok/commit/d91177a269698b8fbd7b530f0100da82d4ce8879))
+* **libscoop:** support loading config from all possible location ([2bcc649](https://github.com/chawyehsu/hok/commit/2bcc649808e8238bef5795c73eab41c182cac61b))
+* move to v0.1.0-alpha.3 ([1ecd0ed](https://github.com/chawyehsu/hok/commit/1ecd0edf100ea4a3676494b40b5c72c787ad5501))
+
+
+### Bug Fixes
+
+* **ci:** remove unneeded condition ([718084f](https://github.com/chawyehsu/hok/commit/718084f80c615513c69a838205e58edd2a553d44))
+* **libscoop|fs:** `write_json` should create file instead of dir ([54482a7](https://github.com/chawyehsu/hok/commit/54482a7c8c1733e8d0c01bac5e85fc5da7f4fd3e))
+* **libscoop:** fix doctest ([c0237a2](https://github.com/chawyehsu/hok/commit/c0237a2e73d976c4f959bb0928da4cbd0ff3376e))
+
 ## [0.1.0-alpha.2](https://github.com/chawyehsu/hok/compare/v0.1.0-alpha.1...v0.1.0-alpha.2) (2023-07-25)
 
 
