@@ -31,26 +31,30 @@ pub fn cmd_install(matches: &ArgMatches, session: &Session) -> Result<()> {
                     println!("Calculating download size...");
                 }
                 Event::SelectPackage(pkgs) => {
-                    println!("Select package:");
+                    let name = pkgs[0].split_once('/').unwrap().1;
+                    println!("Found multiple candidates for package '{}':\n", name);
                     for (i, pkg) in pkgs.iter().enumerate() {
-                        println!("{}: {}", i, pkg);
+                        println!("  {}: {}", i, pkg);
                     }
+
                     let mut index = 0usize;
                     loop {
-                        print!("Enter the number of the package to continue: ");
+                        print!("\nPlease select one, enter the number to continue: ");
                         std::io::stdout().flush().unwrap();
                         let mut input = String::new();
                         std::io::stdin().read_line(&mut input).unwrap();
                         let parsed = input.trim().parse::<usize>();
-                        if let Ok(index) = parsed {
-                            if index < pkgs.len() {
+                        if let Ok(num) = parsed {
+                            index = num;
+                            // bounds check
+                            if num < pkgs.len() {
                                 break;
                             }
                         }
                         println!("Invalid input.");
                     }
 
-                    let _ = tx.send(Event::SelectPackageAnswer(index));
+                    tx.send(Event::SelectPackageAnswer(index));
                 }
                 _ => {}
             }
