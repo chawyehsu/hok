@@ -641,17 +641,6 @@ impl Manifest {
     /// Create a [`Manifest`] representation of a manfest JSON file with the
     /// given path.
     ///
-    /// ## Examples
-    ///
-    /// ```no_run
-    /// use std::path::PathBuf;
-    /// use libscoop::types::Manifest;
-    ///
-    /// let path = PathBuf::from(r"C:\Scoop\buckets\main\bucket\unzip.json");
-    /// let manifest = Manifest::parse(path);
-    /// assert!(manifest.is_err());
-    /// ```
-    ///
     /// ## Errors
     ///
     /// If the process fails to read the file, this method will return a

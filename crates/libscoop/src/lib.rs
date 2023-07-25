@@ -21,8 +21,8 @@
 //!
 //! ```rust
 //! use libscoop::Session;
-//! let (session, _) = Session::init().expect("failed to create session");
-//! let config = session.get_config();
+//! let session = Session::new().expect("Failed to create a session.");
+//! let config = session.config();
 //! println!("{}", config.root_path().display());
 //! ```
 //!
