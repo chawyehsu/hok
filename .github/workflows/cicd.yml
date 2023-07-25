@@ -9,8 +9,8 @@ permissions:
   contents: write
   pull-requests: write
 jobs:
-  # Check code style
-  check_cargo_style:
+  # Check code style and tests
+  check_cargo_base:
     name: Check Code Style
     runs-on: windows-latest
     steps:
@@ -20,8 +20,20 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
+          profile: minimal
           toolchain: stable
           components: clippy, rustfmt
+
+      - name: Setup Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Format Check
         run: cargo fmt -- --check
@@ -29,27 +41,13 @@ jobs:
       - name: Clippy Check
         run: cargo clippy
 
-  # Check tests
-  check_cargo_test:
-    name: Check Tests
-    needs: check_cargo_style
-    runs-on: windows-latest
-    steps:
-      - name: Checkout Source
-        uses: actions/checkout@v3
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-
-      - name: Test Check
+      - name: Tests Check
         run: cargo test --workspace
 
   # Check build
   check_cargo_build:
     name: Check Dev Build
-    needs: check_cargo_test
+    needs: check_cargo_base
     strategy:
       fail-fast: false
       matrix:
@@ -65,8 +63,20 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
+          profile: minimal
           toolchain: stable
           target: ${{ matrix.target }}
+
+      - name: Setup Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build Check
         run: cargo build --locked --target ${{ matrix.target }}
@@ -118,8 +128,20 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
+          profile: minimal
           toolchain: stable
           target: ${{ matrix.target }}
+
+      - name: Setup Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build
         uses: actions-rs/cargo@v1.0.3
