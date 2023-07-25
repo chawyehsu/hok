@@ -18,7 +18,7 @@
 //! ```
 use chrono::{SecondsFormat, Utc};
 use futures::{executor::ThreadPool, task::SpawnExt};
-use log::{debug, warn};
+use log::debug;
 use std::{
     collections::HashSet,
     iter::FromIterator,
@@ -40,6 +40,13 @@ use crate::{
 };
 
 /// Add a bucket to Scoop.
+///
+/// # Errors
+///
+/// This method will return an error if the bucket already exists, or the remote
+/// url is not specified when adding a non built-in bucket.
+///
+/// A git error will be returned if failed to clone the bucket.
 pub fn bucket_add(session: &Session, name: &str, remote_url: &str) -> Fallible<()> {
     let config = session.config();
     let mut path = config.root_path.clone();
@@ -65,8 +72,16 @@ pub fn bucket_add(session: &Session, name: &str, remote_url: &str) -> Fallible<(
 }
 
 /// Get a list of added buckets.
+///
+/// # Returns
+///
+/// A list of added buckets. Buckets cannot be parsed will be filtered out.
+///
+/// # Errors
+///
+/// I/O errors will be returned if the `buckets` directory is not readable.
 pub fn bucket_list(session: &Session) -> Fallible<Vec<Bucket>> {
-    let mut buckets = Vec::new();
+    let mut buckets = vec![];
     let buckets_dir = session.config().root_path.join("buckets");
 
     if buckets_dir.exists() {
@@ -78,7 +93,7 @@ pub fn bucket_list(session: &Session) -> Fallible<Vec<Bucket>> {
             let path = entry.path();
             match Bucket::from(&path) {
                 Ok(bucket) => buckets.push(bucket),
-                Err(err) => warn!("failed to parse bucket {} ({})", path.display(), err),
+                Err(err) => debug!("failed to parse bucket {} ({})", path.display(), err),
             }
         }
     }
@@ -86,11 +101,24 @@ pub fn bucket_list(session: &Session) -> Fallible<Vec<Bucket>> {
 }
 
 /// Get a list of known (built-in) buckets.
+///
+/// # Returns
+///
+/// A list of known buckets.
 pub fn bucket_list_known() -> Vec<(&'static str, &'static str)> {
     crate::constant::BUILTIN_BUCKET_LIST.to_vec()
 }
 
 /// Update all added buckets. *
+///
+/// # Errors
+///
+/// I/O errors will be returned if the `buckets` directory is not readable or
+/// failed to start up the update threads.
+///
+/// A [`ConfigInUse`][1] error will be returned if the config is borrowed elsewhere.
+///
+/// [1]: crate::Error::ConfigInUse
 pub fn bucket_update(session: &Session) -> Fallible<()> {
     let buckets = bucket_list(session)?;
 
@@ -110,8 +138,9 @@ pub fn bucket_update(session: &Session) -> Fallible<()> {
     for bucket in buckets.iter() {
         let repo = bucket.path().to_owned();
 
-        if !repo.join(".git").exists() {
-            debug!("ignored non-git bucket {}", bucket.name());
+        // There is no remote url for this bucket, so we just ignore it.
+        if bucket.remote_url().is_none() {
+            debug!("ignored not updatable bucket {}", bucket.name());
             continue;
         }
 
@@ -165,6 +194,11 @@ pub fn bucket_update(session: &Session) -> Fallible<()> {
 }
 
 /// Remove a bucket from Scoop.
+///
+/// # Errors
+///
+/// This method will return an error if the bucket does not exist. I/O errors
+/// will be returned if the bucket directory is unable to be removed.
 pub fn bucket_remove(session: &Session, name: &str) -> Fallible<()> {
     let mut path = session.config().root_path.clone();
     path.push("buckets");
@@ -178,6 +212,14 @@ pub fn bucket_remove(session: &Session, name: &str) -> Fallible<()> {
 }
 
 /// Get a list of downloaded cache files.
+///
+/// # Returns
+///
+/// A list of downloaded cache files.
+///
+/// # Errors
+///
+/// I/O errors will be returned if the cache directory is not readable.
 pub fn cache_list(session: &Session, query: &str) -> Fallible<Vec<CacheFile>> {
     let mut entires = session
         .config()
@@ -200,6 +242,11 @@ pub fn cache_list(session: &Session, query: &str) -> Fallible<Vec<CacheFile>> {
 }
 
 /// Remove cache files by query.
+///
+/// # Errors
+///
+/// I/O errors will be returned if the cache directory is not readable or failed
+/// to remove the cache files.
 pub fn cache_remove(session: &Session, query: &str) -> Fallible<()> {
     match query {
         "*" => Ok(fs::empty_dir(&session.config().cache_path)?),
@@ -214,17 +261,50 @@ pub fn cache_remove(session: &Session, query: &str) -> Fallible<()> {
 }
 
 /// Get the configuation list.
+///
+/// # Returns
+///
+/// A string of the configuation list in pretty-printed JSON format.
+///
+/// # Errors
+///
+/// Serde errors will be returned if the config cannot be serialized.
 pub fn config_list(session: &Session) -> Fallible<String> {
     let config = session.config();
     config.pretty()
 }
 
 /// Set a configuation key. *
+///
+/// # Errors
+///
+/// A [`ConfigInUse`][1] error will be returned if the config is borrowed
+/// elsewhere.
+///
+/// A [`ConfigKeyInvalid`][2] error will be returned if the key is invalid.
+///
+/// A [`ConfigValueInvalid`][3] error will be returned if the value is invalid.
+///
+/// [1]: crate::Error::ConfigInUse
+/// [2]: crate::Error::ConfigKeyInvalid
+/// [3]: crate::Error::ConfigValueInvalid
 pub fn config_set(session: &Session, key: &str, value: &str) -> Fallible<()> {
     session.config_mut()?.set(key, value)
 }
 
 /// Hold or unhold a package.
+///
+/// # Errors
+///
+/// This method will return an error if the package is not installed.
+///
+/// A [`PackageHoldBrokenInstall`][1] error will be returned if the install is
+/// broken (`install.json` is missing or broken).
+///
+/// I/O errors will be returned if failed to write the `install.json` file.
+/// Serde errors will be returned if the install info cannot be serialized.
+///
+/// [1]: crate::Error::PackageHoldBrokenInstall
 pub fn package_hold(session: &Session, name: &str, flag: bool) -> Fallible<()> {
     let mut path = session.config().root_path.clone();
     path.push("apps");
@@ -247,7 +327,20 @@ pub fn package_hold(session: &Session, name: &str, flag: bool) -> Fallible<()> {
 
 /// Query packages.
 ///
+/// # Note
 /// Set `installed` to `true` to query installed packages.
+///
+/// # Returns
+///
+/// A list of packages that match the query.
+///
+/// # Errors
+///
+/// I/O errors will be returned if the `apps`/`buckets` directory is not readable.
+///
+/// A [`Regex`][1] error will be returned if the given query is not a valid regex.
+///
+/// [1]: crate::Error::Regex
 pub fn package_query(
     session: &Session,
     queries: Vec<&str>,
@@ -277,8 +370,22 @@ pub fn package_query(
 
 /// Sync packages.
 ///
+/// # Note
 /// The meaning of `sync` packages is to download, (un)install and/or upgrade
 /// packages.
+///
+/// # Errors
+///
+/// I/O errors will be returned if the `apps`/`buckets` directory is not readable.
+///
+/// A [`PackageNotFound`][1] error will be returned if no package is found for
+/// the given query.
+///
+/// A [`PackageMultipleCandidates`][2] error will be returned if multiple
+/// candidates are found for the given query and not able to ask for a selection.
+///
+/// [1]: crate::Error::PackageNotFound
+/// [2]: crate::Error::PackageMultipleCandidates
 pub fn package_sync(
     session: &Session,
     queries: Vec<&str>,

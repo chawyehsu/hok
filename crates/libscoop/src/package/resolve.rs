@@ -6,6 +6,7 @@ use crate::{
     Error, Session,
 };
 
+/// Resolve dependencies of the given packages.
 pub(crate) fn resolve_dependencies(session: &Session, packages: &mut Vec<Package>) -> Fallible<()> {
     let mut graph = DepGraph::<String>::new();
     let mut to_resolve = packages.clone();
@@ -64,6 +65,7 @@ pub(crate) fn resolve_dependencies(session: &Session, packages: &mut Vec<Package
     Ok(())
 }
 
+/// Resolve packages that depend on the given packages.
 pub(crate) fn resolve_dependents(session: &Session, packages: &mut Vec<Package>) -> Fallible<()> {
     let mut to_resolve = packages.clone();
     let installed = query::query_installed(session, "*", &[QueryOption::Explicit])?;

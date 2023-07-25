@@ -146,14 +146,14 @@ impl Config {
                 true => self.use_external_7zip = None,
                 false => match value.parse::<bool>() {
                     Ok(value) => self.use_external_7zip = Some(value),
-                    Err(_) => return Err(Error::InvalidConfigValue(value.to_owned())),
+                    Err(_) => return Err(Error::ConfigValueInvalid(value.to_owned())),
                 },
             },
             "aria2_enabled" | "aria2-enabled" => match is_unset {
                 true => self.aria2_enabled = None,
                 false => match value.parse::<bool>() {
                     Ok(value) => self.aria2_enabled = Some(value),
-                    Err(_) => return Err(Error::InvalidConfigValue(value.to_owned())),
+                    Err(_) => return Err(Error::ConfigValueInvalid(value.to_owned())),
                 },
             },
             "cat_style" => {
@@ -178,14 +178,14 @@ impl Config {
                 true => self.use_lessmsi = None,
                 false => match value.parse::<bool>() {
                     Ok(value) => self.use_lessmsi = Some(value),
-                    Err(_) => return Err(Error::InvalidConfigValue(value.to_owned())),
+                    Err(_) => return Err(Error::ConfigValueInvalid(value.to_owned())),
                 },
             },
             "proxy" => match value {
                 "" | "none" => self.proxy = None,
                 _ => self.proxy = Some(value.to_string()),
             },
-            key => return Err(Error::InvalidConfigKey(key.to_owned())),
+            key => return Err(Error::ConfigKeyInvalid(key.to_owned())),
         }
 
         self.commit()
@@ -196,6 +196,7 @@ impl Config {
         write_json(&self.config_path, self)
     }
 
+    /// Pretty print the config
     pub(crate) fn pretty(&self) -> Fallible<String> {
         Ok(serde_json::to_string_pretty(self)?)
     }

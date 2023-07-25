@@ -8,6 +8,7 @@ pub type Fallible<T> = Result<T, Error>;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
+    /// Thrown when trying to add a bucket that already exists.
     #[error("bucket '{0}' already exists")]
     BucketAlreadyExists(String),
 
@@ -22,12 +23,17 @@ pub enum Error {
     #[error("bare bucket '{0}' is no longer supported")]
     BareBucketFound(String),
 
-    /// A custom error.
-    #[error("{0}")]
-    Custom(String),
-
+    /// Thrown when trying to mutate config while it is in use.
     #[error("Could not alter config because it is in use.")]
     ConfigInUse,
+
+    /// Invalid config key error
+    #[error("invalid config key '{0}'")]
+    ConfigKeyInvalid(String),
+
+    /// Invalid config value error
+    #[error("invalid config value '{0}'")]
+    ConfigValueInvalid(String),
 
     /// Thrown when trying to set the user agent twice.
     #[error("User agent already set")]
@@ -39,11 +45,6 @@ pub enum Error {
     /// Invalid cache file error
     #[error("error")]
     InvalidCacheFile { path: PathBuf },
-
-    #[error("invalid config key '{0}'")]
-    InvalidConfigKey(String),
-    #[error("invalid config value '{0}'")]
-    InvalidConfigValue(String),
 
     #[error("error")]
     InvalidHashValue(String),
@@ -57,6 +58,7 @@ pub enum Error {
     #[error("Could not find package named '{0}'")]
     PackageNotFound(String),
 
+    /// Thrown when there are multiple candidates for a package name.
     #[error("Found multiple candidates for package named '{0}'")]
     PackageMultipleCandidates(String),
 
@@ -69,6 +71,10 @@ pub enum Error {
     /// the installation is broken.
     #[error("package '{0}' is broken")]
     PackageHoldBrokenInstall(String),
+
+    /// A custom error.
+    #[error("{0}")]
+    Custom(String),
 
     /// Cycle dependency error
     #[error(transparent)]

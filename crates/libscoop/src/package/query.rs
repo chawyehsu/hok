@@ -57,6 +57,7 @@ impl Matcher for RegexMatcher {
     }
 }
 
+/// Search installed packages.
 pub(crate) fn query_installed(
     session: &Session,
     query: &str,
@@ -212,13 +213,12 @@ pub(crate) fn query_installed(
                             bucket_path.push(bucket);
 
                             if let Ok(origin_bucket) = Bucket::from(&bucket_path) {
-                                let origin_manifest_path = origin_bucket.path_of_manifest(name);
-                                if origin_manifest_path.exists() {
-                                    // println!("origin_manifest_path: {:?}", origin_manifest_path);
+                                if let Some(origin_manifest_path) =
+                                    origin_bucket.path_of_manifest(name)
+                                {
                                     if let Ok(origin_manifest) =
                                         Manifest::parse(origin_manifest_path)
                                     {
-                                        // let current_version = manifest.version();
                                         let origin_version = origin_manifest.version();
                                         let is_upgradable =
                                             compare_versions(origin_version, &current_version)
@@ -260,6 +260,7 @@ pub(crate) fn query_installed(
     Ok(packages)
 }
 
+/// Search available packages.
 pub(crate) fn query_synced(
     session: &Session,
     query: &str,
