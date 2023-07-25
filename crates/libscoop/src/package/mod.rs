@@ -1,6 +1,6 @@
 mod manifest;
-pub(super) mod query;
-pub(super) mod resolve;
+pub mod query;
+pub mod resolve;
 mod sync;
 
 use lazycell::LazyCell;

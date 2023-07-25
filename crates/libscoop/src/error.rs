@@ -48,10 +48,17 @@ pub enum Error {
     #[error("error")]
     InvalidHashValue(String),
 
+    /// Throw when receiving an invalid answer from the frontend.
+    #[error("invalid answer")]
+    InvalidAnswer,
+
     /// Package not found error, this may occur when doing an explicit lookup
     /// for a package and no record with the given query was found.
     #[error("Could not find package named '{0}'")]
     PackageNotFound(String),
+
+    #[error("Found multiple candidates for package named '{0}'")]
+    PackageMultipleCandidates(String),
 
     /// Thrown when trying to perform (un)hold operation on a package that is
     /// not installed.

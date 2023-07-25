@@ -307,46 +307,7 @@ pub fn package_sync(
         }
 
         if pkg.len() > 1 {
-            // Try to filter out installed ones if possible
-            pkg = pkg
-                .into_iter()
-                .filter(|p| !p.is_strictly_installed())
-                .collect::<Vec<_>>();
-            // Luckily, there is no more than one package left
-            if pkg.len() <= 1 {
-                continue;
-            }
-
-            if let Some(tx) = emitter.clone() {
-                println!(
-                    "{}",
-                    pkg.iter().map(|p| p.ident()).collect::<Vec<_>>().join(" ")
-                );
-                let question = pkg.iter().map(|p| p.ident()).collect::<Vec<_>>();
-                if tx.send(Event::SelectPackage(question)).is_ok() {
-                    let rx = session.event_bus().inner_receiver();
-                    while let Ok(answer) = rx.recv() {
-                        if let Event::SelectPackageAnswer(idx) = answer {
-                            println!("{}", idx);
-                            if idx < pkg.len() {
-                                pkg = vec![pkg[idx].clone()];
-                                break;
-                            } else {
-                                return Err(Error::Custom(format!(
-                                    "Invalid package index: {}",
-                                    idx
-                                )));
-                            }
-                        }
-                    }
-                }
-            } else {
-                // TODO: handle this case smartly
-                return Err(Error::Custom(format!(
-                    "Found multiple candidates for package named '{}'",
-                    query
-                )));
-            }
+            resolve::select_candidate(session, &mut pkg)?;
         }
 
         packages.extend(pkg);

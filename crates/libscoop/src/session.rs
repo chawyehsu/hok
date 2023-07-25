@@ -1,4 +1,4 @@
-use flume::Sender;
+use flume::{Receiver, Sender};
 use lazycell::LazyCell;
 use std::cell::{Ref, RefCell, RefMut};
 use std::path::Path;
@@ -105,6 +105,11 @@ impl Session {
     /// Get an outbound sender to emit events.
     pub(crate) fn emitter(&self) -> Option<Sender<Event>> {
         self.event_bus.borrow().map(|bus| bus.inner_sender())
+    }
+
+    /// Get an inbound receiver to reveive events.
+    pub(crate) fn receiver(&self) -> Option<&Receiver<Event>> {
+        self.event_bus.borrow().map(|bus| bus.inner_receiver())
     }
 
     /// Set the user agent for the session.
