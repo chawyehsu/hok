@@ -13,7 +13,7 @@
 //!
 //! ```rust
 //! use libscoop::{Session, operation};
-//! let session = Session::new().expect("Failed to create a session.");
+//! let session = Session::new();
 //! let buckets = operation::bucket_list(&session).expect("failed to get buckets");
 //! println!("{} bucket(s)", buckets.len());
 //! ```

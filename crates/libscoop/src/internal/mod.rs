@@ -126,8 +126,8 @@ pub fn extract_name_and_bucket(path: &Path) -> Fallible<(String, String)> {
 /// fail, or on Windows returns annoying device paths.
 ///
 /// This function is copied from Cargo.
-pub fn normalize_path(path: &Path) -> PathBuf {
-    let mut components = path.components().peekable();
+pub fn normalize_path<P: AsRef<Path>>(path: P) -> PathBuf {
+    let mut components = path.as_ref().components().peekable();
     let mut ret = if let Some(c @ Component::Prefix(..)) = components.peek().cloned() {
         components.next();
         PathBuf::from(c.as_os_str())

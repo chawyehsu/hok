@@ -4,7 +4,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::path::Path;
 
 use crate::{
-    config::{default_config_path, Config, ConfigBuilder},
+    config::{possible_config_paths, Config, ConfigBuilder},
     error::{Error, Fallible},
     event::{Event, EventBus},
 };
@@ -33,14 +33,22 @@ impl Session {
     /// # Returns
     ///
     /// A new session.
-    ///
-    /// # Errors
-    ///
-    /// This method will return an error if the config file is not found or
-    /// cannot be parsed.
-    pub fn new() -> Fallible<Session> {
-        let config_path = default_config_path();
-        Self::new_with(config_path)
+    pub fn new() -> Session {
+        // Try to load config from the possible config paths, once a successful
+        // load is done, return the session immediately.
+        for path in possible_config_paths() {
+            if let Ok(session) = Self::new_with(path) {
+                return session;
+            }
+        }
+
+        // Config loading failed, create a new default config and return.
+        let config = RefCell::new(Config::init());
+        Session {
+            config,
+            event_bus: LazyCell::new(),
+            user_agent: LazyCell::new(),
+        }
     }
 
     /// Create a new session with the given config path.
@@ -57,7 +65,7 @@ impl Session {
     where
         P: AsRef<Path>,
     {
-        let config = RefCell::new(ConfigBuilder::new(config_path).build()?);
+        let config = RefCell::new(ConfigBuilder::new().path(config_path).load()?);
 
         Ok(Session {
             config,
