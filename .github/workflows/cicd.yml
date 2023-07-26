@@ -9,31 +9,25 @@ permissions:
   contents: write
   pull-requests: write
 jobs:
-  # Check code style and tests
-  check_cargo_base:
-    name: Check Code Style
+  # format and lint check
+  style_check:
+    name: Code Style Check
     runs-on: windows-latest
+    env:
+      SCCACHE_GHA_ENABLED: true
+      RUSTC_WRAPPER: sccache
     steps:
       - name: Checkout Source
         uses: actions/checkout@v3
 
-      - name: Setup Rust
+      - name: Rust Setup
         uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
           toolchain: stable
           components: clippy, rustfmt
 
-      - name: Setup Cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache Setup
+        uses: mozilla-actions/sccache-action@v0.0.3
 
       - name: Format Check
         run: cargo fmt -- --check
@@ -41,13 +35,10 @@ jobs:
       - name: Clippy Check
         run: cargo clippy
 
-      - name: Tests Check
-        run: cargo test --workspace
-
-  # Check build
-  check_cargo_build:
-    name: Check Dev Build
-    needs: check_cargo_base
+  # tests and build
+  test_build:
+    name: Test Build
+    needs: style_check
     strategy:
       fail-fast: false
       matrix:
@@ -56,27 +47,24 @@ jobs:
           - target: i686-pc-windows-msvc
           - target: aarch64-pc-windows-msvc
     runs-on: windows-latest
+    env:
+      SCCACHE_GHA_ENABLED: true
+      RUSTC_WRAPPER: sccache
     steps:
       - name: Checkout Source
         uses: actions/checkout@v3
 
-      - name: Setup Rust
+      - name: Rust Setup
         uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
           toolchain: stable
           target: ${{ matrix.target }}
 
-      - name: Setup Cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache Setup
+        uses: mozilla-actions/sccache-action@v0.0.3
+
+      - name: Tests Check
+        run: cargo test --workspace
 
       - name: Build Check
         run: cargo build --locked --target ${{ matrix.target }}
@@ -84,7 +72,7 @@ jobs:
   # Create/Update release PR
   release_please:
     name: Release Please
-    needs: check_cargo_build
+    needs: test_build
     runs-on: ubuntu-latest
     if: github.repository == 'chawyehsu/hok' && github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
@@ -121,27 +109,21 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     continue-on-error: true
+    env:
+      SCCACHE_GHA_ENABLED: true
+      RUSTC_WRAPPER: sccache
     steps:
       - name: Checkout Source
         uses: actions/checkout@v3
 
-      - name: Setup Rust
+      - name: Rust Setup
         uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
           toolchain: stable
           target: ${{ matrix.target }}
 
-      - name: Setup Cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache Setup
+        uses: mozilla-actions/sccache-action@v0.0.3
 
       - name: Build
         uses: actions-rs/cargo@v1.0.3
@@ -186,7 +168,7 @@ jobs:
 
   # Create GitHub release with Rust build targets and release notes
   upload_artifacts:
-    name: Add Build Artifacts to Release
+    name: Create Release
     needs: [release_please, github_build]
     runs-on: ubuntu-latest
     steps:
@@ -201,7 +183,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Add Artifacts to Release
+      - name: Attach Artifacts
         uses: softprops/action-gh-release@v1
         with:
           files: hok-*/hok-*
