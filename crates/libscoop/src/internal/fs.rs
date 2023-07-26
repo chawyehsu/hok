@@ -21,10 +21,15 @@ pub fn remove_dir<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
     remove_dir_all::remove_dir_all(path.as_ref())
 }
 
+/// Remove all files and subdirectories in given `path`.
+///
+/// This function will not remove the given `path` itself. No-op if the given
+/// `path` does not exist.
 #[inline(always)]
 pub fn empty_dir<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
-    match path.as_ref().exists() {
-        true => remove_dir_all::remove_dir_contents(path.as_ref()),
+    let path = path.as_ref();
+    match path.exists() {
+        true => remove_dir_all::remove_dir_contents(path),
         false => Ok(()),
     }
 }

@@ -98,7 +98,7 @@ pub struct ConfigInner {
     #[serde(alias = "cachePath")]
     #[serde(default = "default::cache_path")]
     #[serde(skip_serializing_if = "default::is_default_cache_path")]
-    pub cache_path: PathBuf,
+    cache_path: PathBuf,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     cat_style: Option<String>,
@@ -172,6 +172,11 @@ impl Config {
         // try to write the default config to the default path, error is ignored
         let _ = write_json(default::config_path(), &config.inner);
         config
+    }
+
+    #[inline]
+    pub fn cache_path(&self) -> &Path {
+        self.cache_path.as_path()
     }
 
     #[inline]

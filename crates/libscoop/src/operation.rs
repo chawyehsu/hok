@@ -50,11 +50,12 @@ use crate::{
 /// A git error will be returned if failed to clone the bucket.
 pub fn bucket_add(session: &Session, name: &str, remote_url: &str) -> Fallible<()> {
     let config = session.config();
-    let mut path = config.root_path.clone();
-
+    let mut path = config.root_path().to_owned();
     path.push("buckets");
-    path.push(name);
 
+    internal::fs::ensure_dir(&path)?;
+
+    path.push(name);
     if path.exists() {
         return Err(Error::BucketAlreadyExists(name.to_owned()));
     }
@@ -201,7 +202,7 @@ pub fn bucket_update(session: &Session) -> Fallible<()> {
 /// This method will return an error if the bucket does not exist. I/O errors
 /// will be returned if the bucket directory is unable to be removed.
 pub fn bucket_remove(session: &Session, name: &str) -> Fallible<()> {
-    let mut path = session.config().root_path.clone();
+    let mut path = session.config().root_path().to_owned();
     path.push("buckets");
     path.push(name);
 
@@ -222,24 +223,39 @@ pub fn bucket_remove(session: &Session, name: &str) -> Fallible<()> {
 ///
 /// I/O errors will be returned if the cache directory is not readable.
 pub fn cache_list(session: &Session, query: &str) -> Fallible<Vec<CacheFile>> {
-    let mut entires = session
-        .config()
-        .cache_path
+    let is_wildcard_query = query.eq("*") || query.is_empty();
+    let config = session.config();
+    let cache_dir = config.cache_path();
+
+    internal::fs::ensure_dir(&cache_dir)?;
+
+    let entries = cache_dir
         .read_dir()?
         .filter_map(Result::ok)
-        .filter(|e| e.file_type().unwrap().is_file())
-        .filter_map(|de| CacheFile::from(de.path()).ok())
+        .filter_map(|de| {
+            let is_file = de.file_type().unwrap().is_file();
+            if is_file {
+                if let Ok(item) = CacheFile::from(de.path()) {
+                    if !is_wildcard_query {
+                        let matched = item
+                            .package_name()
+                            .to_lowercase()
+                            .contains(&query.to_lowercase());
+                        if matched {
+                            return Some(item);
+                        } else {
+                            return None;
+                        }
+                    }
+
+                    return Some(item);
+                }
+            }
+            None
+        })
         .collect::<Vec<_>>();
-    match query {
-        "" | "*" => {}
-        query => {
-            entires = entires
-                .into_iter()
-                .filter(|f| f.package_name().contains(query))
-                .collect::<Vec<_>>();
-        }
-    }
-    Ok(entires)
+
+    Ok(entries)
 }
 
 /// Remove cache files by query.
@@ -250,7 +266,11 @@ pub fn cache_list(session: &Session, query: &str) -> Fallible<Vec<CacheFile>> {
 /// to remove the cache files.
 pub fn cache_remove(session: &Session, query: &str) -> Fallible<()> {
     match query {
-        "*" => Ok(fs::empty_dir(&session.config().cache_path)?),
+        "*" => {
+            let config = session.config();
+            let cache_dir = config.cache_path();
+            Ok(internal::fs::empty_dir(cache_dir)?)
+        }
         query => {
             let files = cache_list(session, query)?;
             for f in files.into_iter() {

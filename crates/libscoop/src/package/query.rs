@@ -5,7 +5,7 @@ use regex::{Regex, RegexBuilder};
 use crate::{
     bucket::Bucket,
     error::Fallible,
-    internal::compare_versions,
+    internal::{self, compare_versions},
     package::manifest::{InstallInfo, Manifest},
     Session,
 };
@@ -96,6 +96,8 @@ pub(crate) fn query_installed(
             matcher.push((None, Box::new(RegexMatcher(re))));
         }
     }
+
+    internal::fs::ensure_dir(&apps_dir)?;
 
     let packages = apps_dir
         .read_dir()?
