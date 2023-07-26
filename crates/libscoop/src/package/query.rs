@@ -65,7 +65,7 @@ pub(crate) fn query_installed(
 ) -> Fallible<Vec<Package>> {
     let is_explicit_mode = options.contains(&QueryOption::Explicit);
     let is_wildcard_query = query.eq("*") || query.is_empty();
-    let root_path = session.config().root_path.clone();
+    let root_path = session.config().root_path().to_owned();
     let apps_dir = root_path.join("apps");
     // build matchers
     let mut matcher: Vec<(Option<String>, Box<dyn Matcher + Send + Sync>)> = vec![];
@@ -271,7 +271,7 @@ pub(crate) fn query_synced(
     let is_explicit_mode = options.contains(&QueryOption::Explicit);
     let is_wildcard_query = query.eq("*") || query.is_empty();
     let buckets = crate::operation::bucket_list(session)?;
-    let apps_dir = session.config().root_path.join("apps");
+    let apps_dir = session.config().root_path().join("apps");
     // build matchers
     let mut matcher: Vec<(Option<String>, Box<dyn Matcher + Send + Sync>)> = vec![];
 

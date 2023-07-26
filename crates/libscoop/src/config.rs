@@ -115,7 +115,6 @@ pub struct ConfigInner {
     #[serde(skip_serializing_if = "Option::is_none")]
     gh_token: Option<String>,
 
-    /// The global path
     #[serde(alias = "globalPath")]
     #[serde(default = "default::global_path")]
     #[serde(skip_serializing_if = "default::is_default_global_path")]
@@ -141,12 +140,11 @@ pub struct ConfigInner {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     proxy: Option<String>,
-    /// This is the root directory of a Scoop installation, by default the value
-    /// is `$HOME/scoop`.
+
     #[serde(alias = "rootPath")]
     #[serde(default = "default::root_path")]
     #[serde(skip_serializing_if = "default::is_default_root_path")]
-    pub root_path: PathBuf,
+    root_path: PathBuf,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     scoop_branch: Option<String>,
@@ -166,29 +164,40 @@ pub struct ConfigInner {
 }
 
 impl Config {
-    /// Initialize the config file with default values.
-    pub fn init() -> Config {
+    /// Initialize the config with default values.
+    ///
+    /// This function will try to write the default config to the default path,
+    /// located in the XDG_CONFIG_HOME directory.
+    pub(crate) fn init() -> Config {
         let config = Config::default();
         // try to write the default config to the default path, error is ignored
         let _ = write_json(default::config_path(), &config.inner);
         config
     }
 
+    /// Get the `cache` directory of Scoop.
     #[inline]
     pub fn cache_path(&self) -> &Path {
         self.cache_path.as_path()
     }
 
+    /// Get the root directory of Scoop.
+    ///
+    /// This is the root directory of a Scoop installation, by default the value
+    /// is `$HOME/scoop`. It may be changed by setting the `SCOOP` environment
+    /// variable.
     #[inline]
     pub fn root_path(&self) -> &Path {
         self.root_path.as_path()
     }
 
+    /// Get the `proxy` setting.
     #[inline]
     pub fn proxy(&self) -> Option<&str> {
         self.proxy.as_deref()
     }
 
+    /// Get the `cat_style` setting.
     #[inline]
     pub fn cat_style(&self) -> &str {
         self.cat_style.as_deref().unwrap_or_default()
@@ -376,46 +385,58 @@ mod default {
     /// Join the given `path` to `$HOME` and return a new [`PathBuf`].
     #[inline]
     fn home_join<P: AsRef<Path>>(path: P) -> PathBuf {
-        dirs::home_dir()
-            .map(|p| normalize_path(p.join(path.as_ref())))
-            .unwrap()
+        dirs::home_dir().map(|p| p.join(path.as_ref())).unwrap()
+    }
+
+    /// Get the default Scoop config path: `$HOME/.config/scoop/config.json`.
+    #[inline]
+    pub(super) fn config_path() -> PathBuf {
+        normalize_path(home_join(".config/scoop/config.json"))
+    }
+
+    /// Get the default Scoop root path.
+    #[inline]
+    pub(super) fn root_path() -> PathBuf {
+        let path = if let Some(path) = std::env::var_os("SCOOP") {
+            PathBuf::from(path)
+        } else {
+            home_join("scoop")
+        };
+
+        normalize_path(path)
+    }
+
+    /// Get the default Scoop cache path.
+    #[inline]
+    pub(super) fn cache_path() -> PathBuf {
+        let path = if let Some(path) = std::env::var_os("SCOOP_CACHE") {
+            PathBuf::from(path)
+        } else {
+            root_path().join("cache")
+        };
+
+        normalize_path(path)
+    }
+
+    /// Get the default Scoop global path.
+    #[inline]
+    pub(super) fn global_path() -> PathBuf {
+        let path = if let Some(path) = std::env::var_os("SCOOP_GLOBAL") {
+            return PathBuf::from(path);
+        } else {
+            std::env::var_os("ProgramData")
+                .map(PathBuf::from)
+                .map(|p| p.join("scoop"))
+                .unwrap_or(PathBuf::from("C:/ProgramData/scoop"))
+        };
+
+        normalize_path(path)
     }
 
     /// Check if the given `path` is equal to the `default` one.
     #[inline]
     fn is_default(default: &Path, path: &Path) -> bool {
         path.eq(default)
-    }
-
-    /// Get the default Scoop config path: `$HOME/.config/scoop/config.json`.
-    #[inline]
-    pub(super) fn config_path() -> PathBuf {
-        home_join(".config/scoop/config.json")
-    }
-
-    /// Get the default Scoop root path.
-    #[inline]
-    pub(super) fn root_path() -> PathBuf {
-        if let Some(path) = std::env::var_os("SCOOP") {
-            return PathBuf::from(path);
-        }
-
-        home_join("scoop")
-    }
-
-    /// Get the default Scoop cache path.
-    #[inline]
-    pub(super) fn cache_path() -> PathBuf {
-        root_path().join("cache")
-    }
-
-    /// Get the default Scoop global path.
-    #[inline]
-    pub(super) fn global_path() -> PathBuf {
-        std::env::var_os("ProgramData")
-            .map(PathBuf::from)
-            .map(|p| p.join("scoop"))
-            .unwrap_or(PathBuf::from("C:\\ProgramData\\scoop"))
     }
 
     /// Check if the given `path` is equal to the `default` Scoop root path.

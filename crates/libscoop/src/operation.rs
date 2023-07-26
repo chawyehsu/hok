@@ -84,7 +84,7 @@ pub fn bucket_add(session: &Session, name: &str, remote_url: &str) -> Fallible<(
 /// I/O errors will be returned if the `buckets` directory is not readable.
 pub fn bucket_list(session: &Session) -> Fallible<Vec<Bucket>> {
     let mut buckets = vec![];
-    let buckets_dir = session.config().root_path.join("buckets");
+    let buckets_dir = session.config().root_path().join("buckets");
 
     if buckets_dir.exists() {
         let entries = buckets_dir
@@ -226,34 +226,35 @@ pub fn cache_list(session: &Session, query: &str) -> Fallible<Vec<CacheFile>> {
     let is_wildcard_query = query.eq("*") || query.is_empty();
     let config = session.config();
     let cache_dir = config.cache_path();
+    let mut entries = vec![];
 
-    internal::fs::ensure_dir(&cache_dir)?;
-
-    let entries = cache_dir
-        .read_dir()?
-        .filter_map(Result::ok)
-        .filter_map(|de| {
-            let is_file = de.file_type().unwrap().is_file();
-            if is_file {
-                if let Ok(item) = CacheFile::from(de.path()) {
-                    if !is_wildcard_query {
-                        let matched = item
-                            .package_name()
-                            .to_lowercase()
-                            .contains(&query.to_lowercase());
-                        if matched {
-                            return Some(item);
-                        } else {
-                            return None;
+    if cache_dir.exists() {
+        entries = cache_dir
+            .read_dir()?
+            .filter_map(Result::ok)
+            .filter_map(|de| {
+                let is_file = de.file_type().unwrap().is_file();
+                if is_file {
+                    if let Ok(item) = CacheFile::from(de.path()) {
+                        if !is_wildcard_query {
+                            let matched = item
+                                .package_name()
+                                .to_lowercase()
+                                .contains(&query.to_lowercase());
+                            if matched {
+                                return Some(item);
+                            } else {
+                                return None;
+                            }
                         }
-                    }
 
-                    return Some(item);
+                        return Some(item);
+                    }
                 }
-            }
-            None
-        })
-        .collect::<Vec<_>>();
+                None
+            })
+            .collect::<Vec<_>>();
+    }
 
     Ok(entries)
 }
@@ -268,8 +269,7 @@ pub fn cache_remove(session: &Session, query: &str) -> Fallible<()> {
     match query {
         "*" => {
             let config = session.config();
-            let cache_dir = config.cache_path();
-            Ok(internal::fs::empty_dir(cache_dir)?)
+            Ok(internal::fs::empty_dir(config.cache_path())?)
         }
         query => {
             let files = cache_list(session, query)?;
@@ -327,7 +327,7 @@ pub fn config_set(session: &Session, key: &str, value: &str) -> Fallible<()> {
 ///
 /// [1]: crate::Error::PackageHoldBrokenInstall
 pub fn package_hold(session: &Session, name: &str, flag: bool) -> Fallible<()> {
-    let mut path = session.config().root_path.clone();
+    let mut path = session.config().root_path().to_owned();
     path.push("apps");
     path.push(name);
 
