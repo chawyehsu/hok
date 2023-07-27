@@ -71,29 +71,19 @@ pub(crate) fn query_installed(
     let mut matcher: Vec<(Option<String>, Box<dyn Matcher + Send + Sync>)> = vec![];
 
     if !is_wildcard_query {
-        if query.contains('/') {
-            let (bucket_prefix, name) = query.split_once('/').unwrap();
+        let (bucket_prefix, name) = query
+            .split_once('/')
+            .map(|(b, n)| (Some(b.to_owned()), n))
+            .unwrap_or((None, query));
 
-            if is_explicit_mode {
-                matcher.push((
-                    Some(bucket_prefix.to_owned()),
-                    Box::new(ExplicitMatcher(name)),
-                ));
-            } else {
-                let re = RegexBuilder::new(name)
-                    .case_insensitive(true)
-                    .multi_line(true)
-                    .build()?;
-                matcher.push((Some(bucket_prefix.to_owned()), Box::new(RegexMatcher(re))));
-            }
-        } else if is_explicit_mode {
-            matcher.push((None, Box::new(ExplicitMatcher(query))));
+        if is_explicit_mode {
+            matcher.push((bucket_prefix, Box::new(ExplicitMatcher(name))));
         } else {
-            let re = RegexBuilder::new(query)
+            let re = RegexBuilder::new(name)
                 .case_insensitive(true)
                 .multi_line(true)
                 .build()?;
-            matcher.push((None, Box::new(RegexMatcher(re))));
+            matcher.push((bucket_prefix, Box::new(RegexMatcher(re))));
         }
     }
 
@@ -276,29 +266,19 @@ pub(crate) fn query_synced(
     let mut matcher: Vec<(Option<String>, Box<dyn Matcher + Send + Sync>)> = vec![];
 
     if !is_wildcard_query {
-        if query.contains('/') {
-            let (bucket_prefix, name) = query.split_once('/').unwrap();
+        let (bucket_prefix, name) = query
+            .split_once('/')
+            .map(|(b, n)| (Some(b.to_owned()), n))
+            .unwrap_or((None, query));
 
-            if is_explicit_mode {
-                matcher.push((
-                    Some(bucket_prefix.to_owned()),
-                    Box::new(ExplicitMatcher(name)),
-                ));
-            } else {
-                let re = RegexBuilder::new(name)
-                    .case_insensitive(true)
-                    .multi_line(true)
-                    .build()?;
-                matcher.push((Some(bucket_prefix.to_owned()), Box::new(RegexMatcher(re))));
-            }
-        } else if is_explicit_mode {
-            matcher.push((None, Box::new(ExplicitMatcher(query))));
+        if is_explicit_mode {
+            matcher.push((bucket_prefix, Box::new(ExplicitMatcher(name))));
         } else {
-            let re = RegexBuilder::new(query)
+            let re = RegexBuilder::new(name)
                 .case_insensitive(true)
                 .multi_line(true)
                 .build()?;
-            matcher.push((None, Box::new(RegexMatcher(re))));
+            matcher.push((bucket_prefix, Box::new(RegexMatcher(re))));
         }
     }
 
