@@ -816,8 +816,8 @@ impl Manifest {
         let hook_scripts = [
             self.pre_install(),
             self.post_install(),
-            self.installer().map(|i| i.script().unwrap_or_default()),
-            self.uninstaller().map(|i| i.script().unwrap_or_default()),
+            self.installer().map(|i| i.script()).unwrap_or_default(),
+            self.uninstaller().map(|u| u.script()).unwrap_or_default(),
             self.pre_uninstall(),
             self.post_uninstall(),
         ];
