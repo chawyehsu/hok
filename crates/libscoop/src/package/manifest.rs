@@ -712,8 +712,19 @@ impl Manifest {
     }
 
     /// Return the `depends` of this manifest.
+    ///
+    /// This method returns the explicit dependencies defined in the manifest,
+    /// while [`dependencies`] returns all dependencies including the implicit
+    /// ones.
+    ///
+    /// # Note
+    ///
+    /// The format of a value in the `depends` field can be either `name` or
+    /// `bucket/name`, for example: `7zip` or `main/7zip`.
+    ///
+    /// [`dependencies`]: #method.dependencies
     #[inline]
-    pub fn raw_dependencies(&self) -> Option<Vec<&str>> {
+    pub fn depends(&self) -> Option<Vec<&str>> {
         self.inner.depends.as_ref().map(|v| v.devectorize())
     }
 
@@ -780,13 +791,22 @@ impl Manifest {
     }
 
     /// Returns the dependencies of this manifest.
+    ///
+    /// This method returns all dependencies including the implicit ones, while
+    /// [`depends`] returns the explicit dependencies defined in the `depends`
+    /// field of the manifest.
+    ///
+    /// # Note
+    ///
+    /// The format of the value of a dependency can be either `name` or
+    /// `bucket/name`, for example: `7zip` or `main/7zip`.
+    ///
+    /// [`depends`]: #method.depends
     pub fn dependencies(&self) -> Vec<String> {
         let mut deps = HashSet::new();
 
-        if let Some(raw_depends) = self.raw_dependencies() {
-            raw_depends.into_iter().for_each(|dep| {
-                deps.insert(dep.to_owned());
-            });
+        if let Some(raw_depends) = self.depends() {
+            deps.extend(raw_depends.into_iter().map(|s| s.to_owned()));
         }
 
         if self.innosetup() {
