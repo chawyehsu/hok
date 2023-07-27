@@ -2,7 +2,7 @@
 name = "scoop-hash"
 description = "Hashing library for libscoop"
 homepage = "https://github.com/chawyehsu/hok"
-version = "0.1.0-alpha.3"
+version = "0.1.0-beta.1"
 authors = ["Chawye Hsu <su+cratesio@chawyehsu.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2021"
