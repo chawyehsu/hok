@@ -31,12 +31,8 @@ use crate::{
     cache::CacheFile,
     error::{Error, Fallible},
     event::{BucketUpdateFailedCtx, Event},
-    internal::{
-        self,
-        fs::{self, filenamify},
-        git,
-    },
-    package::{self, resolve, InstallInfo, Package, QueryOption},
+    internal, package,
+    package::{InstallInfo, Package, QueryOption},
     Session, SyncOption,
 };
 
@@ -70,7 +66,7 @@ pub fn bucket_add(session: &Session, name: &str, remote_url: &str) -> Fallible<(
             .ok_or_else(|| Error::BucketAddRemoteRequired(name.to_owned()))?,
     };
 
-    git::clone_repo(remote_url, path, proxy)
+    internal::git::clone_repo(remote_url, path, proxy)
 }
 
 /// Get a list of added buckets.
@@ -158,7 +154,7 @@ pub fn bucket_update(session: &Session) -> Fallible<()> {
                     let _ = tx.send(Event::BucketUpdateStarted(name.clone()));
                 }
 
-                match git::reset_head(repo, proxy) {
+                match internal::git::reset_head(repo, proxy) {
                     Ok(_) => {
                         *flag.lock().unwrap() = true;
                         if let Some(tx) = emitter {
@@ -340,7 +336,7 @@ pub fn package_hold(session: &Session, name: &str, flag: bool) -> Fallible<()> {
 
     if let Ok(mut install_info) = InstallInfo::parse(&path) {
         install_info.set_held(flag);
-        fs::write_json(path, install_info)
+        internal::fs::write_json(path, install_info)
     } else {
         Err(Error::PackageHoldBrokenInstall(name.to_owned()))
     }
@@ -413,114 +409,22 @@ pub fn package_sync(
     queries: Vec<&str>,
     options: Vec<SyncOption>,
 ) -> Fallible<()> {
-    let is_op_remove = options.contains(&SyncOption::Remove);
-    let query_opts = vec![QueryOption::Explicit];
-    let mut packages = vec![];
     // remove possible duplicates
-    let queries = HashSet::<&str>::from_iter(queries);
+    let queries = HashSet::<&str>::from_iter(queries)
+        .into_iter()
+        .collect::<Vec<_>>();
 
     let emitter = session.emitter();
     if let Some(tx) = emitter {
         let _ = tx.send(Event::PackageResolveStart);
     }
 
-    for query in queries.into_iter() {
-        let mut pkg = if is_op_remove {
-            package::query::query_installed(session, query, &query_opts)?
-        } else {
-            package::query::query_synced(session, query, &query_opts)?
-        };
-
-        if pkg.is_empty() {
-            return Err(Error::PackageNotFound(query.to_owned()));
-        }
-
-        if pkg.len() > 1 {
-            resolve::select_candidate(session, &mut pkg)?;
-        }
-
-        packages.extend(pkg);
-    }
-
-    if is_op_remove {
-        resolve::resolve_dependents(session, &mut packages)?;
-
-        // println!("The following packages will be removed:");
-        // for pkg in packages.iter() {
-        //     println!("  {}", pkg.name());
-        // }
-    } else {
-        resolve::resolve_dependencies(session, &mut packages)?;
-
-        // filter installed packages
-        packages = packages
-            .into_iter()
-            .filter(|p| !p.is_strictly_installed())
-            .collect::<Vec<_>>();
-
-        if packages.is_empty() {
-            return Ok(());
-        }
-
-        // let download_only = options.contains(&SyncOption::DownloadOnly);
-        // let ignore_cache = options.contains(&SyncOption::IgnoreCache);
-
-        // if download_only {
-        //     println!("The following packages will be downloaded:");
-        // } else {
-        //     println!("The following packages will be installed:");
-        // }
-        // for pkg in packages.iter() {
-        //     println!("  {}", pkg.ident());
-        // }
-
-        // if let Some(tx) = emitter {
-        //     let _ = tx.send(Event::PackageDownloadSizingStart);
-        // }
-
-        // let mut total_size = 0f64;
-        // let mut size_estimated = false;
-
-        // let config = session.config();
-        // let cache_root = config.cache_path.clone();
-        // let proxy = config.proxy();
-
-        // for pkg in packages.iter() {
-        //     let mut urls_mapped_files = pkg
-        //         .url()
-        //         .into_iter()
-        //         .map(|url| {
-        //             let fname = format!("{}#{}#{}", pkg.name(), pkg.version(), filenamify(url));
-        //             let path = cache_root.join(fname);
-        //             (url, path)
-        //         })
-        //         .collect::<Vec<_>>();
-
-        //     if !ignore_cache {
-        //         urls_mapped_files = urls_mapped_files
-        //             .into_iter()
-        //             .filter(|(_, path)| !path.exists())
-        //             .collect::<Vec<_>>();
-        //     }
-
-        //     for (mut url, _) in urls_mapped_files.into_iter() {
-        //         if url.contains('#') {
-        //             url = url.split_once('#').unwrap().0;
-        //         }
-
-        //         let size = internal::network::get_content_length(url, proxy);
-        //         if size.is_none() {
-        //             size_estimated = true;
-        //         }
-        //         total_size += size.unwrap_or(1f64);
-        //     }
-        // }
-        // if size_estimated {
-        //     println!("  Total download size: {} (estimated)", total_size);
-        // } else {
-        //     println!("  Total download size: {}", total_size);
-        // }
-    }
+    // let is_op_remove = options.contains(&SyncOption::Remove);
+    // if is_op_remove {
+    //     package::sync::remove(session, &queries, &options)?;
+    // } else {
+    //     package::sync::install(session, &queries, &options)?;
+    // }
 
     Ok(())
 }
