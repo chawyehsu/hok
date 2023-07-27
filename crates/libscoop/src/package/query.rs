@@ -4,6 +4,7 @@ use regex::{Regex, RegexBuilder};
 
 use crate::{
     bucket::Bucket,
+    constant::ISOLATED_PACKAGE_BUCKET,
     error::Fallible,
     internal::{self, compare_versions},
     package::manifest::{InstallInfo, Manifest},
@@ -68,7 +69,7 @@ pub(crate) fn query_installed(
     let root_path = session.config().root_path().to_owned();
     let apps_dir = root_path.join("apps");
     // build matchers
-    let mut matcher: Vec<(Option<String>, Box<dyn Matcher + Send + Sync>)> = vec![];
+    let mut matchers: Vec<(Option<String>, Box<dyn Matcher + Send + Sync>)> = vec![];
 
     if !is_wildcard_query {
         let (bucket_prefix, name) = query
@@ -77,13 +78,13 @@ pub(crate) fn query_installed(
             .unwrap_or((None, query));
 
         if is_explicit_mode {
-            matcher.push((bucket_prefix, Box::new(ExplicitMatcher(name))));
+            matchers.push((bucket_prefix, Box::new(ExplicitMatcher(name))));
         } else {
             let re = RegexBuilder::new(name)
                 .case_insensitive(true)
                 .multi_line(true)
                 .build()?;
-            matcher.push((bucket_prefix, Box::new(RegexMatcher(re))));
+            matchers.push((bucket_prefix, Box::new(RegexMatcher(re))));
         }
     }
 
@@ -117,7 +118,7 @@ pub(crate) fn query_installed(
                     // name is always matched for wildcard query
                     true
                 } else {
-                    matcher.iter().any(|(_, m)| m.is_match(name))
+                    matchers.iter().any(|(_, m)| m.is_match(name))
                 };
 
                 if !is_wildcard_query && !extra_query && !name_matched {
@@ -128,19 +129,21 @@ pub(crate) fn query_installed(
                     if let Ok(install_info) = InstallInfo::parse(install_info_path) {
                         // Noted that packages installed via URLs don't have
                         // bucket info in install info file. We mark them as
-                        // isolated packages and use `__isolated__` as bucket
-                        // name.
-                        let bucket = install_info.bucket().unwrap_or("__isolated__");
+                        // isolated packages and use `ISOLATED_PACKAGE_BUCKET`
+                        // as bucket name.
+                        let bucket = install_info.bucket().unwrap_or(ISOLATED_PACKAGE_BUCKET);
 
                         let mut unmatched = true;
 
                         if is_wildcard_query {
                             unmatched = false;
                         } else {
-                            let prefixed_name_matched = matcher
+                            let prefixed_name_matched = matchers
                                 .iter()
                                 .filter(|&(_, m)| m.is_match(name))
                                 .any(|(prefix, _)| {
+                                    // either no bucket prefix or the bucket
+                                    // is also matched.
                                     prefix.is_none() || prefix.as_deref().unwrap() == bucket
                                 });
 
@@ -152,7 +155,7 @@ pub(crate) fn query_installed(
                                 if options.contains(&QueryOption::Description) {
                                     let description = manifest.description().unwrap_or_default();
                                     let description_matched =
-                                        matcher.iter().any(|(_, m)| m.is_match(description));
+                                        matchers.iter().any(|(_, m)| m.is_match(description));
                                     if description_matched {
                                         unmatched = false;
                                     }
@@ -160,7 +163,7 @@ pub(crate) fn query_installed(
 
                                 if options.contains(&QueryOption::Binary) {
                                     let binaries = manifest.executables().unwrap_or_default();
-                                    let binary_matched = matcher
+                                    let binary_matched = matchers
                                         .iter()
                                         .any(|(_, m)| binaries.iter().any(|&b| m.is_match(b)));
                                     if binary_matched {
@@ -193,7 +196,7 @@ pub(crate) fn query_installed(
                         // Filter out packages that are not upgradable when
                         // the upgradable option is requested.
                         if options.contains(&QueryOption::Upgradable) {
-                            if bucket == "__isolated__" {
+                            if bucket == ISOLATED_PACKAGE_BUCKET {
                                 debug!("ignore isolated package '{}'", name);
                                 // isolated packages are not upgradable currently,
                                 // we may support it by live checking the origin
@@ -263,7 +266,7 @@ pub(crate) fn query_synced(
     let buckets = crate::operation::bucket_list(session)?;
     let apps_dir = session.config().root_path().join("apps");
     // build matchers
-    let mut matcher: Vec<(Option<String>, Box<dyn Matcher + Send + Sync>)> = vec![];
+    let mut matchers: Vec<(Option<String>, Box<dyn Matcher + Send + Sync>)> = vec![];
 
     if !is_wildcard_query {
         let (bucket_prefix, name) = query
@@ -272,13 +275,13 @@ pub(crate) fn query_synced(
             .unwrap_or((None, query));
 
         if is_explicit_mode {
-            matcher.push((bucket_prefix, Box::new(ExplicitMatcher(name))));
+            matchers.push((bucket_prefix, Box::new(ExplicitMatcher(name))));
         } else {
             let re = RegexBuilder::new(name)
                 .case_insensitive(true)
                 .multi_line(true)
                 .build()?;
-            matcher.push((bucket_prefix, Box::new(RegexMatcher(re))));
+            matchers.push((bucket_prefix, Box::new(RegexMatcher(re))));
         }
     }
 
@@ -304,7 +307,7 @@ pub(crate) fn query_synced(
                             // name is always matched for wildcard query
                             true
                         } else {
-                            matcher.iter().any(|(_, m)| m.is_match(name))
+                            matchers.iter().any(|(_, m)| m.is_match(name))
                         };
 
                         if !is_wildcard_query && !extra_query && !name_matched {
@@ -319,10 +322,12 @@ pub(crate) fn query_synced(
                             if is_wildcard_query {
                                 unmatched = false;
                             } else {
-                                let prefixed_name_matched = matcher
+                                let prefixed_name_matched = matchers
                                     .iter()
                                     .filter(|&(_, m)| m.is_match(name))
                                     .any(|(prefix, _)| {
+                                        // either no bucket prefix or the bucket
+                                        // is also matched.
                                         prefix.is_none() || prefix.as_deref().unwrap() == bucket
                                     });
 
@@ -335,7 +340,7 @@ pub(crate) fn query_synced(
                                         let description =
                                             manifest.description().unwrap_or_default();
                                         let description_matched =
-                                            matcher.iter().any(|(_, m)| m.is_match(description));
+                                            matchers.iter().any(|(_, m)| m.is_match(description));
                                         if description_matched {
                                             unmatched = false;
                                         }
@@ -343,7 +348,7 @@ pub(crate) fn query_synced(
 
                                     if options.contains(&QueryOption::Binary) {
                                         let binaries = manifest.executables().unwrap_or_default();
-                                        let binary_matched = matcher
+                                        let binary_matched = matchers
                                             .iter()
                                             .any(|(_, m)| binaries.iter().any(|&b| m.is_match(b)));
                                         if binary_matched {

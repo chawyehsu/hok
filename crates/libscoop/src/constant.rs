@@ -8,6 +8,12 @@ pub static EVENT_BUS_CAPACITY: usize = 20;
 
 pub static DEFAULT_USER_AGENT: &str = "Scoop/1.0 (+http://scoop.sh/)";
 
+/// Dummy bucket name for isolated packages.
+///
+/// Isolated packages are installed via URLs or paths and not managed by any
+/// synced bucket.
+pub static ISOLATED_PACKAGE_BUCKET: &str = "__isolated__";
+
 pub static BUILTIN_BUCKET_LIST: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
     vec![
         ("main", "https://github.com/ScoopInstaller/Main"),
