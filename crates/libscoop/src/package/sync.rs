@@ -19,6 +19,11 @@ pub enum SyncOption {
     /// This option will also suppress the prompt for package candidate selection.
     /// A built-in candidate selection algorithm will be used to select the
     /// proper candidate. This may not be the desired behavior in some cases.
+    ///
+    /// Enabling this option will also suppress the calculation of download size.
+    /// In other words, [`NoDownloadSize`][1] option will be enabled implicitly.
+    ///
+    /// [1]: enum.SyncOption.html#variant.NoDownloadSize
     AssumeYes,
 
     /// Download package only.
@@ -410,8 +415,9 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
     let mut set = download::PackageSet::new(session, &packages, reuse_cache)?;
     let mut no_download_needed = false;
 
+    let assume_yes = options.contains(&SyncOption::AssumeYes);
     let no_download_size = options.contains(&SyncOption::NoDownloadSize);
-    if !no_download_size {
+    if !(assume_yes || no_download_size) {
         if let Some(tx) = session.emitter() {
             let _ = tx.send(Event::PackageDownloadSizingStart);
         }
@@ -421,7 +427,6 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
         transaction.set_download_size(download_size);
     }
 
-    let assume_yes = options.contains(&SyncOption::AssumeYes);
     if !assume_yes {
         if let Some(tx) = session.emitter() {
             if tx
