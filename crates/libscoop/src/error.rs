@@ -4,7 +4,9 @@ use crate::internal::dag::CyclicError;
 
 pub type Fallible<T> = Result<T, Error>;
 
-/// Error that may occur during performing operations.
+/// Error that may occur during the lifetime of a [`Session`][1].
+///
+/// [1]: crate::Session
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
@@ -58,6 +60,9 @@ pub enum Error {
     #[error("Could not find package named '{0}'")]
     PackageNotFound(String),
 
+    #[error("Found dependent(s):\n{}", .0.iter().map(|(d, p)| format!("'{}' requires '{}'", d, p)).collect::<Vec<_>>().join("\n"))]
+    PackageDependentFound(Vec<(String, String)>),
+
     /// Thrown when there are multiple candidates for a package name.
     #[error("Found multiple candidates for package named '{0}'")]
     PackageMultipleCandidates(String),
@@ -79,6 +84,14 @@ pub enum Error {
     /// Cycle dependency error
     #[error(transparent)]
     CyclicDependency(#[from] CyclicError),
+
+    /// Curl error
+    #[error(transparent)]
+    Curl(#[from] curl::Error),
+
+    /// Curl Multi error
+    #[error(transparent)]
+    CurlMulti(#[from] curl::MultiError),
 
     /// Git error
     #[error(transparent)]

@@ -27,10 +27,10 @@ use std::{
 };
 
 use crate::{
-    bucket::Bucket,
+    bucket::{Bucket, BucketUpdateProgressContext},
     cache::CacheFile,
     error::{Error, Fallible},
-    event::{BucketUpdateFailedCtx, Event},
+    event::Event,
     internal, package,
     package::{InstallInfo, Package, QueryOption},
     Session, SyncOption,
@@ -149,26 +149,25 @@ pub fn bucket_update(session: &Session) -> Fallible<()> {
 
         let task = pool
             .spawn_with_handle(async move {
-                if emitter.is_some() {
-                    let tx = emitter.clone().unwrap();
-                    let _ = tx.send(Event::BucketUpdateStarted(name.clone()));
+                let mut ctx = BucketUpdateProgressContext::new(name.as_str());
+
+                if let Some(tx) = emitter.clone() {
+                    let _ = tx.send(Event::BucketUpdateProgress(ctx.clone()));
                 }
 
                 match internal::git::reset_head(repo, proxy) {
                     Ok(_) => {
                         *flag.lock().unwrap() = true;
+
                         if let Some(tx) = emitter {
-                            let _ = tx.send(Event::BucketUpdateSuccessed(name));
+                            ctx.set_succeeded();
+                            let _ = tx.send(Event::BucketUpdateProgress(ctx));
                         }
                     }
                     Err(err) => {
                         if let Some(tx) = emitter {
-                            let ctx: BucketUpdateFailedCtx = BucketUpdateFailedCtx {
-                                name: name.clone(),
-                                err_msg: err.to_string(),
-                            };
-
-                            let _ = tx.send(Event::BucketUpdateFailed(ctx));
+                            ctx.set_failed(err.to_string().as_str());
+                            let _ = tx.send(Event::BucketUpdateProgress(ctx));
                         }
                     }
                 };
@@ -186,7 +185,7 @@ pub fn bucket_update(session: &Session) -> Fallible<()> {
     }
 
     if let Some(tx) = emitter {
-        let _ = tx.send(Event::BucketUpdateFinished);
+        let _ = tx.send(Event::BucketUpdateDone);
     }
     Ok(())
 }
@@ -365,25 +364,25 @@ pub fn package_query(
     options: Vec<QueryOption>,
     installed: bool,
 ) -> Fallible<Vec<Package>> {
-    let mut ret = vec![];
+    let mut packages = vec![];
     // remove possible duplicates
-    let mut queries = HashSet::<&str>::from_iter(queries);
+    let mut queries = HashSet::<&str>::from_iter(queries)
+        .into_iter()
+        .collect::<Vec<_>>();
+
     if queries.is_empty() {
-        queries.insert("*");
+        queries.push("*");
     }
 
-    for query in queries.into_iter() {
-        let qret = if installed {
-            package::query::query_installed(session, query, &options)?
-        } else {
-            package::query::query_synced(session, query, &options)?
-        };
-        ret.extend(qret);
-    }
+    packages = if installed {
+        package::query::query_installed(session, &queries, &options)?
+    } else {
+        package::query::query_synced(session, &queries, &options)?
+    };
 
-    ret.sort_by_key(|p| p.name().to_owned());
+    packages.sort_by_key(|p| p.name().to_owned());
 
-    Ok(ret)
+    Ok(packages)
 }
 
 /// Sync packages.
@@ -414,17 +413,20 @@ pub fn package_sync(
         .into_iter()
         .collect::<Vec<_>>();
 
-    let emitter = session.emitter();
-    if let Some(tx) = emitter {
+    if let Some(tx) = session.emitter() {
         let _ = tx.send(Event::PackageResolveStart);
     }
 
-    // let is_op_remove = options.contains(&SyncOption::Remove);
-    // if is_op_remove {
-    //     package::sync::remove(session, &queries, &options)?;
-    // } else {
-    //     package::sync::install(session, &queries, &options)?;
-    // }
+    let is_op_remove = options.contains(&SyncOption::Remove);
+    if is_op_remove {
+        package::sync::remove(session, &queries, &options)?;
+    } else {
+        package::sync::install(session, &queries, &options)?;
+    }
+
+    if let Some(tx) = session.emitter() {
+        let _ = tx.send(Event::PackageSyncDone);
+    }
 
     Ok(())
 }

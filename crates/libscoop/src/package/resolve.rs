@@ -2,14 +2,23 @@ use crate::{
     error::Fallible,
     event,
     internal::dag::DepGraph,
-    package::{query, Package, QueryOption},
+    package::{query, Package},
     Error, Session,
 };
 
 /// Resolve dependencies of the given packages.
+///
+/// # Note
+///
+/// This function ensures that packages are unique and sorted in dependency first
+/// order.
 pub(crate) fn resolve_dependencies(session: &Session, packages: &mut Vec<Package>) -> Fallible<()> {
     let mut graph = DepGraph::<String>::new();
     let mut to_resolve = packages.clone();
+
+    // For performance reason, a wildcard query is done here to get all the
+    // available packages in one shot and then used for the following queries.
+    let synced = query::query_synced(session, &["*"], &[])?;
 
     loop {
         if to_resolve.is_empty() {
@@ -29,15 +38,39 @@ pub(crate) fn resolve_dependencies(session: &Session, packages: &mut Vec<Package
                 let queries = deps.iter().map(|d| d.as_str());
 
                 for query in queries {
-                    let mut matched =
-                        query::query_synced(session, query, &[QueryOption::Explicit])?;
+                    let mut matched = synced
+                        .iter()
+                        .filter(|p| {
+                            let (query_bucket, query_name) =
+                                query.split_once('/').unwrap_or(("", query));
+                            let bucket_matched =
+                                query_bucket.is_empty() || p.bucket() == query_bucket;
+                            let name_matched = p.name() == query_name;
+                            bucket_matched && name_matched
+                        })
+                        .cloned()
+                        .collect::<Vec<_>>();
 
                     match matched.len() {
                         0 => return Err(Error::PackageNotFound(query.to_owned())),
-                        1 => resolved.push(matched.pop().unwrap()),
+                        1 => {
+                            let p = matched.pop().unwrap();
+                            if !(resolved.contains(&p)
+                                || to_resolve.contains(&p)
+                                || packages.contains(&p))
+                            {
+                                resolved.push(p);
+                            }
+                        }
                         _ => {
                             select_candidate(session, &mut matched)?;
-                            resolved.push(matched.pop().unwrap());
+                            let p = matched.pop().unwrap();
+                            if !(resolved.contains(&p)
+                                || to_resolve.contains(&p)
+                                || packages.contains(&p))
+                            {
+                                resolved.push(p);
+                            }
                         }
                     }
                 }
@@ -51,14 +84,12 @@ pub(crate) fn resolve_dependencies(session: &Session, packages: &mut Vec<Package
             // Cyclic dependency check
             graph.check()?;
 
-            resolved.dedup();
             to_resolve.append(&mut resolved);
         }
 
         packages.extend(to_resolve.clone());
     }
 
-    packages.dedup();
     // dependencies need to be installed before dependents
     packages.reverse();
 
@@ -89,13 +120,16 @@ pub(crate) fn select_candidate(session: &Session, candidates: &mut Vec<Package>)
     if let Some(tx) = session.emitter() {
         let question = candidates.iter().map(|p| p.ident()).collect::<Vec<_>>();
 
-        if tx.send(event::Event::SelectPackage(question)).is_ok() {
+        if tx
+            .send(event::Event::PromptPackageCandidate(question))
+            .is_ok()
+        {
             // The unwrap is safe here because we have obtained the outbound tx,
             // so the inbound rx must be available.
             let rx = session.receiver().unwrap();
 
             while let Ok(answer) = rx.recv() {
-                if let event::Event::SelectPackageAnswer(idx) = answer {
+                if let event::Event::PromptPackageCandidateResult(idx) = answer {
                     // bounds check
                     if idx < candidates.len() {
                         *candidates = vec![candidates[idx].clone()];
@@ -115,6 +149,8 @@ pub(crate) fn select_candidate(session: &Session, candidates: &mut Vec<Package>)
 
 /// Resolve unneeded dependencies of the given packages.
 ///
+/// # Note
+///
 /// This function is used to resolve the unneeded dependencies of the given
 /// packages. The unneeded dependencies are the dependencies that are not
 /// depended by other installed packages.
@@ -122,7 +158,10 @@ pub(crate) fn select_candidate(session: &Session, candidates: &mut Vec<Package>)
 /// The purpose is to support cascading removal of installed packages.
 pub(crate) fn resolve_cascade(session: &Session, packages: &mut Vec<Package>) -> Fallible<()> {
     let mut to_resolve = packages.clone();
-    let installed = query::query_installed(session, "*", &[QueryOption::Explicit])?;
+
+    // For performance reason, a wildcard query is done here to get all the
+    // installed packages in one shot and then used for the following queries.
+    let installed = query::query_installed(session, &["*"], &[])?;
 
     loop {
         if to_resolve.is_empty() {

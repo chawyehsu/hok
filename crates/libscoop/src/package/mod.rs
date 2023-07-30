@@ -1,3 +1,4 @@
+pub(crate) mod download;
 pub(crate) mod manifest;
 pub(crate) mod query;
 pub(crate) mod resolve;
@@ -10,7 +11,7 @@ pub use manifest::{InstallInfo, License, Manifest};
 pub use query::QueryOption;
 pub use sync::SyncOption;
 
-use crate::{constant::ISOLATED_PACKAGE_BUCKET, internal::compare_versions};
+use crate::{constant::ISOLATED_PACKAGE_BUCKET, internal};
 
 /// A Scoop package.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -159,15 +160,46 @@ impl Package {
 
     /// Get the dependencies of this package.
     ///
+    /// # Note
+    ///
     /// There is no guarantee that whether a dependency is represented as a
     /// format of `bucket/name` or `name`.
+    ///
+    /// # Returns
+    ///
+    /// A list of dependencies of this package.
     pub fn dependencies(&self) -> Vec<String> {
         self.manifest.dependencies()
     }
 
     /// Get download urls of this package.
-    pub fn url(&self) -> Vec<&str> {
-        self.manifest.url()
+    ///
+    /// # Note
+    ///
+    /// This method will return the actual download urls without the `#/dl.7z`
+    /// fragment which is used to fake the file extension of the download urls.
+    pub(crate) fn download_urls(&self) -> Vec<&str> {
+        self.manifest
+            .url()
+            .into_iter()
+            .map(|u| u.split_once('#').map(|s| s.0).unwrap_or(u))
+            .collect::<Vec<_>>()
+    }
+
+    /// Get download urls of this package.
+    pub(crate) fn download_filenames(&self) -> Vec<String> {
+        self.manifest
+            .url()
+            .into_iter()
+            .map(|u| {
+                format!(
+                    "{}#{}#{}",
+                    self.name(),
+                    self.version(),
+                    internal::fs::filenamify(u)
+                )
+            })
+            .collect::<Vec<_>>()
     }
 
     /// Get the installed bucket of this package.
@@ -239,25 +271,29 @@ impl Package {
     }
 
     /// Get the path of the manifest file of this package.
+    ///
+    /// # Returns
+    ///
+    /// The path of the manifest file of this package.
     #[inline]
     pub fn manfest_path(&self) -> &Path {
         self.manifest.path()
     }
 
-    /// Check if the package is upgradable.
+    /// Get the upgradable version of this package.
     ///
     /// # Returns
     ///
     /// The upgradable version when the package is upgradable, otherwise `None`.
-    pub fn upgradable(&self) -> Option<&str> {
+    pub fn upgradable_version(&self) -> Option<&str> {
         let origin_pkg = self.upgradable.borrow();
 
         if let Some(Some(pkg)) = origin_pkg {
             return Some(pkg.version());
         } else if let Some(installed_version) = self.installed_version() {
             let this_version = self.version();
-            let is_upgradable =
-                compare_versions(this_version, installed_version) == std::cmp::Ordering::Greater;
+            let is_upgradable = internal::compare_versions(this_version, installed_version)
+                == std::cmp::Ordering::Greater;
             if is_upgradable {
                 return Some(this_version);
             }
@@ -300,7 +336,9 @@ impl Package {
             InstallState::NotInstalled => OriginateFrom::Bucket(self.bucket.clone()),
             InstallState::Installed(info) => match info.url() {
                 Some(url) => OriginateFrom::File(url.to_owned()),
-                None => OriginateFrom::Bucket(info.bucket().unwrap_or("__isolated").to_owned()),
+                None => OriginateFrom::Bucket(
+                    info.bucket().unwrap_or(ISOLATED_PACKAGE_BUCKET).to_owned(),
+                ),
             },
         };
 

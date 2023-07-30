@@ -61,30 +61,32 @@ impl Matcher for RegexMatcher {
 /// Search installed packages.
 pub(crate) fn query_installed(
     session: &Session,
-    query: &str,
+    queries: &[&str],
     options: &[QueryOption],
 ) -> Fallible<Vec<Package>> {
     let is_explicit_mode = options.contains(&QueryOption::Explicit);
-    let is_wildcard_query = query.eq("*") || query.is_empty();
+    let is_wildcard_query = queries.contains(&"*") || queries.is_empty();
     let root_path = session.config().root_path().to_owned();
     let apps_dir = root_path.join("apps");
     // build matchers
     let mut matchers: Vec<(Option<String>, Box<dyn Matcher + Send + Sync>)> = vec![];
 
     if !is_wildcard_query {
-        let (bucket_prefix, name) = query
-            .split_once('/')
-            .map(|(b, n)| (Some(b.to_owned()), n))
-            .unwrap_or((None, query));
+        for query in queries {
+            let (bucket_prefix, name) = query
+                .split_once('/')
+                .map(|(b, n)| (Some(b.to_owned()), n))
+                .unwrap_or((None, query));
 
-        if is_explicit_mode {
-            matchers.push((bucket_prefix, Box::new(ExplicitMatcher(name))));
-        } else {
-            let re = RegexBuilder::new(name)
-                .case_insensitive(true)
-                .multi_line(true)
-                .build()?;
-            matchers.push((bucket_prefix, Box::new(RegexMatcher(re))));
+            if is_explicit_mode {
+                matchers.push((bucket_prefix, Box::new(ExplicitMatcher(name))));
+            } else {
+                let re = RegexBuilder::new(name)
+                    .case_insensitive(true)
+                    .multi_line(true)
+                    .build()?;
+                matchers.push((bucket_prefix, Box::new(RegexMatcher(re))));
+            }
         }
     }
 
@@ -258,30 +260,32 @@ pub(crate) fn query_installed(
 /// Search available packages.
 pub(crate) fn query_synced(
     session: &Session,
-    query: &str,
+    queries: &[&str],
     options: &[QueryOption],
 ) -> Fallible<Vec<Package>> {
     let is_explicit_mode = options.contains(&QueryOption::Explicit);
-    let is_wildcard_query = query.eq("*") || query.is_empty();
+    let is_wildcard_query = queries.contains(&"*") || queries.is_empty();
     let buckets = crate::operation::bucket_list(session)?;
     let apps_dir = session.config().root_path().join("apps");
     // build matchers
     let mut matchers: Vec<(Option<String>, Box<dyn Matcher + Send + Sync>)> = vec![];
 
     if !is_wildcard_query {
-        let (bucket_prefix, name) = query
-            .split_once('/')
-            .map(|(b, n)| (Some(b.to_owned()), n))
-            .unwrap_or((None, query));
+        for query in queries {
+            let (bucket_prefix, name) = query
+                .split_once('/')
+                .map(|(b, n)| (Some(b.to_owned()), n))
+                .unwrap_or((None, query));
 
-        if is_explicit_mode {
-            matchers.push((bucket_prefix, Box::new(ExplicitMatcher(name))));
-        } else {
-            let re = RegexBuilder::new(name)
-                .case_insensitive(true)
-                .multi_line(true)
-                .build()?;
-            matchers.push((bucket_prefix, Box::new(RegexMatcher(re))));
+            if is_explicit_mode {
+                matchers.push((bucket_prefix, Box::new(ExplicitMatcher(name))));
+            } else {
+                let re = RegexBuilder::new(name)
+                    .case_insensitive(true)
+                    .multi_line(true)
+                    .build()?;
+                matchers.push((bucket_prefix, Box::new(RegexMatcher(re))));
+            }
         }
     }
 

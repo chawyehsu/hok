@@ -1,6 +1,10 @@
 use flume::{bounded, Receiver, Sender};
 
-use crate::{bucket::Bucket, constant::EVENT_BUS_CAPACITY};
+use crate::{
+    bucket::BucketUpdateProgressContext,
+    constant::EVENT_BUS_CAPACITY,
+    package::{download::PackageDownloadProgressContext, sync::Transaction},
+};
 
 /// Event bus for event transmission.
 #[derive(Debug)]
@@ -59,26 +63,51 @@ impl Default for EventBus {
 }
 
 /// Event that may be emitted during the execution of operations.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 #[non_exhaustive]
 pub enum Event {
-    BucketAddStarted(String),
-    BucketAddFailed(String),
-    BucketAddFinished(String),
-    BucketListItem(Bucket),
-    BucketUpdateStarted(String),
-    BucketUpdateFailed(BucketUpdateFailedCtx),
-    BucketUpdateSuccessed(String),
-    BucketUpdateFinished,
-    PackageResolveStart,
-    PackageDownloadSizingStart,
-    SelectPackage(Vec<String>),
-    SelectPackageAnswer(usize),
-    SessionTerminated,
-}
+    /// Bucket update has made some progress.
+    BucketUpdateProgress(BucketUpdateProgressContext),
 
-#[derive(Debug, Clone)]
-pub struct BucketUpdateFailedCtx {
-    pub name: String,
-    pub err_msg: String,
+    /// Bucket update is finished.
+    BucketUpdateDone,
+
+    /// Package resolving is started.
+    PackageResolveStart,
+
+    /// Package resolving is finished.
+    PackageResolveDone,
+
+    /// Calculating download size is started.
+    PackageDownloadSizingStart,
+
+    /// Calculating download size is finished.
+    PackageDownloadSizingDone,
+
+    /// Package download is started.
+    PackageDownloadStart,
+
+    /// Package download has made some progress.
+    PackageDownloadProgress(PackageDownloadProgressContext),
+
+    /// Package download is finished.
+    PackageDownloadDone,
+
+    /// Package integrity check is started.
+    PackageIntegrityCheckStart,
+
+    /// Package sync operation is finished.
+    PackageSyncDone,
+
+    /// Prompt the user to confirm the transaction.
+    PromptTransactionNeedConfirm(Transaction),
+
+    /// Result of [`PromptTransactionNeedConfirm`].
+    PromptTransactionNeedConfirmResult(bool),
+
+    /// Prompt the user to select a package from multiple candidates.
+    PromptPackageCandidate(Vec<String>),
+
+    /// Result of [`PromptPackageCandidate`].
+    PromptPackageCandidateResult(usize),
 }

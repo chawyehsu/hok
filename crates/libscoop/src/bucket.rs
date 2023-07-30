@@ -248,3 +248,73 @@ impl Bucket {
         Ok(self.manifests()?.len())
     }
 }
+
+/// Bucket update progress context.
+#[derive(Clone)]
+pub struct BucketUpdateProgressContext {
+    /// The name of the bucket.
+    name: String,
+
+    /// The update progress state of the bucket.
+    state: BucketUpdateState,
+}
+
+impl BucketUpdateProgressContext {
+    pub fn new(name: &str) -> BucketUpdateProgressContext {
+        BucketUpdateProgressContext {
+            name: name.to_owned(),
+            state: BucketUpdateState::Started,
+        }
+    }
+
+    /// Get the name of the bucket associated with this context.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Get the update progress state of the bucket.
+    pub fn state(&self) -> &BucketUpdateState {
+        &self.state
+    }
+
+    pub(crate) fn set_succeeded(&mut self) {
+        self.state = BucketUpdateState::Succeeded;
+    }
+
+    pub(crate) fn set_failed(&mut self, msg: &str) {
+        self.state = BucketUpdateState::Failed(msg.to_owned());
+    }
+}
+
+/// Bucket update progress state.
+#[derive(Clone, PartialEq)]
+pub enum BucketUpdateState {
+    /// The bucket is started to update.
+    Started,
+
+    /// The bucket is failed to update with the given error message.
+    Failed(String),
+
+    /// The bucket is updated successfully.
+    Succeeded,
+}
+
+impl BucketUpdateState {
+    /// Check if the state is started.
+    pub fn started(&self) -> bool {
+        self == &BucketUpdateState::Started
+    }
+
+    /// Check if the state is succeeded.
+    pub fn succeeded(&self) -> bool {
+        self == &BucketUpdateState::Succeeded
+    }
+
+    /// Check if the state is failed.
+    pub fn failed(&self) -> Option<&str> {
+        match self {
+            BucketUpdateState::Failed(msg) => Some(msg),
+            _ => None,
+        }
+    }
+}

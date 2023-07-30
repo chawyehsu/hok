@@ -1,417 +1,572 @@
+use lazycell::LazyCell;
+use log::debug;
+
+use crate::{error::Fallible, Error, Event, QueryOption, Session};
+
+use super::{
+    download::{self, DownloadSize},
+    query, resolve, Package,
+};
+
 /// Options that may be used to tweak behavior of package sync operation.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum SyncOption {
-    AssumeNo,
+    /// Assume YES on all prompts.
+    ///
+    /// # Note
+    ///
+    /// This option will also suppress the prompt for package candidate selection.
+    /// A built-in candidate selection algorithm will be used to select the
+    /// proper candidate. This may not be the desired behavior in some cases.
     AssumeYes,
 
-    /// Download package only without installing it.
+    /// Download package only.
+    ///
+    /// # Note
+    ///
+    /// To sync packages by just downloading and caching them without installing
+    /// or upgrading, this option can be used. Transcation will be stopped after
+    /// the download is done.
     DownloadOnly,
-    IgnoreFailure,
-    IgnoreHold,
 
-    /// Ignore local cache and yet download package.
+    /// Ignore operation failure.
+    IgnoreFailure,
+
+    /// Ignore local cache and yet download packages.
+    ///
+    /// # Note
+    ///
+    /// This option is not intended to be used with the [`NoDownloadSize`][1]
+    /// option.
+    ///
+    /// [1]: enum.SyncOption.html#variant.NoDownloadSize
     IgnoreCache,
+
+    /// Stop checking hash of downloaded packages.
     NoHashCheck,
+
+    /// Skip download size calculation.
+    ///
+    /// # Note
+    ///
+    /// This option is useful when user wants to install or upgrade packages
+    /// with existing local cached packages. By opting in this option and having
+    /// valid caches prepared, network access can be avoided to perform the sync
+    /// operation. However, the operation may fail if there is any missing or
+    /// invalid cache.
+    ///
+    /// This option is not intended to be used with the [`IgnoreCache`][1] option.
+    ///
+    /// [1]: enum.SyncOption.html#variant.IgnoreCache
+    NoDownloadSize,
+
+    /// Do not install dependencies.
+    ///
+    /// # Note
+    ///
+    /// By default, dependencies of the pending installation package will be
+    /// resolved and installed **recursively** if they are not installed yet.
+    /// One can opt in this option to disable the default behavior. However,
+    /// it is not recommended to do so since it clearly breaks the dependency
+    /// relationship, and may stop the dependents from working properly.
+    NoDependencies,
+
+    /// Do not upgrade packages.
+    ///
+    /// This option is not intended to be used with the [`OnlyUpgrade`][1] option.
+    ///
+    /// [1]: enum.SyncOption.html#variant.OnlyUpgrade
     NoUpgrade,
+
+    /// Force operations on held packages.
+    ///
+    /// # Note
+    ///
+    /// Held packages are ignored during the replace, upgrade or uninstall
+    /// operations by default. The option can be used to escape the hold and
+    /// enforce operations on the held packages.
+    ///
+    /// Packages will be held again after the replace or upgrade operation.
+    EscapeHold,
+
+    /// Replace packages.
+    ///
+    /// Use this option to assume YES on replacing replaceable packages.
+    Replace,
+
+    /// Do not replace packages.
+    ///
+    /// Use this option to assume NO on replacing replaceable packages.
+    NoReplace,
+
+    /// Upgrade packages only.
+    ///
+    /// Use this option to specify a sync operation of only upgrading packages.
+    ///
+    /// This option is not intended to be used with the [`NoUpgrade`][1] option.
+    ///
+    /// [1]: enum.SyncOption.html#variant.NoUpgrade
     OnlyUpgrade,
 
     /// Uninstall packages.
     ///
-    /// Use this option to specify a sync operation of uninstalling packages.
+    /// Use this option to specify a sync operation of only uninstalling packages.
     Remove,
+
+    /// Purge uninstall.
+    ///
+    /// # Note
+    ///
+    /// By enabling this option, persistent data of the pending removal packages
+    /// will be removed simultaneously.
+    ///
+    /// This option only takes effect with the [`Remove`][1] option.
+    ///
+    /// [1]: enum.SyncOption.html#variant.Remove
+    Purge,
+
+    /// Cascade uninstall.
+    ///
+    /// # Note
+    ///
+    /// By opt in this option, dependencies of the pending removal package
+    /// will also be removed **recursively** if they are not required by other
+    /// installed packages.
+    ///
+    /// This option only takes effect with the [`Remove`][1] option.
+    ///
+    /// [1]: enum.SyncOption.html#variant.Remove
+    Cascade,
+
+    /// Disable dependent check.
+    ///
+    /// # Note
+    ///
+    /// By default, a reverse dependencies check will be performed on the pending
+    /// removal package. If any installed package depends on the pending removal
+    /// package, the removal operation will be aborted.
+    ///
+    /// The default behavior can be modified by opting in this option, however,
+    /// it is not recommended to do so since it clearly breaks the dependency
+    /// relationship, and may stop the dependents from working properly.
+    ///
+    /// This option only takes effect with the [`Remove`][1] option.
+    ///
+    /// [1]: enum.SyncOption.html#variant.Remove
+    NoDependentCheck,
 }
 
-// #[derive(Clone, Debug)]
-// pub struct DownloadProgressContext {
-//     pub name: String,
-//     pub total: u64,
-//     pub position: u64,
-//     pub file_count: usize,
-//     pub index: usize,
-//     pub state: DownloadProgressState,
-// }
+/// Transaction of sync operation.
+///
+/// # Note
+///
+/// A transaction is a set of packages that will be installed, upgraded, replaced
+/// or removed. The transaction is calculated by the sync operation and can be
+/// used to prompt the user to confirm the operation.
+#[derive(Clone)]
+pub struct Transaction {
+    /// Packages that will be installed with the transaction.
+    install: LazyCell<Vec<Package>>,
 
-// #[derive(Clone, Debug, PartialEq, Eq)]
-// pub enum DownloadProgressState {
-//     Prepared,
-//     Downloading,
-//     Finished,
-// }
+    /// Packages that will be upgraded with the transaction.
+    upgrade: LazyCell<Vec<Package>>,
 
-// pub(crate) fn install_packages(
-//     session: &Session,
-//     packages: Vec<Package>,
-//     options: HashSet<SyncOption>,
-// ) -> Fallible<()> {
-//     let no_cache = options.contains(&SyncOption::IgnoreCache);
-//     // let ignore_failure = options.contains(&InstallOption::IgnoreFailure);
+    /// Packages that will be replaced with the transaction.
+    replace: LazyCell<Vec<Package>>,
 
-//     // download
-//     // download_packages(session, &packages, no_cache)?;
-//     let download_only = options.contains(&SyncOption::DownloadOnly);
-//     if download_only {
-//         return Ok(());
-//     }
+    /// Packages that will be removed with the transaction.
+    remove: LazyCell<Vec<Package>>,
 
-//     // verrify integrity
-//     let no_hash_check = options.contains(&SyncOption::NoHashCheck);
-//     if !no_hash_check {
-//         // verify_integrity(session, &packages)?;
-//     }
+    /// Total download size of the transaction.
+    download_size: LazyCell<DownloadSize>,
+}
 
-//     // setup working_dir, copy cached files to working_dir, do decompression
-//     for package in &packages {
-//         let extract_dirs = package.manifest.extract_dir();
-//         let extract_tos = package.manifest.extract_to();
+impl Transaction {
+    fn new() -> Transaction {
+        Transaction {
+            install: LazyCell::new(),
+            upgrade: LazyCell::new(),
+            replace: LazyCell::new(),
+            remove: LazyCell::new(),
+            download_size: LazyCell::new(),
+        }
+    }
 
-//         let (working_dir, files) = setup_working_dir(session, package)?;
-//     }
+    fn set_install(&mut self, packages: Vec<Package>) {
+        self.install.replace(packages);
+    }
 
-//     Ok(())
-// }
+    fn set_upgrade(&mut self, packages: Vec<Package>) {
+        self.upgrade.replace(packages);
+    }
 
-// fn setup_working_dir(session: &Session, package: &Package) -> Fallible<(PathBuf, Vec<PathBuf>)> {
-//     let files = package
-//         .manifest
-//         .url()
-//         .into_iter()
-//         .map(|url| {
-//             session.config().cache_path.join(format!(
-//                 "{}#{}#{}",
-//                 package.name,
-//                 package.version(),
-//                 fs::filenamify(url)
-//             ))
-//         })
-//         .collect::<Vec<_>>();
+    fn set_replace(&mut self, packages: Vec<Package>) {
+        self.replace.replace(packages);
+    }
 
-//     let version = match package.manifest.is_nightly() {
-//         false => package.manifest.version().to_owned(),
-//         true => {
-//             let date = chrono::Local::now().format("%Y%m%d");
-//             format!("nightly-{}", date)
-//         }
-//     };
+    fn set_remove(&mut self, packages: Vec<Package>) {
+        self.remove.replace(packages);
+    }
 
-//     let working_dir = session
-//         .config()
-//         .root_path
-//         .join(format!("apps/{}/{}", package.name, version));
-//     fs::ensure_dir(&working_dir)?;
+    fn set_download_size(&self, download_size: DownloadSize) -> bool {
+        self.download_size.fill(download_size).is_ok()
+    }
 
-//     for src in files.iter() {
-//         let dst = working_dir.join(src.file_name().unwrap());
-//         std::fs::copy(&src, &dst)?;
-//     }
+    /// Get packages that will be installed with the transaction.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the vector of packages that will be installed or `None`
+    /// if no packages will be installed.
+    pub fn install_view(&self) -> Option<&Vec<Package>> {
+        self.install.borrow()
+    }
 
-//     let ret = (working_dir, files);
+    /// Get packages that will be upgraded with the transaction.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the vector of packages that will be upgraded or `None`
+    /// if no packages will be upgraded.
+    pub fn upgrade_view(&self) -> Option<&Vec<Package>> {
+        self.upgrade.borrow()
+    }
 
-//     // Return the last file as the fname
-//     Ok(ret)
-// }
+    /// Get packages that will be replaced with the transaction.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the vector of packages that will be replaced or `None`
+    /// if no packages will be replaced.
+    pub fn replace_view(&self) -> Option<&Vec<Package>> {
+        self.replace.borrow()
+    }
 
-// #[derive(Debug)]
-// struct ChunkedRange {
-//     pub offset: u64,
-//     pub length: u64,
-//     pub data: [u8; 4096],
-// }
+    /// Get packages that will be removed with the transaction.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the vector of packages that will be removed or `None`
+    /// if no packages will be removed.
+    pub fn remove_view(&self) -> Option<&Vec<Package>> {
+        self.remove.borrow()
+    }
 
-// fn download_packages<F>(
-//     session: &Session,
-//     packages: &Vec<Package>,
-//     no_cache: bool,
-//     callback: F,
-// ) -> Fallible<()>
-// where
-//     F: FnMut(DownloadProgressContext) + Send + 'static,
-// {
-//     let callback = Arc::new(Mutex::new(callback));
-//     let mut client = AgentBuilder::new();
-//     let user_agent = match session.user_agent.filled() {
-//         true => session.user_agent.borrow().unwrap().to_owned(),
-//         false => constant::DEFAULT_USER_AGENT.to_string(),
-//     };
-//     client = client.user_agent(&user_agent);
-//     let config = session.get_config();
-//     if config.proxy().is_some() {
-//         let proxy = config.proxy().unwrap();
-//         let proxy = ureq::Proxy::new(proxy)?;
-//         client = client.proxy(proxy);
-//     }
-//     let client = client.build();
+    /// Get the total download size of the transaction.
+    ///
+    /// # Returns
+    ///
+    /// A `DownloadSize` reference that contains the total download size of the
+    /// transaction.
+    pub fn download_size(&self) -> Option<&DownloadSize> {
+        self.download_size.borrow()
+    }
+}
 
-//     for package in packages {
-//         let urls = package.manifest.url();
-//         let cookie = package.manifest.cookie();
+impl Default for Transaction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
-//         let file_count = urls.len();
+/// Sync operation: install and/or upgrade packages.
+pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> Fallible<()> {
+    let mut packages = vec![];
 
-//         for (index, url) in urls.into_iter().enumerate() {
-//             let index = index + 1;
-//             let client = client.clone();
-//             let cache_path = session.get_config().cache_path.join(format!(
-//                 "{}#{}#{}",
-//                 package.name,
-//                 package.version(),
-//                 fs::filenamify(url)
-//             ));
+    let only_upgrade = options.contains(&SyncOption::OnlyUpgrade);
+    if only_upgrade {
+        let installed = query::query_installed(session, &["*"], &[QueryOption::Upgradable])?;
 
-//             if !no_cache && cache_path.exists() {
-//                 continue;
-//             }
+        for &query in queries {
+            let mut matched = installed
+                .iter()
+                .filter(|&p| p.name() == query)
+                .cloned()
+                .collect::<Vec<_>>();
 
-//             // strip `#/dl.7z` url renaming
-//             let url = url.split_once('#').map(|s| s.0).unwrap_or(url);
+            if matched.is_empty() {
+                return Err(Error::PackageNotFound(query.to_string()));
+            }
 
-//             let mut request = client.get(url);
+            // It's impossible to have more than one installed packages for
+            // the same package name.
+            assert_eq!(matched.len(), 1);
 
-//             // Add cookie header if present
-//             if let Some(cookie) = cookie {
-//                 let mut cookies = vec![];
-//                 for (key, value) in cookie {
-//                     cookies.push(format!("{}={}", key, value));
-//                 }
-//                 let cookie = cookies.join("; ");
-//                 request = request.set("Cookie", &cookie);
-//             }
+            let p = matched.pop().unwrap();
+            if !packages.contains(&p) {
+                packages.push(p);
+            }
+        }
+    } else {
+        let synced = query::query_synced(session, &["*"], &[])?;
 
-//             let response = request.call()?;
+        for &query in queries {
+            let mut matched = synced
+                .iter()
+                .filter(|&p| {
+                    let (query_bucket, query_name) = query.split_once('/').unwrap_or(("", query));
+                    let bucket_matched = query_bucket.is_empty() || p.bucket() == query_bucket;
+                    let name_matched = p.name() == query_name;
+                    bucket_matched && name_matched
+                })
+                .cloned()
+                .collect::<Vec<_>>();
 
-//             if response.status() != 200 {
-//                 return Err(Error::Custom(format!(
-//                     "failed to fetch {} (status code: {}",
-//                     url,
-//                     response.status()
-//                 )));
-//             }
+            match matched.len() {
+                0 => return Err(Error::PackageNotFound(query.to_owned())),
+                1 => {
+                    let p = matched.pop().unwrap();
+                    if !packages.contains(&p) {
+                        packages.push(p);
+                    }
+                }
+                _ => {
+                    resolve::select_candidate(session, &mut matched)?;
+                    let p = matched.pop().unwrap();
+                    if !packages.contains(&p) {
+                        packages.push(p);
+                    }
+                }
+            }
+        }
+    };
 
-//             let content_length = response
-//                 .header("Content-Length")
-//                 .map(|s| s.parse::<u64>().unwrap_or_default())
-//                 .unwrap_or_default();
-//             let accept_ranges = response
-//                 .header("Accept-Ranges")
-//                 .map(|s| "bytes" == s)
-//                 .unwrap_or_default();
+    let mut transaction = Transaction::default();
 
-//             let cache_file = CacheFile::from(cache_path)?;
+    let no_dependencies = options.contains(&SyncOption::NoDependencies);
+    if !no_dependencies {
+        resolve::resolve_dependencies(session, &mut packages)?;
+    }
 
-//             let ctx = DownloadProgressContext {
-//                 name: package.ident(),
-//                 total: content_length,
-//                 position: 0,
-//                 file_count,
-//                 index,
-//                 state: DownloadProgressState::Prepared,
-//             };
+    let (installed, installable): (Vec<_>, Vec<_>) =
+        packages.into_iter().partition(|p| p.is_installed());
 
-//             let (tx, rx) = mpsc::channel::<ChunkedRange>();
-//             let mut tasks = vec![];
-//             if !accept_ranges {
-//                 let pool = ThreadPool::builder().pool_size(2).create()?;
+    let (upgradable, replaceable): (Vec<_>, Vec<_>) = installed
+        .into_iter()
+        .partition(|p| p.is_strictly_installed());
 
-//                 let write_task = pool
-//                     .spawn_with_handle(do_write(cache_file, ctx, rx, callback.clone()))
-//                     .map_err(|e| Error::Custom(e.to_string()))?;
-//                 tasks.push(write_task);
+    if !only_upgrade && !installable.is_empty() {
+        transaction.set_install(installable);
+    }
 
-//                 let read_task = pool
-//                     .spawn_with_handle(do_read(response, tx.clone()))
-//                     .map_err(|e| Error::Custom(e.to_string()))?;
-//                 tasks.push(read_task);
-//             } else {
-//                 let default_connections = 5;
-//                 let split_size = 5_000_000 as u64;
+    let upgradable = upgradable
+        .into_iter()
+        .filter(|p| p.upgradable_version().is_some())
+        .collect::<Vec<_>>();
 
-//                 let x = content_length;
-//                 let y = split_size;
+    let no_upgrade = options.contains(&SyncOption::NoUpgrade);
+    if !no_upgrade && !upgradable.is_empty() {
+        let escape_hold = options.contains(&SyncOption::EscapeHold);
+        if !escape_hold {
+            let (_held, upgradable): (Vec<_>, Vec<_>) =
+                upgradable.into_iter().partition(|p| p.is_held());
 
-//                 let split_count = (x / y + (x % y != 0) as u64) as usize;
-//                 let connections = std::cmp::min(split_count, default_connections);
+            if !upgradable.is_empty() {
+                transaction.set_upgrade(upgradable);
+            }
+        } else {
+            transaction.set_upgrade(upgradable);
+        }
+    }
 
-//                 let mut ranges = vec![];
-//                 let mut range_start = 0;
-//                 let mut range_end = 0;
-//                 for _ in 1..=split_count {
-//                     range_end += split_size;
-//                     if range_end >= content_length {
-//                         range_end = content_length - 1;
-//                     }
-//                     ranges.push((range_start, range_end));
-//                     range_start = range_end + 1;
-//                 }
+    let no_replace = options.contains(&SyncOption::NoReplace);
+    if !no_replace && !replaceable.is_empty() {
+        transaction.set_replace(replaceable);
+    }
 
-//                 let pool_size = connections + 1;
-//                 let pool = ThreadPool::builder().pool_size(pool_size).create()?;
+    let reuse_cache = !options.contains(&SyncOption::IgnoreCache);
 
-//                 let write_task = pool
-//                     .spawn_with_handle(do_write(cache_file, ctx, rx, callback.clone()))
-//                     .map_err(|e| Error::Custom(e.to_string()))?;
-//                 tasks.push(write_task);
+    let empty = vec![];
+    let install = transaction.install_view().unwrap_or(&empty);
+    let upgrade = transaction.upgrade_view().unwrap_or(&empty);
+    let replace = transaction.replace_view().unwrap_or(&empty);
+    let packages = install
+        .iter()
+        .chain(upgrade.iter())
+        .chain(replace.iter())
+        .collect::<Vec<_>>();
 
-//                 for range in ranges {
-//                     let mut request = client.get(url);
-//                     request = request.set("Range", &format!("bytes={}-{}", range.0, range.1));
-//                     let read_task = pool
-//                         .spawn_with_handle(do_read_range(request, range, tx.clone()))
-//                         .map_err(|e| Error::Custom(e.to_string()))?;
-//                     tasks.push(read_task);
-//                 }
-//             }
-//             drop(tx);
+    debug!(
+        "transaction packages ({}): [{}]",
+        packages.len(),
+        packages
+            .iter()
+            .map(|p| p.name())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
 
-//             let joined = futures::future::join_all(tasks);
-//             futures::executor::block_on(joined);
-//         }
-//     }
+    if packages.is_empty() {
+        return Ok(());
+    }
 
-//     Ok(())
-// }
+    let mut set = download::PackageSet::new(session, &packages, reuse_cache)?;
+    let mut no_download_needed = false;
 
-// async fn do_write<F>(
-//     cache_file: CacheFile,
-//     mut ctx: DownloadProgressContext,
-//     rx: Receiver<ChunkedRange>,
-//     callback: Arc<Mutex<F>>,
-// ) -> Fallible<()>
-// where
-//     F: FnMut(DownloadProgressContext),
-// {
-//     let mut callback = callback.lock().unwrap();
+    let no_download_size = options.contains(&SyncOption::NoDownloadSize);
+    if !no_download_size {
+        if let Some(tx) = session.emitter() {
+            let _ = tx.send(Event::PackageDownloadSizingStart);
+        }
 
-//     let fd = std::fs::OpenOptions::new()
-//         .truncate(true)
-//         .create(true)
-//         .write(true)
-//         .open(cache_file.path())?;
+        let download_size = set.calculate_download_size()?;
+        no_download_needed = download_size.total == 0;
+        transaction.set_download_size(download_size);
+    }
 
-//     // emit
-//     callback(ctx.clone());
+    let assume_yes = options.contains(&SyncOption::AssumeYes);
+    if !assume_yes {
+        if let Some(tx) = session.emitter() {
+            if tx
+                .send(Event::PromptTransactionNeedConfirm(transaction.clone()))
+                .is_ok()
+            {
+                let rx = session.receiver().unwrap();
+                let mut confirmed = false;
 
-//     while let Ok(chunk) = rx.recv() {
-//         let _ = fd.seek_write(&chunk.data[..chunk.length as usize], chunk.offset)?;
+                while let Ok(event) = rx.recv() {
+                    if let Event::PromptTransactionNeedConfirmResult(ret) = event {
+                        confirmed = ret;
+                        break;
+                    }
+                }
 
-//         ctx.position = ctx.position + chunk.length;
-//         if ctx.state != DownloadProgressState::Downloading {
-//             ctx.state = DownloadProgressState::Downloading;
-//         }
-//         callback(ctx.clone());
-//     }
-//     drop(fd);
+                if !confirmed {
+                    return Ok(());
+                }
+            }
+        }
+    }
 
-//     ctx.state = DownloadProgressState::Finished;
-//     // emit
-//     callback(ctx);
-//     Ok(())
-// }
+    if !no_download_needed {
+        if let Some(tx) = session.emitter() {
+            let _ = tx.send(Event::PackageDownloadStart);
+        }
 
-// async fn do_read(response: ureq::Response, tx: Sender<ChunkedRange>) -> Fallible<()> {
-//     let mut chunk = [0; 4096];
-//     let mut offset = 0;
-//     let mut reader = response.into_reader();
+        set.download()?;
 
-//     loop {
-//         match reader.read(&mut chunk)? {
-//             0 => break,
-//             len => {
-//                 let chunk = ChunkedRange {
-//                     offset,
-//                     length: len as u64,
-//                     data: chunk,
-//                 };
-//                 offset += len as u64;
-//                 tx.send(chunk).unwrap();
-//             }
-//         }
-//     }
-//     Ok(drop(tx))
-// }
+        if let Some(tx) = session.emitter() {
+            let _ = tx.send(Event::PackageDownloadDone);
+        }
+    }
 
-// async fn do_read_range(
-//     request: Request,
-//     range: (u64, u64),
-//     tx: Sender<ChunkedRange>,
-// ) -> Fallible<()> {
-//     let response = request.call()?;
-//     if !(response.status() >= 200 && response.status() <= 299) {
-//         return Err(Error::Custom(format!(
-//             "failed to fetch (status code: {})",
-//             response.status()
-//         )));
-//     }
+    let download_only = options.contains(&SyncOption::DownloadOnly);
+    if !download_only {
+        // TODO: commit transcation
+    }
 
-//     let mut chunk = [0; 4096];
-//     let mut offset = range.0;
-//     let mut reader = BufReader::new(response.into_reader());
+    Ok(())
+}
 
-//     loop {
-//         match reader.read(&mut chunk)? {
-//             0 => break,
-//             length => {
-//                 let chunked_range = ChunkedRange {
-//                     offset,
-//                     length: length as u64,
-//                     data: chunk,
-//                 };
+/// Sync operation: remove packages.
+pub fn remove(session: &Session, queries: &[&str], options: &[SyncOption]) -> Fallible<()> {
+    let mut packages = vec![];
 
-//                 tx.send(chunked_range)
-//                     .map_err(|e| Error::Custom(format!("failed to send chunk: {}", e)))?;
+    let installed = query::query_installed(session, &["*"], &[])?;
 
-//                 offset += length as u64;
-//             }
-//         }
-//     }
-//     Ok(drop(tx))
-// }
+    for &name in queries {
+        let mut matched = installed
+            .iter()
+            .filter(|&p| p.name() == name)
+            .cloned()
+            .collect::<Vec<_>>();
 
-// pub(crate) fn verify_integrity(session: &Session, packages: &Vec<Package>) -> Fallible<()> {
-//     println!("Verifying integrity of packages...");
+        if matched.is_empty() {
+            return Err(Error::PackageNotFound(name.to_string()));
+        }
 
-//     for package in packages {
-//         // skip nightly package
-//         if package.manifest.is_nightly() {
-//             continue;
-//         }
+        // It's impossible to have more than one installed packages for the same
+        // package name.
+        assert_eq!(matched.len(), 1);
 
-//         let urls = package.manifest.url_with_hash();
-//         print!("Checking hash of {}... ", package.name);
+        packages.push(matched.pop().unwrap());
+    }
 
-//         for (url, hash) in urls.into_iter() {
-//             let cache_path = session.get_config().cache_path.join(format!(
-//                 "{}#{}#{}",
-//                 package.name,
-//                 package.version(),
-//                 fs::filenamify(url)
-//             ));
+    let no_dependent_check = options.contains(&SyncOption::NoDependentCheck);
+    if !no_dependent_check {
+        let mut dependents = vec![];
 
-//             let mut hasher = Checksum::new(hash).map_err(|e| Error::Custom(e.to_string()))?;
-//             let mut file = std::fs::File::open(&cache_path)
-//                 .with_context(|| format!("failed to open cache file: {}", cache_path.display()))?;
-//             let mut buffer = [0; 4096];
-//             loop {
-//                 let len = file.read(&mut buffer).with_context(|| {
-//                     format!("failed to read cache file: {}", cache_path.display())
-//                 })?;
-//                 match len {
-//                     0 => break,
-//                     len => hasher.consume(&buffer[..len]),
-//                 }
-//             }
-//             let checksum = hasher.result();
-//             if hash != &checksum {
-//                 println!("Err");
-//                 return Err(Error::Custom(format!(
-//                     "checksum mismatch: {}\n Expected: {}\n Actual: {}",
-//                     cache_path.display(),
-//                     hash,
-//                     checksum
-//                 )));
-//             }
-//         }
-//         println!("Ok");
-//     }
+        for pkg in packages.iter() {
+            let mut result = installed
+                .iter()
+                .filter_map(|p| {
+                    if packages.contains(p) {
+                        return None;
+                    }
 
-//     Ok(())
-// }
+                    let dep_names = p
+                        .dependencies()
+                        .into_iter()
+                        .map(super::extract_name)
+                        .collect::<Vec<_>>();
+
+                    if dep_names.contains(&pkg.name().to_owned()) {
+                        // p depends on pkg
+                        Some((p.name().to_owned(), pkg.name().to_owned()))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            if result.is_empty() {
+                continue;
+            }
+
+            dependents.append(&mut result);
+        }
+
+        if !dependents.is_empty() {
+            return Err(Error::PackageDependentFound(dependents));
+        }
+    }
+
+    let is_cascade = options.contains(&SyncOption::Cascade);
+    if is_cascade {
+        resolve::resolve_cascade(session, &mut packages)?;
+    }
+
+    if let Some(tx) = session.emitter() {
+        let _ = tx.send(Event::PackageResolveDone);
+    }
+
+    let mut transaction = Transaction::default();
+
+    // TODO: PowerShell hosting with execution context is not supported yet.
+    // Perhaps at present we could call Scoop to do the removal for packages
+    // using PS scripts...
+    let (_packages_with_script, _packages): (Vec<_>, Vec<_>) =
+        packages.iter().partition(|p| p.has_ps_script());
+
+    transaction.set_remove(packages);
+
+    let assume_yes = options.contains(&SyncOption::AssumeYes);
+    if !assume_yes {
+        if let Some(tx) = session.emitter() {
+            if tx
+                .send(Event::PromptTransactionNeedConfirm(transaction.clone()))
+                .is_ok()
+            {
+                let rx = session.receiver().unwrap();
+                let mut confirmed = false;
+
+                while let Ok(event) = rx.recv() {
+                    if let Event::PromptTransactionNeedConfirmResult(ret) = event {
+                        confirmed = ret;
+                        break;
+                    }
+                }
+
+                if !confirmed {
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    // TODO: commit transcation
+    // let purge = options.contains(&SyncOption::Purge);
+
+    Ok(())
+}
