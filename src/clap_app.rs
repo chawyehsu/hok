@@ -181,19 +181,14 @@ pub fn build() -> Command {
                         .required(true)
                         .action(ArgAction::Append),
                 )
-                // .arg(
-                //     Arg::new("independent")
-                //         .help("Do not automatically install dependencies")
-                //         .short("i")
-                //         .long("independent")
-                // )
                 .arg(
-                    Arg::new("download-only")
-                        .help("Download package(s) without performing installation")
-                        .short('D')
-                        .long("download-only")
+                    Arg::new("assume-yes")
+                        .help("Assume yes to all prompts and run non-interactively")
+                        .short('y')
+                        .long("assume-yes")
                         .action(ArgAction::SetTrue),
-                ) // .arg(
+                )
+                // .arg(
                 //     Arg::new("ignore-broken")
                 //         .long_help(
                 //             "Ignore broken packages while performing installation.\n\
@@ -207,17 +202,66 @@ pub fn build() -> Command {
                 //         .action(ArgAction::SetTrue)
                 // )
                 .arg(
+                    Arg::new("escape-hold")
+                        .help("Escape hold to enable replace/upgrade on held package(s)")
+                        .short('s')
+                        .long("escape-hold")
+                        .action(ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("yes-replace")
+                        .help("Replace replaceable package(s)")
+                        .short('r')
+                        .long("yes-replace")
+                        .action(ArgAction::SetTrue),
+                )
+                // .arg(
+                //     Arg::new("independent")
+                //         .help("Do not install dependencies (may cause install fail)")
+                //         .short('I')
+                //         .long("independent")
+                //         .action(ArgAction::SetTrue),
+                // )
+                .arg(
+                    Arg::new("download-only")
+                        .help("Download package(s) without performing installation")
+                        .short('d')
+                        .long("download-only")
+                        .action(ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("no-download-size")
+                        .help("Skip live checking download size")
+                        .short('L')
+                        .long("no-download-size")
+                        .action(ArgAction::SetTrue),
+                )
+                .arg(
                     Arg::new("ignore-cache")
                         .help("Ignore cache and yet perform download")
-                        .short('F')
+                        .short('D')
                         .long("ignore-cache")
+                        .action(ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("no-replace")
+                        .help("Do not replace package(s)")
+                        .short('R')
+                        .long("no-replace")
+                        .action(ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("no-upgrade")
+                        .help("Do not upgrade package(s)")
+                        .short('U')
+                        .long("no-upgrade")
                         .action(ArgAction::SetTrue),
                 ), // .arg(
                    //     Arg::new("no-hash-check")
                    //         .help("Skip package integrity check, USE WITH CAUTION!")
                    //         .long("no-hash-check")
-                   //         .action(ArgAction::SetTrue)
-                   // )
+                   //         .action(ArgAction::SetTrue),
+                   // ),
         )
         .subcommand(
             Command::new("list")
@@ -311,12 +355,72 @@ pub fn build() -> Command {
                         .help("The package(s) to uninstall")
                         .required(true)
                         .action(ArgAction::Append),
+                )
+                .arg(
+                    Arg::new("assume-yes")
+                        .help("Assume yes to all prompts and run non-interactively")
+                        .short('y')
+                        .long("assume-yes")
+                        .action(ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("cascade")
+                        .help("Remove unneeded dependencies as well")
+                        .short('c')
+                        .long("cascade")
+                        .action(ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("escape-hold")
+                        .help("Escape hold to enable uninstall on held package(s)")
+                        .short('s')
+                        .long("escape-hold")
+                        .action(ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("purge")
+                        .help("Purge package(s) persistent data as well")
+                        .short('p')
+                        .long("purge")
+                        .action(ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("no-dependent-check")
+                        .help("Disable dependent check")
+                        .short('D')
+                        .long("no-dependent-check")
+                        .action(ArgAction::SetTrue),
                 ),
         )
         .subcommand(Command::new("update").about("Fetch and update all buckets"))
         .subcommand(
             Command::new("upgrade")
                 .about("Upgrade installed package(s)")
-                .arg(Arg::new("package").help("Specified package(s) to be upgraded")),
+                .alias("u")
+                .arg(
+                    Arg::new("package")
+                        .help("The package(s) to be upgraded (default: all except held)"),
+                )
+                .arg(
+                    Arg::new("assume-yes")
+                        .help("Assume yes to all prompts and run non-interactively")
+                        .short('y')
+                        .long("assume-yes")
+                        .action(ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("escape-hold")
+                        .help("Escape hold to enable replace/upgrade on held package(s)")
+                        .short('s')
+                        .long("escape-hold")
+                        .action(ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("no-download-size")
+                        .help("Skip live checking download size")
+                        .short('L')
+                        .long("no-download-size")
+                        .action(ArgAction::SetTrue),
+                ),
         )
 }

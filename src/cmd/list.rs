@@ -35,7 +35,7 @@ pub fn cmd_list(matches: &ArgMatches, session: &Session) -> Result<()> {
                     continue;
                 }
 
-                let upgradable = pkg.upgradable();
+                let upgradable = pkg.upgradable_version();
                 if upgradable.is_some() {
                     output.push_str(format!(" -> {}", upgradable.unwrap().blue()).as_str());
                 }
