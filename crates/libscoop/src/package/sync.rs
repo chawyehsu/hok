@@ -278,24 +278,30 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
     if only_upgrade {
         let installed = query::query_installed(session, &["*"], &[QueryOption::Upgradable])?;
 
-        for &query in queries {
-            let mut matched = installed
-                .iter()
-                .filter(|&p| p.name() == query)
-                .cloned()
-                .collect::<Vec<_>>();
+        // Got wildcard query, all installed packages will be marked as pending
+        // upgrade.
+        if queries.contains(&"*") {
+            packages = installed;
+        } else {
+            for &query in queries {
+                let mut matched = installed
+                    .iter()
+                    .filter(|&p| p.name() == query)
+                    .cloned()
+                    .collect::<Vec<_>>();
 
-            if matched.is_empty() {
-                return Err(Error::PackageNotFound(query.to_string()));
-            }
+                if matched.is_empty() {
+                    return Err(Error::PackageNotFound(query.to_string()));
+                }
 
-            // It's impossible to have more than one installed packages for
-            // the same package name.
-            assert_eq!(matched.len(), 1);
+                // It's impossible to have more than one installed packages for
+                // the same package name.
+                assert_eq!(matched.len(), 1);
 
-            let p = matched.pop().unwrap();
-            if !packages.contains(&p) {
-                packages.push(p);
+                let p = matched.pop().unwrap();
+                if !packages.contains(&p) {
+                    packages.push(p);
+                }
             }
         }
     } else {
