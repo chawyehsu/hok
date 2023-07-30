@@ -23,7 +23,7 @@ pub enum SyncOption {
     /// Enabling this option will also suppress the calculation of download size.
     /// In other words, [`NoDownloadSize`][1] option will be enabled implicitly.
     ///
-    /// [1]: enum.SyncOption.html#variant.NoDownloadSize
+    /// [1]: SyncOption::NoDownloadSize
     AssumeYes,
 
     /// Download package only.
@@ -45,7 +45,7 @@ pub enum SyncOption {
     /// This option is not intended to be used with the [`NoDownloadSize`][1]
     /// option.
     ///
-    /// [1]: enum.SyncOption.html#variant.NoDownloadSize
+    /// [1]: SyncOption::NoDownloadSize
     IgnoreCache,
 
     /// Stop checking hash of downloaded packages.
@@ -63,7 +63,7 @@ pub enum SyncOption {
     ///
     /// This option is not intended to be used with the [`IgnoreCache`][1] option.
     ///
-    /// [1]: enum.SyncOption.html#variant.IgnoreCache
+    /// [1]: SyncOption::IgnoreCache
     NoDownloadSize,
 
     /// Do not install dependencies.
@@ -81,7 +81,7 @@ pub enum SyncOption {
     ///
     /// This option is not intended to be used with the [`OnlyUpgrade`][1] option.
     ///
-    /// [1]: enum.SyncOption.html#variant.OnlyUpgrade
+    /// [1]: SyncOption::OnlyUpgrade
     NoUpgrade,
 
     /// Force operations on held packages.
@@ -111,7 +111,7 @@ pub enum SyncOption {
     ///
     /// This option is not intended to be used with the [`NoUpgrade`][1] option.
     ///
-    /// [1]: enum.SyncOption.html#variant.NoUpgrade
+    /// [1]: SyncOption::NoUpgrade
     OnlyUpgrade,
 
     /// Uninstall packages.
@@ -128,7 +128,7 @@ pub enum SyncOption {
     ///
     /// This option only takes effect with the [`Remove`][1] option.
     ///
-    /// [1]: enum.SyncOption.html#variant.Remove
+    /// [1]: SyncOption::Remove
     Purge,
 
     /// Cascade uninstall.
@@ -141,7 +141,7 @@ pub enum SyncOption {
     ///
     /// This option only takes effect with the [`Remove`][1] option.
     ///
-    /// [1]: enum.SyncOption.html#variant.Remove
+    /// [1]: SyncOption::Remove
     Cascade,
 
     /// Disable dependent check.
@@ -158,7 +158,7 @@ pub enum SyncOption {
     ///
     /// This option only takes effect with the [`Remove`][1] option.
     ///
-    /// [1]: enum.SyncOption.html#variant.Remove
+    /// [1]: SyncOption::Remove
     NoDependentCheck,
 }
 

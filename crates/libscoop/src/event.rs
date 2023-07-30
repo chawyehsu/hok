@@ -102,12 +102,16 @@ pub enum Event {
     /// Prompt the user to confirm the transaction.
     PromptTransactionNeedConfirm(Transaction),
 
-    /// Result of [`PromptTransactionNeedConfirm`].
+    /// Result of [`PromptTransactionNeedConfirm`][1].
+    ///
+    /// [1]: Event::PromptTransactionNeedConfirm
     PromptTransactionNeedConfirmResult(bool),
 
     /// Prompt the user to select a package from multiple candidates.
     PromptPackageCandidate(Vec<String>),
 
-    /// Result of [`PromptPackageCandidate`].
+    /// Result of [`PromptPackageCandidate`][1].
+    ///
+    /// [1]: Event::PromptPackageCandidate
     PromptPackageCandidateResult(usize),
 }
