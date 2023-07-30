@@ -4,6 +4,7 @@
 
 [![cicd][cicd-badge]][cicd]
 [![release][release-badge]][releases]
+[![crates-svg]][crates-url]
 [![license][license-badge]](LICENSE)
 [![downloads][downloads-badge]][releases]
 [![docs-svg]][docs-url]
@@ -83,6 +84,8 @@ For licenses of sub crates, see [COPYING](COPYING).
 [cicd]: https://github.com/chawyehsu/hok/actions/workflows/cicd.yml
 [release-badge]: https://img.shields.io/github/v/release/chawyehsu/hok
 [releases]: https://github.com/chawyehsu/hok/releases/latest
+[crates-svg]: https://img.shields.io/crates/v/libscoop.svg
+[crates-url]: https://crates.io/crates/libscoop
 [license-badge]: https://img.shields.io/github/license/chawyehsu/hok
 [downloads-badge]: https://img.shields.io/github/downloads/chawyehsu/hok/total
 [docs-svg]: https://docs.rs/libscoop/badge.svg
