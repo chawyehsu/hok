@@ -25,8 +25,10 @@ use crate::internal;
 pub struct Manifest {
     /// The path is used to determine the location of the manifest file.
     path: PathBuf,
+
     /// The actual manifest specification.
     inner: ManifestSpec,
+
     /// The hash of the manifest.
     hash: String,
 }
@@ -92,9 +94,13 @@ pub struct ManifestSpec {
     pub notes: Option<Vectorized<String>>,
 }
 
+/// License information of a Scoop package.
 #[derive(Clone, Debug, Serialize)]
 pub struct License {
+    /// The identifier of the license, which is intended to be a SPDX license.
     identifier: String,
+
+    /// The url to the license text.
     #[serde(skip_serializing_if = "Option::is_none")]
     url: Option<String>,
 }
@@ -940,20 +946,24 @@ impl Manifest {
 }
 
 impl License {
+    /// Create a [`License`] representation.
     pub fn new(identifier: String, url: Option<String>) -> License {
         Self { identifier, url }
     }
 
+    /// Return the identifier of this license.
     #[inline]
     pub fn identifier(&self) -> &str {
         &self.identifier
     }
 
+    /// Check if this license is a valid SPDX identifier.
     #[inline]
     pub fn is_spdx(&self) -> bool {
         SPDX_LIST.contains(self.identifier())
     }
 
+    /// Return the url to the license text of this license.
     #[inline]
     pub fn url(&self) -> Option<&str> {
         self.url.as_deref()

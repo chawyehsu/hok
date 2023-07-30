@@ -4,8 +4,10 @@ use regex::{Regex, RegexBuilder};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
+/// Default capacity of the event bus.
 pub static EVENT_BUS_CAPACITY: usize = 20;
 
+/// Default user agent for HTTP requests.
 pub static DEFAULT_USER_AGENT: &str = "Scoop/1.0 (+http://scoop.sh/)";
 
 /// Dummy bucket name for isolated packages.
@@ -14,6 +16,7 @@ pub static DEFAULT_USER_AGENT: &str = "Scoop/1.0 (+http://scoop.sh/)";
 /// synced bucket.
 pub static ISOLATED_PACKAGE_BUCKET: &str = "__isolated__";
 
+/// Built-in list of known buckets.
 pub static BUILTIN_BUCKET_LIST: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
     vec![
         ("main", "https://github.com/ScoopInstaller/Main"),
@@ -75,6 +78,7 @@ static REGEX_ARCHIVE_ZSTD: Lazy<Regex> = Lazy::new(|| {
     RegexBuilder::new(pattern).build().unwrap()
 });
 
+/// List of valid SPDX license identifiers.
 pub static SPDX_LIST: Lazy<HashSet<&str>> = Lazy::new(|| {
     // Reference: https://github.com/spdx/license-list-data
     const ID_LIST: [&str; 458] = [
