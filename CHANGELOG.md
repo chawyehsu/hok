@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.1.0-beta.1](https://github.com/chawyehsu/hok/compare/v0.1.0-alpha.3...v0.1.0-beta.1) (2023-07-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **libscoop:** Some `Event` variants related to bucekt update progress have been updated to fit the latest codebase.
+
+### Features
+
+* **hok:** support resolving and downloading packages ([bdc08dd](https://github.com/chawyehsu/hok/commit/bdc08dd63898f7af22fa538f20b3fb068e87c26f))
+* **libscoop|config:** support `SCOOP_CACHE` and `SCOOP_GLOBAL` envs ([cf2a2a5](https://github.com/chawyehsu/hok/commit/cf2a2a5503c93e5d57b5ac72aec490e2d53b2a7d))
+* **libscoop|resolve:** added `resolve_cascade` ([0aa0c52](https://github.com/chawyehsu/hok/commit/0aa0c52802ea2238a31352e9ae0b19c730b7510e))
+* **libscoop:** added coordination between `AssumeYes` and `NoDownloadSize` ([5e9d578](https://github.com/chawyehsu/hok/commit/5e9d5784f62fd0eb64009aa23d6d76847c164f46))
+* **libscoop:** added support for package resolution and download ([4ff0d95](https://github.com/chawyehsu/hok/commit/4ff0d9573794c003c440477656e808bd527377a2))
+* move to v0.1.0-beta.1 ([e1a2376](https://github.com/chawyehsu/hok/commit/e1a2376e58eb91889d7b102aaa6c415cf7b49ef1))
+
+
+### Bug Fixes
+
+* **libscoop:** ensure ops working dir exist ([0520ae8](https://github.com/chawyehsu/hok/commit/0520ae8fc6e7e560e343a4dffa4c7b514adf92c3))
+* **libscoop:** handle wildcard query in upgrade operation ([639e8c6](https://github.com/chawyehsu/hok/commit/639e8c6680f53c34fbd989fdb60a0ea5e9b92c14))
+* **libscoop:** update crate categories metadata ([8d6271d](https://github.com/chawyehsu/hok/commit/8d6271d208c40faf2de32787fe9c5ccf32e303f6))
+* **libscoop:** update doc comments ([bcd29b4](https://github.com/chawyehsu/hok/commit/bcd29b4b172f7adf5511de457f13ce74ac676370))
+
 ## [0.1.0-alpha.3](https://github.com/chawyehsu/hok/compare/v0.1.0-alpha.2...v0.1.0-alpha.3) (2023-07-25)
 
 
