@@ -213,6 +213,8 @@ impl<'a> PackageSet<'a> {
                 continue;
             }
 
+            let cookie = cache.package.cookie().unwrap_or_default();
+
             for (uidx, (filename, dlinfo)) in cache.inner.iter().enumerate() {
                 if self.reuse_cache
                     && dlinfo.local_size > 0
@@ -230,6 +232,7 @@ impl<'a> PackageSet<'a> {
                 if let Some(proxy) = proxy {
                     easy.proxy(proxy)?;
                 }
+                set_cookie(&mut easy, &cookie)?;
 
                 if let Some(tx) = self.session.emitter() {
                     let ident = cache.package.ident();
@@ -334,6 +337,7 @@ impl<'a> PackageSet<'a> {
 
             let urls = pkg.download_urls();
             let filenames = pkg.download_filenames();
+            let cookie = pkg.cookie().unwrap_or_default();
 
             for (uidx, (url, filename)) in urls.iter().zip(filenames.iter()).enumerate() {
                 let mut easy = Easy::new();
@@ -345,6 +349,7 @@ impl<'a> PackageSet<'a> {
                 if let Some(proxy) = proxy {
                     easy.proxy(proxy)?;
                 }
+                set_cookie(&mut easy, &cookie)?;
 
                 let mut easyhandle = self.multi.add(easy)?;
                 let token = pidx * 100 + uidx;
@@ -417,6 +422,24 @@ impl<'a> PackageSet<'a> {
 
         Ok(DownloadSize { total, estimated })
     }
+}
+
+fn set_cookie(easy: &mut Easy, cookie: &Vec<(&str, &str)>) -> Fallible<()> {
+    if !cookie.is_empty() {
+        let mut header_cookie = String::from("Cookie: ");
+        header_cookie.push_str(
+            &cookie
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("; "),
+        );
+        let mut list = List::new();
+        list.append(&header_cookie)?;
+        easy.http_headers(list)?;
+    }
+
+    Ok(())
 }
 
 /// Progress context for package download.
