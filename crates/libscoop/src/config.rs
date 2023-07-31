@@ -138,6 +138,18 @@ pub struct ConfigInner {
     #[serde(skip_serializing_if = "Option::is_none")]
     no_junctions: Option<bool>,
 
+    /// A list of private hosts.
+    ///
+    /// # Note
+    ///
+    /// Array of private hosts that need additional authentication. For example,
+    /// if you want to access a private GitHub repository, you need to add the
+    /// host to this list with 'match' and 'headers' strings.
+    ///
+    /// Refer to: https://github.com/ScoopInstaller/Scoop/pull/4254
+    #[serde(skip_serializing_if = "Option::is_none")]
+    private_hosts: Option<Vec<PrivateHosts>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     proxy: Option<String>,
 
@@ -161,6 +173,16 @@ pub struct ConfigInner {
     #[serde(alias = "7zipextract_use_external")]
     #[serde(skip_serializing_if = "Option::is_none")]
     use_external_7zip: Option<bool>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct PrivateHosts {
+    /// A string defining the host to match.
+    #[serde(rename = "match")]
+    match_: String,
+
+    /// A string defining HTTP headers.
+    headers: String,
 }
 
 impl Config {
@@ -292,6 +314,7 @@ impl Default for Config {
             show_manifest: Default::default(),
             use_lessmsi: Default::default(),
             no_junctions: Default::default(),
+            private_hosts: Default::default(),
             proxy: Default::default(),
             // default_root_path: default::root_path(),
             root_path: default::root_path(),
