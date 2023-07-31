@@ -158,6 +158,15 @@ impl Package {
         self.manifest.license()
     }
 
+    /// Get the cookie of this package.
+    pub fn cookie(&self) -> Option<Vec<(&str, &str)>> {
+        self.manifest.cookie().map(|c| {
+            c.iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect::<Vec<_>>()
+        })
+    }
+
     /// Get the dependencies of this package.
     ///
     /// # Note
@@ -299,6 +308,19 @@ impl Package {
             }
         }
 
+        None
+    }
+
+    /// Check if this package is upgradable.
+    ///
+    /// # Returns
+    ///
+    /// The reference to the upgradable package of this package when it is
+    /// upgradable, otherwise `None`.
+    pub fn upgradable(&self) -> Option<&Package> {
+        if let Some(Some(pkg)) = self.upgradable.borrow() {
+            return Some(pkg.as_ref());
+        }
         None
     }
 

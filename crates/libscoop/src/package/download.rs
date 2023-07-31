@@ -1,6 +1,8 @@
-use curl::{easy::Easy, multi::Multi};
+use curl::easy::{Easy, List};
+use curl::multi::Multi;
 use flume::Sender;
 use lazycell::LazyCell;
+use log::debug;
 use std::{
     collections::HashMap,
     fs::{File, OpenOptions},
@@ -132,6 +134,9 @@ impl<'a> PackageSet<'a> {
         let mut caches = HashMap::new();
 
         for &pkg in self.packages.iter() {
+            // if the package is upgradable, use the upgradable reference instead
+            let pkg = pkg.upgradable().unwrap_or(pkg);
+
             let urls = pkg.download_urls();
             let filenames = pkg.download_filenames();
 
@@ -196,8 +201,7 @@ impl<'a> PackageSet<'a> {
             .unwrap_or(DEFAULT_USER_AGENT);
 
         let mut handles = HashMap::new();
-        let mut token_pkg_filename_map = HashMap::new();
-
+        let mut token_ctx = HashMap::new();
         let package_caches = self.caches.borrow().unwrap();
 
         for (pidx, (_, cache)) in package_caches.iter().enumerate() {
@@ -222,10 +226,6 @@ impl<'a> PackageSet<'a> {
                 easy.fail_on_error(true)?;
                 if let Some(proxy) = proxy {
                     easy.proxy(proxy)?;
-                }
-
-                if std::env::var("DEBUG").is_ok() {
-                    easy.verbose(true)?;
                 }
 
                 if let Some(tx) = self.session.emitter() {
@@ -268,7 +268,7 @@ impl<'a> PackageSet<'a> {
                 let _ = easyhandle.set_token(token);
                 handles.insert(token, easyhandle);
 
-                token_pkg_filename_map.insert(token, (cache.package.ident(), filename.to_owned()));
+                token_ctx.insert(token, (cache.package.ident(), filename.to_owned()));
             }
         }
 
@@ -316,10 +316,13 @@ impl<'a> PackageSet<'a> {
             .unwrap_or(DEFAULT_USER_AGENT);
 
         let mut handles = HashMap::new();
-        let mut token_pkg_filename_map = HashMap::new();
+        let mut token_ctx = HashMap::new();
         let package_caches = self.caches.borrow_mut().unwrap();
 
         for (pidx, &pkg) in self.packages.iter().enumerate() {
+            // if the package is upgradable, use the upgradable reference instead
+            let pkg = pkg.upgradable().unwrap_or(pkg);
+
             let urls = pkg.download_urls();
             let filenames = pkg.download_filenames();
 
@@ -334,16 +337,12 @@ impl<'a> PackageSet<'a> {
                     easy.proxy(proxy)?;
                 }
 
-                if std::env::var("DEBUG").is_ok() {
-                    easy.verbose(true)?;
-                }
-
                 let mut easyhandle = self.multi.add(easy)?;
                 let token = pidx * 100 + uidx;
                 let _ = easyhandle.set_token(token);
                 handles.insert(token, easyhandle);
 
-                token_pkg_filename_map.insert(token, (pkg.ident(), filename.to_owned()));
+                token_ctx.insert(token, (pkg.ident(), url.to_string(), filename.to_owned()));
             }
         }
 
@@ -364,26 +363,35 @@ impl<'a> PackageSet<'a> {
                     match handle_ret {
                         Err(e) => handle_err = Some(e),
                         Ok(_) => {
-                            let content_length =
-                                handle.content_length_download().unwrap_or(0f64) as u64;
-                            let (ident, filename) = token_pkg_filename_map.get(&token).unwrap();
+                            let (ident, url, filename) = token_ctx.get(&token).unwrap();
                             let package_cache = package_caches.get_mut(ident).unwrap();
                             let info = package_cache
                                 .inner
                                 .get_mut(filename)
                                 .expect("failed to get cache info");
 
-                            info.remote_size = content_length;
-                            if content_length != info.local_size {
-                                total += content_length;
-                            }
+                            if let Ok(code) = handle.response_code() {
+                                let mut content_length = 0u64;
+                                if code == 200 {
+                                    content_length =
+                                        handle.content_length_download().unwrap_or(0f64) as u64;
+                                    info.remote_size = content_length;
+                                    if content_length != info.local_size {
+                                        total += content_length;
+                                    }
+                                } else {
+                                    debug!("code: {}, ident: {}, url: {}", code, ident, url)
+                                }
 
-                            if content_length == 0 {
-                                info.estimated = true;
-                                estimated = true;
-                            }
+                                if content_length == 0 {
+                                    info.estimated = true;
+                                    estimated = true;
+                                }
 
-                            package_cache.update_valid_state();
+                                package_cache.update_valid_state();
+                            } else {
+                                debug!("failed to get response code for {}", url);
+                            }
                         }
                     }
                 }

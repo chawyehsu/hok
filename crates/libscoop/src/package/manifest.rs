@@ -37,59 +37,86 @@ pub struct Manifest {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ManifestSpec {
     pub version: String,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+
     pub homepage: String,
+
     pub license: License,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub depends: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub innosetup: Option<bool>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cookie: Option<HashMap<String, String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub architecture: Option<Architecture>,
+
     /// Architecture-independent - `noarch` download url(s).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<Vectorized<String>>,
+
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_vertorized_hash")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extract_dir: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extract_to: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pre_install: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub installer: Option<Installer>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub post_install: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pre_uninstall: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uninstaller: Option<Uninstaller>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub post_uninstall: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bin: Option<Vectorized<Vectorized<String>>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub env_add_path: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub env_set: Option<HashMap<String, String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shortcuts: Option<Vec<Vec<String>>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub persist: Option<Vectorized<Vectorized<String>>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub psmodule: Option<Psmodule>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub suggest: Option<HashMap<String, Vectorized<String>>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub checkver: Option<Checkver>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub autoupdate: Option<Autoupdate>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub notes: Option<Vectorized<String>>,
 }
