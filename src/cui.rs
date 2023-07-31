@@ -38,19 +38,16 @@ impl MultiProgressUI {
             .entry(ident.clone())
             .and_modify(|inner| {
                 inner.insert(url.clone(), (dltotal, dlnow));
-
-                for (_, (t, n)) in inner.iter() {
-                    total += t;
-                    now += n;
-                }
             })
             .or_insert({
-                total = dltotal;
-                now = dlnow;
-
                 let mut ctx = HashMap::new();
                 ctx.insert(url.clone(), (dltotal, dlnow));
                 ctx
+            })
+            .iter()
+            .for_each(|(_, (t, n))| {
+                total += t;
+                now += n;
             });
 
         self.bars
