@@ -204,6 +204,9 @@ impl<'a> PackageSet<'a> {
         let mut token_ctx = HashMap::new();
         let package_caches = self.caches.borrow().unwrap();
 
+        // map download tmp files to their final names
+        let mut filepaths = vec![];
+
         for (pidx, (_, cache)) in package_caches.iter().enumerate() {
             // skip download if all files are cached and valid
             if self.reuse_cache && cache.valid == CacheMaybeValid::Full {
@@ -246,7 +249,7 @@ impl<'a> PackageSet<'a> {
                 }
 
                 let path = cache_root.join(filename);
-                let tmp = path.join(".download");
+                let tmp = cache_root.join(format!("{}.download", filename));
                 if path.exists() {
                     let _ = std::fs::remove_file(&path);
                 }
@@ -255,9 +258,11 @@ impl<'a> PackageSet<'a> {
                     let _ = std::fs::remove_file(&tmp);
                 }
 
+                filepaths.push((tmp.clone(), path.clone()));
+
                 // TODO: Fragmented download support could be added to improve
                 // download speed.
-                let mut file = OpenOptions::new().create(true).append(true).open(&path)?;
+                let mut file = OpenOptions::new().create(true).append(true).open(&tmp)?;
                 easy.write_function(move |data| {
                     file.write_all(data).unwrap();
                     Ok(data.len())
@@ -295,6 +300,10 @@ impl<'a> PackageSet<'a> {
             if alive {
                 self.multi.wait(&mut [], Duration::from_secs(5))?;
             }
+        }
+
+        for (tmp, path) in filepaths.iter() {
+            std::fs::rename(tmp, path)?;
         }
 
         Ok(())
