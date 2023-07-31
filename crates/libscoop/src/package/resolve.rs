@@ -63,7 +63,20 @@ pub(crate) fn resolve_dependencies(session: &Session, packages: &mut Vec<Package
                             }
                         }
                         _ => {
-                            select_candidate(session, &mut matched)?;
+                            let (installed_candidate, mut matched) = matched
+                                .into_iter()
+                                .partition::<Vec<_>, _>(|p| p.is_strictly_installed());
+
+                            // There are multiple candidates for the dependency
+                            // package, we need to select one from them. If a
+                            // candidate is installed, it will be selected
+                            // preferentially as the dependency package.
+                            if !installed_candidate.is_empty() {
+                                matched = installed_candidate;
+                            } else {
+                                select_candidate(session, &mut matched)?;
+                            }
+
                             let p = matched.pop().unwrap();
                             if !(resolved.contains(&p)
                                 || to_resolve.contains(&p)
@@ -98,17 +111,6 @@ pub(crate) fn resolve_dependencies(session: &Session, packages: &mut Vec<Package
 
 /// Select one from multiple package candidates, interactively if possible.
 pub(crate) fn select_candidate(session: &Session, candidates: &mut Vec<Package>) -> Fallible<()> {
-    // Try to filter out strictly installed ones if possible. Only the strictly
-    // installed one because we may support replacement, that is to say, migration
-    // of installed packages by choosing a candidate with a same name but
-    // different bucket.
-    candidates.retain(|p| !p.is_strictly_installed());
-
-    // Luckily, there is no more than one package left
-    if candidates.len() <= 1 {
-        return Ok(());
-    }
-
     let name = candidates[0].name().to_owned();
 
     // Sort candidates by package ident, in other words, by alphabetical order
