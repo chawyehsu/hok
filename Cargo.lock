@@ -699,7 +699,7 @@ checksum = "443144c8cdadd93ebf52ddb4056d257f5b52c04d3c804e657d19eb73fc33668b"
 
 [[package]]
 name = "hok"
-version = "0.1.0-beta.1"
+version = "0.1.0-beta.2"
 dependencies = [
  "anyhow",
  "clap 4.3.11",
@@ -851,7 +851,7 @@ dependencies = [
 
 [[package]]
 name = "libscoop"
-version = "0.1.0-beta.1"
+version = "0.1.0-beta.2"
 dependencies = [
  "chrono",
  "curl",
@@ -1332,7 +1332,7 @@ dependencies = [
 
 [[package]]
 name = "scoop-hash"
-version = "0.1.0-beta.1"
+version = "0.1.0-beta.2"
 dependencies = [
  "criterion",
  "md-5",
