@@ -12,12 +12,13 @@ pub fn cmd_list(matches: &ArgMatches, session: &Session) -> Result<()> {
         .collect::<Vec<_>>();
     let mut options = vec![];
     let flag_held = matches.get_flag("held");
+    let flag_upgradable = matches.get_flag("upgradable");
 
     if matches.get_flag("explicit") {
         options.push(QueryOption::Explicit);
     }
 
-    if matches.get_flag("upgradable") {
+    if flag_upgradable {
         options.push(QueryOption::Upgradable);
     }
 
@@ -36,7 +37,7 @@ pub fn cmd_list(matches: &ArgMatches, session: &Session) -> Result<()> {
                 }
 
                 let upgradable = pkg.upgradable_version();
-                if upgradable.is_some() {
+                if flag_upgradable && upgradable.is_some() {
                     output.push_str(format!(" -> {}", upgradable.unwrap().blue()).as_str());
                 }
 
