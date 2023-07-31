@@ -1,6 +1,6 @@
 # hok
 
-> Hok is a CLI implementation of Scoop in Rust
+> Hok is a CLI implementation of [Scoop](https://scoop.sh/) in Rust
 
 [![cicd][cicd-badge]][cicd]
 [![release][release-badge]][releases]

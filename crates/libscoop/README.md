@@ -1,5 +1,7 @@
 # libscoop
 
+> Rust library implementation of Scoop
+
 [![crates-svg]][crates-url]
 [![docs-svg]][docs-url]
 [![crates-license-svg]][crates-url]
@@ -11,8 +13,6 @@
 [docs-url]: https://docs.rs/libscoop
 [crates-license-svg]: https://img.shields.io/crates/l/libscoop
 [crates-download-svg]: https://img.shields.io/crates/d/libscoop.svg
-
-> Rust library implementation of Scoop
 
 This crate provides manipulation of [Scoop](https://scoop.sh/) from Rust.
 
