@@ -4,6 +4,8 @@ description = "Hashing library for libscoop"
 homepage = "https://github.com/chawyehsu/hok"
 version = "0.1.0-beta.2"
 authors = ["Chawye Hsu <su+cratesio@chawyehsu.com>"]
+categories = ["cryptography"]
+keywords = ["hash", "scoop"]
 license = "MIT OR Apache-2.0"
 edition = "2021"
 readme = "README.md"
@@ -28,10 +30,18 @@ name = "sha512"
 path = "benches/sha512.rs"
 harness = false
 
+[dependencies]
+md-5 = { version = "0.10", optional = true }
+sha1 = { version = "0.10", optional = true }
+sha2 = { version = "0.10", optional = true }
+
 [dev-dependencies]
 criterion = "0.4"
-md-5 = { package = "md-5", version = "0.10.4" }
-md5 = "0.7.0"
-sha1 = "0.10.4"
-sha1_smol = "1.0.0"
-sha2 = "0.10.5"
+
+[features]
+default = []
+# The "rustcrypto" feature enables hash implementations from RustCrypto's crates.
+rustcrypto = ["md-5", "sha1", "sha2"]
+
+[package.metadata.docs.rs]
+default-target = "x86_64-pc-windows-msvc"

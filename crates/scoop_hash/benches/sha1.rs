@@ -1,63 +1,40 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use scoop_hash::Sha1;
-use sha1::Digest;
+use scoop_hash::Checksum;
 
-fn scoop_hash_sha1(size: usize) {
+fn sha1(size: usize) {
     let data = &vec![0xffu8; size][..];
-    Sha1::new().consume(data).result();
-}
-
-fn sha1_smol_sha1(size: usize) {
-    let data = &vec![0xffu8; size][..];
-    let mut hasher = sha1_smol::Sha1::new();
-    hasher.update(data);
-    hasher.digest();
-}
-
-fn sha1_sha1(size: usize) {
-    let data = &vec![0xffu8; size][..];
-    let mut hasher = sha1::Sha1::new();
-    hasher.update(data);
-    hasher.finalize();
+    let mut hasher = Checksum::new("sha1:2aae6c35c94fcfb415dbe95f408b9ce91ee846ed").unwrap();
+    hasher.consume(data);
+    hasher.result();
 }
 
 fn benchmark_sha1_100(c: &mut Criterion) {
     let mut group = c.benchmark_group("sha1_100");
-    group.bench_function("scoop_hash", |b| b.iter(|| scoop_hash_sha1(black_box(100))));
-    group.bench_function("sha1_smol", |b| b.iter(|| sha1_smol_sha1(black_box(100))));
-    group.bench_function("sha1", |b| b.iter(|| sha1_sha1(black_box(100))));
+    group.bench_function("scoop_hash", |b| b.iter(|| sha1(black_box(100))));
     group.finish();
 }
 
 fn benchmark_sha1_1000(c: &mut Criterion) {
     let mut group = c.benchmark_group("sha1_1000");
-    group.bench_function("scoop_hash", |b| {
-        b.iter(|| scoop_hash_sha1(black_box(1000)))
-    });
-    group.bench_function("sha1_smol", |b| b.iter(|| sha1_smol_sha1(black_box(1000))));
-    group.bench_function("sha1", |b| b.iter(|| sha1_sha1(black_box(1000))));
+    group.bench_function("scoop_hash", |b| b.iter(|| sha1(black_box(1000))));
     group.finish();
 }
 
 fn benchmark_sha1_10000(c: &mut Criterion) {
     let mut group = c.benchmark_group("sha1_10000");
-    group.bench_function("scoop_hash", |b| {
-        b.iter(|| scoop_hash_sha1(black_box(10000)))
-    });
-    group.bench_function("sha1_smol", |b| b.iter(|| sha1_smol_sha1(black_box(10000))));
-    group.bench_function("sha1", |b| b.iter(|| sha1_sha1(black_box(10000))));
+    group.bench_function("scoop_hash", |b| b.iter(|| sha1(black_box(10000))));
     group.finish();
 }
 
 fn benchmark_sha1_100000(c: &mut Criterion) {
     let mut group = c.benchmark_group("sha1_100000");
-    group.bench_function("scoop_hash", |b| {
-        b.iter(|| scoop_hash_sha1(black_box(100000)))
-    });
-    group.bench_function("sha1_smol", |b| {
-        b.iter(|| sha1_smol_sha1(black_box(100000)))
-    });
-    group.bench_function("sha1", |b| b.iter(|| sha1_sha1(black_box(100000))));
+    group.bench_function("scoop_hash", |b| b.iter(|| sha1(black_box(100000))));
+    group.finish();
+}
+
+fn benchmark_sha1_1000000(c: &mut Criterion) {
+    let mut group = c.benchmark_group("sha1_1000000");
+    group.bench_function("scoop_hash", |b| b.iter(|| sha1(black_box(1000000))));
     group.finish();
 }
 
@@ -66,6 +43,7 @@ criterion_group!(
     benchmark_sha1_100,
     benchmark_sha1_1000,
     benchmark_sha1_10000,
-    benchmark_sha1_100000
+    benchmark_sha1_100000,
+    benchmark_sha1_1000000
 );
 criterion_main!(benches);

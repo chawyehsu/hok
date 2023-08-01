@@ -1,27 +1,16 @@
 // references:
-//   [SHA-2](https://en.wikipedia.org/wiki/SHA-2)
-//   [golang crypto sha256](https://github.com/golang/go/blob/master/src/crypto/sha256/sha256.go)
+//   [SHA-1](https://en.wikipedia.org/wiki/SHA-1)
+//   [golang crypto sha1](https://github.com/golang/go/blob/master/src/crypto/sha1/sha1.go)
 
 use core::{cmp::min, convert::TryInto};
 
-static INIT_STATE: [u32; 8] = [
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
-];
-static K: [u32; 64] = [
-    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
-];
+static INIT_STATE: [u32; 5] = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0];
+static K: [u32; 4] = [0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6];
 
 #[derive(Debug)]
-pub struct Sha256 {
-    // State A, B, C, D, E, F, G, H
-    state: [u32; 8],
+pub struct Sha1 {
+    // State A, B, C, D, E
+    state: [u32; 5],
     // Hold total length of input data
     total_length: u64,
     // Store the last part of input data to be consumed
@@ -32,11 +21,17 @@ pub struct Sha256 {
     finished: bool,
 }
 
-impl Sha256 {
-    /// Create a new [`Sha256`] instance to consume data and get digest.
+impl Default for Sha1 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Sha1 {
+    /// Create a new [`Sha1`] instance to consume data and get digest.
     #[inline]
     pub fn new() -> Self {
-        Sha256 {
+        Sha1 {
             state: INIT_STATE,
             total_length: 0,
             buffer: [0; 64],
@@ -45,7 +40,7 @@ impl Sha256 {
         }
     }
 
-    /// Reset this [`Sha256`] instance's status.
+    /// Reset this [`Sha1`] instance's status.
     #[inline]
     pub fn reset(&mut self) {
         self.state = INIT_STATE;
@@ -56,9 +51,9 @@ impl Sha256 {
     }
 
     /// Consume the last buffer data, finalize the calculation and return
-    /// the digest as a `[u8; 32]` array format.
+    /// the digest as a `[u8; 20]` array format.
     #[inline]
-    pub fn result(&mut self) -> [u8; 32] {
+    pub fn result(&mut self) -> [u8; 20] {
         if !self.finished {
             let len_mod = self.total_length % 64;
             let pad_idx = if 55 < len_mod {
@@ -102,12 +97,13 @@ impl Sha256 {
     /// method returns `&self` to make itself chainable, so that callers
     /// can continuously consume data by chaining function calls. for example:
     ///
-    /// ```
-    /// use scoop_hash::Sha256;
-    /// let data1 = "hello".as_bytes();
-    /// let data2 = "world".as_bytes();
-    /// let hex_str = Sha256::new().consume(data1).consume(data2).result_string();
-    /// assert_eq!(hex_str, "936a185caaa266bb9cbe981e9e05cb78cd732b0b3280eb944412bb6f8f8f07af");
+    /// ```rust
+    /// use scoop_hash::Checksum;
+    /// let mut hasher = Checksum::new("sha1:2aae6c35c94fcfb415dbe95f408b9ce91ee846ed")
+    ///     .expect("invalid input hash");
+    /// hasher.consume(b"hello world");
+    /// let hex_str = hasher.result();
+    /// assert_eq!(hex_str, "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed");
     /// ```
     pub fn consume<D: AsRef<[u8]>>(&mut self, data: D) -> &mut Self {
         let mut data = data.as_ref();
@@ -165,51 +161,111 @@ impl Sha256 {
     #[inline]
     fn compress(&mut self, block: [u8; 64]) {
         // Create temp state variables for compression
-        let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut h] = self.state;
+        let [mut a, mut b, mut c, mut d, mut e] = self.state;
 
-        let mut words = [0u32; 64];
-
-        // Break block into the first sixteen 32-bit `big-endian` words
-        block.chunks_exact(4).enumerate().for_each(|(i, s)| {
-            words[i] = u32::from_be_bytes(s.try_into().unwrap());
-        });
-
-        // Extend the first 16 words into the remaining 48 words words[16..63]
-        for i in 16..64 {
-            let s0 = words[i - 15].rotate_right(7)
-                ^ words[i - 15].rotate_right(18)
-                ^ (words[i - 15] >> 3);
-            let s1 = words[i - 2].rotate_right(17)
-                ^ words[i - 2].rotate_right(19)
-                ^ (words[i - 2] >> 10);
-
-            words[i] = words[i - 16]
-                .wrapping_add(s0)
-                .wrapping_add(words[i - 7])
-                .wrapping_add(s1);
+        // Break block into sixteen 32-bit `big-endian` words
+        let mut words = [0u32; 16];
+        for (o, s) in words.iter_mut().zip(block.chunks_exact(4)) {
+            *o = u32::from_be_bytes(s.try_into().unwrap());
         }
 
-        // Compression function main loop
-        for i in 0..64 {
-            let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
-            let ch = (e & f) ^ (!e & g);
-            let temp1 = h
-                .wrapping_add(s1)
-                .wrapping_add(ch)
-                .wrapping_add(K[i])
-                .wrapping_add(words[i]);
-            let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
-            let maj = (a & b) ^ (a & c) ^ (b & c);
-            let temp2 = s0.wrapping_add(maj);
-
-            h = g;
-            g = f;
-            f = e;
-            e = d.wrapping_add(temp1);
+        for i in 0..16 {
+            let f = (b & c) | ((!b) & d);
+            let t = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(words[i & 0xf])
+                .wrapping_add(K[0]);
+            e = d;
             d = c;
-            c = b;
+            c = b.rotate_left(30);
             b = a;
-            a = temp1.wrapping_add(temp2);
+            a = t;
+        }
+
+        for i in 16..20 {
+            let tmp = words[(i - 3) & 0xf]
+                ^ words[(i - 8) & 0xf]
+                ^ words[(i - 14) & 0xf]
+                ^ words[i & 0xf];
+            words[i & 0xf] = tmp << 1 | tmp >> (32 - 1);
+
+            let f = (b & c) | ((!b) & d);
+            let t = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(words[i & 0xf])
+                .wrapping_add(K[0]);
+            e = d;
+            d = c;
+            c = b.rotate_left(30);
+            b = a;
+            a = t;
+        }
+
+        for i in 20..40 {
+            let tmp = words[(i - 3) & 0xf]
+                ^ words[(i - 8) & 0xf]
+                ^ words[(i - 14) & 0xf]
+                ^ words[i & 0xf];
+            words[i & 0xf] = tmp << 1 | tmp >> (32 - 1);
+
+            let f = b ^ c ^ d;
+            let t = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(words[i & 0xf])
+                .wrapping_add(K[1]);
+            e = d;
+            d = c;
+            c = b.rotate_left(30);
+            b = a;
+            a = t;
+        }
+
+        for i in 40..60 {
+            let tmp = words[(i - 3) & 0xf]
+                ^ words[(i - 8) & 0xf]
+                ^ words[(i - 14) & 0xf]
+                ^ words[i & 0xf];
+            words[i & 0xf] = tmp << 1 | tmp >> (32 - 1);
+
+            let f = ((b | c) & d) | (b & c);
+            let t = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(words[i & 0xf])
+                .wrapping_add(K[2]);
+            e = d;
+            d = c;
+            c = b.rotate_left(30);
+            b = a;
+            a = t;
+        }
+
+        for i in 60..80 {
+            let tmp = words[(i - 3) & 0xf]
+                ^ words[(i - 8) & 0xf]
+                ^ words[(i - 14) & 0xf]
+                ^ words[i & 0xf];
+            words[i & 0xf] = tmp << 1 | tmp >> (32 - 1);
+
+            let f = b ^ c ^ d;
+            let t = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(words[i & 0xf])
+                .wrapping_add(K[3]);
+            e = d;
+            d = c;
+            c = b.rotate_left(30);
+            b = a;
+            a = t;
         }
 
         // Update state
@@ -218,15 +274,12 @@ impl Sha256 {
         self.state[2] = self.state[2].wrapping_add(c);
         self.state[3] = self.state[3].wrapping_add(d);
         self.state[4] = self.state[4].wrapping_add(e);
-        self.state[5] = self.state[5].wrapping_add(f);
-        self.state[6] = self.state[6].wrapping_add(g);
-        self.state[7] = self.state[7].wrapping_add(h);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Sha256;
+    use super::Sha1;
 
     #[test]
     fn rfc_test_suite() {
@@ -236,19 +289,17 @@ mod tests {
             "abc",
             "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
             "0123456701234567012345670123456701234567012345670123456701234567",
-            "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
         ];
         let outputs = [
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-            "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
-            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-            "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1",
-            "8182cadb21af0e37c06414ece08e19c65bdb22c396d48ba7341012eea9ffdfdd",
-            "cf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1",
+            "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+            "86f7e437faa5a7fce15d1ddcb9eaeaea377667b8",
+            "a9993e364706816aba3e25717850c26c9cd0d89d",
+            "84983e441c3bd26ebaae4aa1f95129e5e54670f1",
+            "e0c094e867ef46c350ef54a7f59dd60bed92ae83",
         ];
 
         for (input, &output) in inputs.iter().zip(outputs.iter()) {
-            let computed = Sha256::new().consume(input.as_bytes()).result_string();
+            let computed = Sha1::new().consume(input.as_bytes()).result_string();
             assert_eq!(output, computed);
         }
     }
@@ -257,36 +308,30 @@ mod tests {
     fn chaining_consume() {
         let data1 = "hello".as_bytes();
         let data2 = "world".as_bytes();
-        let hex_str = Sha256::new().consume(data1).consume(data2).result_string();
+        let hex_str = Sha1::new().consume(data1).consume(data2).result_string();
         // equal to `helloworld`
-        assert_eq!(
-            hex_str,
-            "936a185caaa266bb9cbe981e9e05cb78cd732b0b3280eb944412bb6f8f8f07af"
-        );
+        assert_eq!(hex_str, "6adfb183a4a2c94a2f92dab5ade762a47889a5a1");
     }
 
     #[test]
     fn result() {
-        let hex = Sha256::new().consume("".as_bytes()).result();
+        let hex = Sha1::new().consume("".as_bytes()).result();
         assert_eq!(
             hex,
             [
-                227, 176, 196, 66, 152, 252, 28, 20, 154, 251, 244, 200, 153, 111, 185, 36, 39,
-                174, 65, 228, 100, 155, 147, 76, 164, 149, 153, 27, 120, 82, 184, 85
+                218, 57, 163, 238, 94, 107, 75, 13, 50, 85, 191, 239, 149, 96, 24, 144, 175, 216,
+                7, 9
             ]
         );
     }
 
     #[test]
     fn reset() {
-        let mut sha1 = Sha256::new();
+        let mut sha1 = Sha1::new();
         sha1.consume("".as_bytes());
         sha1.reset();
         let hex_str = sha1.consume("abc".as_bytes()).result_string();
         // equal to `abc`
-        assert_eq!(
-            hex_str,
-            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-        );
+        assert_eq!(hex_str, "a9993e364706816aba3e25717850c26c9cd0d89d");
     }
 }

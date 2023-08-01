@@ -35,6 +35,12 @@ pub struct Md5 {
     finished: bool,
 }
 
+impl Default for Md5 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Md5 {
     /// Create a new [`Md5`] instance to consume data and get digest.
     #[inline]
@@ -106,12 +112,13 @@ impl Md5 {
     /// method returns `&self` to make itself chainable, so that callers
     /// can continuously consume data by chaining function calls. for example:
     ///
-    /// ```
-    /// use scoop_hash::Md5;
-    /// let data1 = "hello".as_bytes();
-    /// let data2 = "world".as_bytes();
-    /// let hex_str = Md5::new().consume(data1).consume(data2).result_string();
-    /// assert_eq!(hex_str, "fc5e038d38a57032085441e7fe7010b0");
+    /// ```rust
+    /// use scoop_hash::Checksum;
+    /// let mut hasher = Checksum::new("md5:5eb63bbbe01eeed093cb22bb8f5acdc3")
+    ///     .expect("invalid input hash");
+    /// hasher.consume(b"hello world");
+    /// let hex_str = hasher.result();
+    /// assert_eq!(hex_str, "5eb63bbbe01eeed093cb22bb8f5acdc3");
     /// ```
     pub fn consume<D: AsRef<[u8]>>(&mut self, data: D) -> &mut Self {
         let mut data = data.as_ref();

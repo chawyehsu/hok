@@ -111,6 +111,12 @@ pub struct Sha512 {
     finished: bool,
 }
 
+impl Default for Sha512 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Sha512 {
     /// Create a new [`Sha512`] instance to consume data and get digest.
     #[inline]
@@ -182,11 +188,12 @@ impl Sha512 {
     /// can continuously consume data by chaining function calls. for example:
     ///
     /// ```
-    /// use scoop_hash::Sha512;
-    /// let data1 = "hello".as_bytes();
-    /// let data2 = "world".as_bytes();
-    /// let hex_str = Sha512::new().consume(data1).consume(data2).result_string();
-    /// assert_eq!(hex_str, "1594244d52f2d8c12b142bb61f47bc2eaf503d6d9ca8480cae9fcf112f66e4967dc5e8fa98285e36db8af1b8ffa8b84cb15e0fbcf836c3deb803c13f37659a60");
+    /// use scoop_hash::Checksum;
+    /// let mut hasher = Checksum::new("sha512:309ecc489c12d6eb4cc40f50c902f2b4d0ed77ee511a7c7a9bcd3ca86d4cd86f989dd35bc5ff499670da34255b45b0cfd830e81f605dcf7dc5542e93ae9cd76f")
+    ///     .expect("invalid input hash");
+    /// hasher.consume(b"hello world");
+    /// let hex_str = hasher.result();
+    /// assert_eq!(hex_str, "309ecc489c12d6eb4cc40f50c902f2b4d0ed77ee511a7c7a9bcd3ca86d4cd86f989dd35bc5ff499670da34255b45b0cfd830e81f605dcf7dc5542e93ae9cd76f");
     /// ```
     pub fn consume<D: AsRef<[u8]>>(&mut self, data: D) -> &mut Self {
         let mut data = data.as_ref();
