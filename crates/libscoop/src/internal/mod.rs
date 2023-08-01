@@ -4,7 +4,6 @@ pub mod dag;
 pub mod fs;
 pub mod git;
 pub mod network;
-mod tokio_util;
 
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -12,7 +11,6 @@ use regex::RegexBuilder;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
-pub use tokio_util::*;
 
 use crate::error::{Error, Fallible};
 
