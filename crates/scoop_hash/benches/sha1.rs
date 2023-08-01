@@ -1,9 +1,9 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use scoop_hash::Checksum;
+use scoop_hash::ChecksumBuilder;
 
 fn sha1(size: usize) {
     let data = &vec![0xffu8; size][..];
-    let mut hasher = Checksum::new("sha1:2aae6c35c94fcfb415dbe95f408b9ce91ee846ed").unwrap();
+    let mut hasher = ChecksumBuilder::new().sha1().build();
     hasher.consume(data);
     hasher.result();
 }

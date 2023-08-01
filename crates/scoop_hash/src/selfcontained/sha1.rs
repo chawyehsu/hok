@@ -98,9 +98,8 @@ impl Sha1 {
     /// can continuously consume data by chaining function calls. for example:
     ///
     /// ```rust
-    /// use scoop_hash::Checksum;
-    /// let mut hasher = Checksum::new("sha1:2aae6c35c94fcfb415dbe95f408b9ce91ee846ed")
-    ///     .expect("invalid input hash");
+    /// use scoop_hash::ChecksumBuilder;
+    /// let mut hasher = ChecksumBuilder::new().sha1().build();
     /// hasher.consume(b"hello world");
     /// let hex_str = hasher.result();
     /// assert_eq!(hex_str, "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed");

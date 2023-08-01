@@ -113,9 +113,8 @@ impl Md5 {
     /// can continuously consume data by chaining function calls. for example:
     ///
     /// ```rust
-    /// use scoop_hash::Checksum;
-    /// let mut hasher = Checksum::new("md5:5eb63bbbe01eeed093cb22bb8f5acdc3")
-    ///     .expect("invalid input hash");
+    /// use scoop_hash::ChecksumBuilder;
+    /// let mut hasher = ChecksumBuilder::new().md5().build();
     /// hasher.consume(b"hello world");
     /// let hex_str = hasher.result();
     /// assert_eq!(hex_str, "5eb63bbbe01eeed093cb22bb8f5acdc3");

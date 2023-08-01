@@ -109,9 +109,8 @@ impl Sha256 {
     /// can continuously consume data by chaining function calls. for example:
     ///
     /// ```rust
-    /// use scoop_hash::Checksum;
-    /// let mut hasher = Checksum::new("b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9")
-    ///     .expect("invalid input hash");
+    /// use scoop_hash::ChecksumBuilder;
+    /// let mut hasher = ChecksumBuilder::new().sha256().build();
     /// hasher.consume(b"hello world");
     /// let hex_str = hasher.result();
     /// assert_eq!(hex_str, "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");

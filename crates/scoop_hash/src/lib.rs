@@ -1,4 +1,5 @@
-use std::cell::OnceCell;
+use core::cell::OnceCell;
+use std::error::Error as StdError;
 
 #[cfg(feature = "rustcrypto")]
 mod rustcrypto;
@@ -14,6 +15,12 @@ trait Hasher {
     fn hash_type(&self) -> String;
     fn update(&mut self, data: &[u8]);
     fn sum(&mut self) -> String;
+}
+
+impl core::fmt::Debug for dyn Hasher {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Hasher {{ hash_type: {} }}", self.hash_type())
+    }
 }
 
 macro_rules! impl_hasher_for {
@@ -49,72 +56,124 @@ impl_hasher_for!(Sha1);
 impl_hasher_for!(Sha256);
 impl_hasher_for!(Sha512);
 
-/// Error is returned when the hash type is not supported.
 #[derive(Debug)]
 pub struct Error;
 
-impl std::error::Error for Error {}
+impl StdError for Error {}
 
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "unsupported hash type")
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "unsupported hash algorithm")
     }
 }
+
+pub struct ChecksumBuilder {
+    hasher: OnceCell<Box<dyn Hasher>>,
+}
+
+impl ChecksumBuilder {
+    /// Creates a new ChecksumBuilder instance.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use scoop_hash::ChecksumBuilder;
+    /// let mut md5 = ChecksumBuilder::new().md5().build();
+    /// md5.consume(b"hello world");
+    /// assert!(md5.check("5eb63bbbe01eeed093cb22bb8f5acdc3"));
+    /// ```
+    pub fn new() -> ChecksumBuilder {
+        let hasher = OnceCell::new();
+
+        ChecksumBuilder { hasher }
+    }
+
+    /// Use the specified hash algorithm.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the specified algorithm is not supported.
+    pub fn algo(&mut self, algo: &str) -> Result<&mut ChecksumBuilder, Error> {
+        match algo {
+            "md5" => Ok(self.md5()),
+            "sha1" => Ok(self.sha1()),
+            "sha256" => Ok(self.sha256()),
+            "sha512" => Ok(self.sha512()),
+            _ => Err(Error),
+        }
+    }
+
+    /// Use the md5 hash algorithm.
+    pub fn md5(&mut self) -> &mut ChecksumBuilder {
+        let algo: Box<dyn Hasher> = Box::new(Md5::new());
+        self.set_algo(algo)
+    }
+
+    /// Use the sha1 hash algorithm.
+    pub fn sha1(&mut self) -> &mut ChecksumBuilder {
+        let algo: Box<dyn Hasher> = Box::new(Sha1::new());
+        self.set_algo(algo)
+    }
+
+    /// Use the sha256 hash algorithm.
+    pub fn sha256(&mut self) -> &mut ChecksumBuilder {
+        let algo: Box<dyn Hasher> = Box::new(Sha256::new());
+        self.set_algo(algo)
+    }
+
+    /// Use the sha512 hash algorithm.
+    pub fn sha512(&mut self) -> &mut ChecksumBuilder {
+        let algo: Box<dyn Hasher> = Box::new(Sha512::new());
+        self.set_algo(algo)
+    }
+
+    fn set_algo(&mut self, algo: Box<dyn Hasher>) -> &mut ChecksumBuilder {
+        let _ = self.hasher.take();
+        self.hasher.set(algo).unwrap();
+        self
+    }
+
+    /// Build the Checksum instance for use.
+    ///
+    /// If no hash algorithm is specified, sha256 will be used.
+    pub fn build(&mut self) -> Checksum {
+        let output_hash = OnceCell::new();
+        let hasher = self.hasher.take().unwrap_or_else(|| {
+            let algo: Box<dyn Hasher> = Box::new(Sha256::new());
+            algo
+        });
+
+        Checksum {
+            hasher,
+            output_hash,
+        }
+    }
+}
+
 /// Checksum is a wrapper around a hash algorithm.
 #[derive(Debug)]
 pub struct Checksum {
     /// The hash algorithm.
     hasher: Box<dyn Hasher>,
 
-    /// The input hash.
-    input_hash: String,
-
     /// The computed hash.
     output_hash: OnceCell<String>,
 }
 
-impl std::fmt::Debug for dyn Hasher {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Hasher {{ hash_type: {} }}", self.hash_type())
-    }
-}
-
 impl Checksum {
-    /// Creates a new Checksum instance.
+    /// Consumes the provided data.
+    ///
+    /// Note that no data can be consumed after the result has been computed.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use scoop_hash::Checksum;
-    /// let mut checksum = Checksum::new("sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9").expect("invalid input hash");
-    /// checksum.consume(b"hello world");
-    /// assert!(checksum.check());
-    /// assert_eq!(checksum.result(), "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");
+    /// use scoop_hash::ChecksumBuilder;
+    /// let mut sha256 = ChecksumBuilder::new().build();
+    /// sha256.consume(b"hello world");
+    /// let result = sha256.result();
+    /// assert_eq!(result, "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");
     /// ```
-    pub fn new<S: AsRef<str>>(hash: S) -> Result<Checksum, Error> {
-        let hash = hash.as_ref().to_lowercase();
-        let (method, input_hash) = hash.split_once(':').unwrap_or(("sha256", &hash));
-        let input_hash = input_hash.to_string();
-        let hasher: Box<dyn Hasher> = match method {
-            "md5" => Box::new(Md5::new()),
-            "sha1" => Box::new(Sha1::new()),
-            "sha256" => Box::new(Sha256::new()),
-            "sha512" => Box::new(Sha512::new()),
-            _ => return Err(Error),
-        };
-
-        let output_hash = OnceCell::new();
-
-        Ok(Checksum {
-            hasher,
-            input_hash,
-            output_hash,
-        })
-    }
-
-    /// Consumes the provided data.
-    ///
-    /// Note that no data can be consumed after the result has been computed.
     #[inline]
     pub fn consume(&mut self, data: &[u8]) {
         if self.output_hash.get().is_some() {
@@ -132,9 +191,7 @@ impl Checksum {
 
     /// Checks if the result of the hash computation matches the input hash.
     #[inline]
-    pub fn check(&mut self) -> bool {
-        let left = self.input_hash.to_owned();
-        let right = self.result();
-        left == right
+    pub fn check(&mut self, input: &str) -> bool {
+        input == self.result()
     }
 }

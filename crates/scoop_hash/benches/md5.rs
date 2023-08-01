@@ -1,9 +1,9 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use scoop_hash::Checksum;
+use scoop_hash::ChecksumBuilder;
 
 fn md5(size: usize) {
     let data = &vec![0xffu8; size][..];
-    let mut hasher = Checksum::new("md5:5eb63bbbe01eeed093cb22bb8f5acdc3").unwrap();
+    let mut hasher = ChecksumBuilder::new().md5().build();
     hasher.consume(data);
     hasher.result();
 }
