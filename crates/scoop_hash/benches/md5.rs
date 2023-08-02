@@ -5,7 +5,7 @@ fn md5(size: usize) {
     let data = &vec![0xffu8; size][..];
     let mut hasher = ChecksumBuilder::new().md5().build();
     hasher.consume(data);
-    hasher.result();
+    hasher.finalize();
 }
 
 fn benchmark_md5_100(c: &mut Criterion) {

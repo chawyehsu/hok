@@ -143,7 +143,7 @@ impl Sha512 {
     /// Consume the last buffer data, finalize the calculation and return
     /// the digest as a `[u8; 64]` array format.
     #[inline]
-    pub fn result(&mut self) -> [u8; 64] {
+    pub fn result(mut self) -> [u8; 64] {
         if !self.finished {
             let len_mod = self.total_length % 128;
             let pad_idx = if 111 < len_mod {
@@ -175,7 +175,7 @@ impl Sha512 {
     /// Consume the last buffer data, finalize the calculation and return
     /// the digest as a [`String`] format.
     #[inline]
-    pub fn result_string(&mut self) -> String {
+    pub fn result_string(self) -> String {
         self.result()
             .iter()
             .map(|byte| format!("{:02x}", byte))
@@ -185,14 +185,7 @@ impl Sha512 {
 
     /// Consume the input data, but not finalize the calculation. This
     /// method returns `&self` to make itself chainable, so that callers
-    /// can continuously consume data by chaining function calls. for example:
-    ///
-    /// ```
-    /// use scoop_hash::ChecksumBuilder;
-    /// let mut hasher = ChecksumBuilder::new().sha512().build();
-    /// hasher.consume(b"hello world");
-    /// let hex_str = hasher.result();
-    /// assert_eq!(hex_str, "309ecc489c12d6eb4cc40f50c902f2b4d0ed77ee511a7c7a9bcd3ca86d4cd86f989dd35bc5ff499670da34255b45b0cfd830e81f605dcf7dc5542e93ae9cd76f");
+    /// can continuously consume data by chaining function calls.
     /// ```
     pub fn consume<D: AsRef<[u8]>>(&mut self, data: D) -> &mut Self {
         let mut data = data.as_ref();
@@ -332,7 +325,9 @@ mod tests {
         ];
 
         for (input, &output) in inputs.iter().zip(outputs.iter()) {
-            let computed = Sha512::new().consume(input.as_bytes()).result_string();
+            let mut hasher = Sha512::new();
+            hasher.consume(input.as_bytes());
+            let computed = hasher.result_string();
             assert_eq!(output, computed);
         }
     }
@@ -341,14 +336,18 @@ mod tests {
     fn chaining_consume() {
         let data1 = "hello".as_bytes();
         let data2 = "world".as_bytes();
-        let hex_str = Sha512::new().consume(data1).consume(data2).result_string();
+        let mut hasher = Sha512::new();
+        hasher.consume(data1).consume(data2);
+        let hex_str = hasher.result_string();
         // equal to `helloworld`
         assert_eq!(hex_str, "1594244d52f2d8c12b142bb61f47bc2eaf503d6d9ca8480cae9fcf112f66e4967dc5e8fa98285e36db8af1b8ffa8b84cb15e0fbcf836c3deb803c13f37659a60");
     }
 
     #[test]
     fn result() {
-        let hex = Sha512::new().consume("".as_bytes()).result();
+        let mut hasher = Sha512::new();
+        hasher.consume("".as_bytes());
+        let hex = hasher.result();
         assert_eq!(
             hex,
             [
@@ -362,10 +361,11 @@ mod tests {
 
     #[test]
     fn reset() {
-        let mut sha1 = Sha512::new();
-        sha1.consume("".as_bytes());
-        sha1.reset();
-        let hex_str = sha1.consume("abc".as_bytes()).result_string();
+        let mut hasher = Sha512::new();
+        hasher.consume("".as_bytes());
+        hasher.reset();
+        hasher.consume("abc".as_bytes());
+        let hex_str = hasher.result_string();
         // equal to `abc`
         assert_eq!(hex_str, "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f");
     }

@@ -5,7 +5,7 @@ fn sha512(size: usize) {
     let data = &vec![0xffu8; size][..];
     let mut hasher = ChecksumBuilder::new().sha512().build();
     hasher.consume(data);
-    hasher.result();
+    hasher.finalize();
 }
 
 fn benchmark_sha512_100(c: &mut Criterion) {

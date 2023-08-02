@@ -67,7 +67,7 @@ impl Md5 {
     /// Consume the last buffer data, finalize the calculation and return
     /// the digest as a `[u8; 16]` array format.
     #[inline]
-    pub fn result(&mut self) -> [u8; 16] {
+    pub fn result(mut self) -> [u8; 16] {
         if !self.finished {
             let len_mod = self.total_length % 64;
             let pad_idx = if 55 < len_mod {
@@ -100,7 +100,7 @@ impl Md5 {
     /// Consume the last buffer data, finalize the calculation and return
     /// the digest as a [`String`] format.
     #[inline]
-    pub fn result_string(&mut self) -> String {
+    pub fn result_string(self) -> String {
         self.result()
             .iter()
             .map(|byte| format!("{:02x}", byte))
@@ -110,14 +110,7 @@ impl Md5 {
 
     /// Consume the input data, but not finalize the calculation. This
     /// method returns `&self` to make itself chainable, so that callers
-    /// can continuously consume data by chaining function calls. for example:
-    ///
-    /// ```rust
-    /// use scoop_hash::ChecksumBuilder;
-    /// let mut hasher = ChecksumBuilder::new().md5().build();
-    /// hasher.consume(b"hello world");
-    /// let hex_str = hasher.result();
-    /// assert_eq!(hex_str, "5eb63bbbe01eeed093cb22bb8f5acdc3");
+    /// can continuously consume data by chaining function calls.
     /// ```
     pub fn consume<D: AsRef<[u8]>>(&mut self, data: D) -> &mut Self {
         let mut data = data.as_ref();
@@ -330,7 +323,9 @@ mod tests {
         ];
 
         for (input, &output) in inputs.iter().zip(outputs.iter()) {
-            let computed = Md5::new().consume(input.as_bytes()).result_string();
+            let mut hasher = Md5::new();
+            hasher.consume(input.as_bytes());
+            let computed = hasher.result_string();
             assert_eq!(output, computed);
         }
     }
@@ -339,14 +334,18 @@ mod tests {
     fn chaining_consume() {
         let data1 = "hello".as_bytes();
         let data2 = "world".as_bytes();
-        let hex_str = Md5::new().consume(data1).consume(data2).result_string();
+        let mut hasher = Md5::new();
+        hasher.consume(data1).consume(data2);
+        let hex_str = hasher.result_string();
         // equal to `helloworld`
         assert_eq!(hex_str, "fc5e038d38a57032085441e7fe7010b0");
     }
 
     #[test]
     fn result() {
-        let hex = Md5::new().consume("".as_bytes()).result();
+        let mut hasher = Md5::new();
+        hasher.consume("".as_bytes());
+        let hex = hasher.result();
         assert_eq!(
             hex,
             [212, 29, 140, 217, 143, 0, 178, 4, 233, 128, 9, 152, 236, 248, 66, 126]
@@ -355,10 +354,11 @@ mod tests {
 
     #[test]
     fn reset() {
-        let mut md5 = Md5::new();
-        md5.consume("".as_bytes());
-        md5.reset();
-        let hex_str = md5.consume("a".as_bytes()).result_string();
+        let mut hasher = Md5::new();
+        hasher.consume("".as_bytes());
+        hasher.reset();
+        hasher.consume("a".as_bytes());
+        let hex_str = hasher.result_string();
         // equal to `a`
         assert_eq!(hex_str, "0cc175b9c0f1b6a831c399e269772661");
     }

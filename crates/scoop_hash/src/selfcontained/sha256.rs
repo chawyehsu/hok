@@ -64,7 +64,7 @@ impl Sha256 {
     /// Consume the last buffer data, finalize the calculation and return
     /// the digest as a `[u8; 32]` array format.
     #[inline]
-    pub fn result(&mut self) -> [u8; 32] {
+    pub fn result(mut self) -> [u8; 32] {
         if !self.finished {
             let len_mod = self.total_length % 64;
             let pad_idx = if 55 < len_mod {
@@ -96,7 +96,7 @@ impl Sha256 {
     /// Consume the last buffer data, finalize the calculation and return
     /// the digest as a [`String`] format.
     #[inline]
-    pub fn result_string(&mut self) -> String {
+    pub fn result_string(self) -> String {
         self.result()
             .iter()
             .map(|byte| format!("{:02x}", byte))
@@ -106,14 +106,7 @@ impl Sha256 {
 
     /// Consume the input data, but not finalize the calculation. This
     /// method returns `&self` to make itself chainable, so that callers
-    /// can continuously consume data by chaining function calls. for example:
-    ///
-    /// ```rust
-    /// use scoop_hash::ChecksumBuilder;
-    /// let mut hasher = ChecksumBuilder::new().sha256().build();
-    /// hasher.consume(b"hello world");
-    /// let hex_str = hasher.result();
-    /// assert_eq!(hex_str, "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");
+    /// can continuously consume data by chaining function calls.
     /// ```
     pub fn consume<D: AsRef<[u8]>>(&mut self, data: D) -> &mut Self {
         let mut data = data.as_ref();
@@ -254,7 +247,9 @@ mod tests {
         ];
 
         for (input, &output) in inputs.iter().zip(outputs.iter()) {
-            let computed = Sha256::new().consume(input.as_bytes()).result_string();
+            let mut hasher = Sha256::new();
+            hasher.consume(input.as_bytes());
+            let computed = hasher.result_string();
             assert_eq!(output, computed);
         }
     }
@@ -263,7 +258,9 @@ mod tests {
     fn chaining_consume() {
         let data1 = "hello".as_bytes();
         let data2 = "world".as_bytes();
-        let hex_str = Sha256::new().consume(data1).consume(data2).result_string();
+        let mut hasher = Sha256::new();
+        hasher.consume(data1).consume(data2);
+        let hex_str = hasher.result_string();
         // equal to `helloworld`
         assert_eq!(
             hex_str,
@@ -273,7 +270,9 @@ mod tests {
 
     #[test]
     fn result() {
-        let hex = Sha256::new().consume("".as_bytes()).result();
+        let mut hasher = Sha256::new();
+        hasher.consume("".as_bytes());
+        let hex = hasher.result();
         assert_eq!(
             hex,
             [
@@ -285,10 +284,11 @@ mod tests {
 
     #[test]
     fn reset() {
-        let mut sha1 = Sha256::new();
-        sha1.consume("".as_bytes());
-        sha1.reset();
-        let hex_str = sha1.consume("abc".as_bytes()).result_string();
+        let mut hasher = Sha256::new();
+        hasher.consume("".as_bytes());
+        hasher.reset();
+        hasher.consume("abc".as_bytes());
+        let hex_str = hasher.result_string();
         // equal to `abc`
         assert_eq!(
             hex_str,

@@ -8,6 +8,7 @@ categories = ["cryptography"]
 keywords = ["hash", "scoop"]
 license = "MIT OR Apache-2.0"
 edition = "2021"
+rust-version = "1.60.0"
 readme = "README.md"
 
 [[bench]]
