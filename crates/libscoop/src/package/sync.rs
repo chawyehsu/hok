@@ -569,6 +569,7 @@ pub fn remove(session: &Session, queries: &[&str], options: &[SyncOption]) -> Fa
     let mut packages = vec![];
 
     let installed = query::query_installed(session, &["*"], &[])?;
+    let escape_hold = options.contains(&SyncOption::EscapeHold);
 
     for &name in queries {
         let mut matched = installed
@@ -585,7 +586,13 @@ pub fn remove(session: &Session, queries: &[&str], options: &[SyncOption]) -> Fa
         // package name.
         assert_eq!(matched.len(), 1);
 
-        packages.push(matched.pop().unwrap());
+        let pkg = matched.pop().unwrap();
+
+        if pkg.is_held() && !escape_hold {
+            continue;
+        }
+
+        packages.push(pkg);
     }
 
     let no_dependent_check = options.contains(&SyncOption::NoDependentCheck);
@@ -629,7 +636,7 @@ pub fn remove(session: &Session, queries: &[&str], options: &[SyncOption]) -> Fa
 
     let is_cascade = options.contains(&SyncOption::Cascade);
     if is_cascade {
-        resolve::resolve_cascade(session, &mut packages)?;
+        resolve::resolve_cascade(session, &mut packages, escape_hold)?;
     }
 
     if let Some(tx) = session.emitter() {

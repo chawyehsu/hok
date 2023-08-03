@@ -158,7 +158,11 @@ pub(crate) fn select_candidate(session: &Session, candidates: &mut Vec<Package>)
 /// depended by other installed packages.
 ///
 /// The purpose is to support cascading removal of installed packages.
-pub(crate) fn resolve_cascade(session: &Session, packages: &mut Vec<Package>) -> Fallible<()> {
+pub(crate) fn resolve_cascade(
+    session: &Session,
+    packages: &mut Vec<Package>,
+    escape_hold: bool,
+) -> Fallible<()> {
     let mut to_resolve = packages.clone();
 
     // For performance reason, a wildcard query is done here to get all the
@@ -227,7 +231,11 @@ pub(crate) fn resolve_cascade(session: &Session, packages: &mut Vec<Package>) ->
                     .any(|p| !packages.contains(p) && !unneeded.contains(p));
 
                 if !needed {
-                    unneeded.push(dep_pkg.to_owned());
+                    if escape_hold {
+                        unneeded.push(dep_pkg.to_owned());
+                    } else {
+                        return Err(Error::PackageCascadeRemoveHold(dep_pkg.name().to_owned()));
+                    }
                 }
             }
 

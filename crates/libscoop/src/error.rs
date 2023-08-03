@@ -60,6 +60,11 @@ pub enum Error {
     #[error("Could not find package named '{0}'")]
     PackageNotFound(String),
 
+    /// Thrown when trying to do a cascading uninstall of a package that has
+    /// a held dependency.
+    #[error("Trying to cascade uninstall held package '{0}'")]
+    PackageCascadeRemoveHold(String),
+
     /// Package dependent found error
     #[error("Found dependent(s):\n{}", .0.iter().map(|(d, p)| format!("'{}' requires '{}'", d, p)).collect::<Vec<_>>().join("\n"))]
     PackageDependentFound(Vec<(String, String)>),
