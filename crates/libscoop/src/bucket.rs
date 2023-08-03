@@ -75,18 +75,37 @@ impl Bucket {
         &self.path
     }
 
-    /// Get the repository url of the bucket.
+    /// Get manifest count of the bucket.
     ///
     /// # Returns
     ///
-    /// The remote url of the bucket, none if the bucket is not a git repository
-    /// or it is a local git repository without remote url, or the git metadata
-    /// is broken.
+    /// The count of manifests in the bucket.
     #[inline]
+    pub fn manifest_count(&self) -> usize {
+        self.manifests().map(|v| v.len()).unwrap_or(0)
+    }
+
+    /// Get the remote url of the bucket.
+    ///
+    /// # Returns
+    ///
+    /// The git remote url of the bucket, otherwise none if the bucket is not a
+    /// git repository, or it's a local git repository not having a remote url
+    /// or the git metadata is broken.
     pub fn remote_url(&self) -> Option<&str> {
         self.remote_url
             .get_or_init(|| internal::git::remote_url_of(self.path(), "origin").unwrap_or(None))
             .as_deref()
+    }
+
+    /// Get the source path of the bucket.
+    ///
+    /// # Returns
+    ///
+    /// Either the remote url of the bucket or the local path of the bucket.
+    #[inline]
+    pub fn source(&self) -> &str {
+        self.remote_url().unwrap_or(self.path().to_str().unwrap())
     }
 
     /// Get the manifest path of the given package name.
@@ -94,7 +113,7 @@ impl Bucket {
     /// # Returns
     ///
     /// The path of the manifest file, none if the package is not in the bucket.
-    pub fn path_of_manifest(&self, name: &str) -> Option<PathBuf> {
+    pub(crate) fn path_of_manifest(&self, name: &str) -> Option<PathBuf> {
         let filename = format!("{}.json", name);
 
         let mut path = self.path().to_path_buf();
@@ -170,20 +189,6 @@ impl Bucket {
         let ret = iter.filter(is_manifest).collect::<Vec<_>>();
 
         Ok(ret)
-    }
-
-    /// Get manifest count of the bucket.
-    ///
-    /// # Returns
-    ///
-    /// The count of manifests.
-    ///
-    /// # Errors
-    ///
-    /// I/O errors will be returned if the bucket directory is not readable.
-    #[inline]
-    pub fn manifest_count(&self) -> Fallible<usize> {
-        Ok(self.manifests()?.len())
     }
 }
 

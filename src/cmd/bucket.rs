@@ -40,9 +40,10 @@ pub fn cmd_bucket(matches: &ArgMatches, session: &Session) -> Result<()> {
                     Ok(buckets) => {
                         for bucket in buckets {
                             println!(
-                                "{} {}",
+                                "{}\n ├─manifests: {}\n └─source: {}",
                                 bucket.name().green(),
-                                bucket.remote_url().unwrap_or("[not a git bucket]")
+                                bucket.manifest_count(),
+                                bucket.source(),
                             );
                         }
                         Ok(())
