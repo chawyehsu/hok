@@ -1,5 +1,7 @@
-use lazycell::LazyCell;
 use log::debug;
+use once_cell::unsync::OnceCell;
+use scoop_hash::ChecksumBuilder;
+use std::io::Read;
 
 use crate::{error::Fallible, Error, Event, QueryOption, Session};
 
@@ -21,9 +23,6 @@ pub enum SyncOption {
     /// proper candidate. This may not be the desired behavior in some cases.
     ///
     /// Enabling this option will also suppress the calculation of download size.
-    /// In other words, [`NoDownloadSize`][1] option will be enabled implicitly.
-    ///
-    /// [1]: SyncOption::NoDownloadSize
     AssumeYes,
 
     /// Download package only.
@@ -34,55 +33,6 @@ pub enum SyncOption {
     /// or upgrading, this option can be used. Transcation will be stopped after
     /// the download is done.
     DownloadOnly,
-
-    /// Ignore operation failure.
-    IgnoreFailure,
-
-    /// Ignore local cache and yet download packages.
-    ///
-    /// # Note
-    ///
-    /// This option is not intended to be used with the [`NoDownloadSize`][1]
-    /// option.
-    ///
-    /// [1]: SyncOption::NoDownloadSize
-    IgnoreCache,
-
-    /// Stop checking hash of downloaded packages.
-    NoHashCheck,
-
-    /// Skip download size calculation.
-    ///
-    /// # Note
-    ///
-    /// This option is useful when user wants to install or upgrade packages
-    /// with existing local cached packages. By opting in this option and having
-    /// valid caches prepared, network access can be avoided to perform the sync
-    /// operation. However, the operation may fail if there is any missing or
-    /// invalid cache.
-    ///
-    /// This option is not intended to be used with the [`IgnoreCache`][1] option.
-    ///
-    /// [1]: SyncOption::IgnoreCache
-    NoDownloadSize,
-
-    /// Do not install dependencies.
-    ///
-    /// # Note
-    ///
-    /// By default, dependencies of the pending installation package will be
-    /// resolved and installed **recursively** if they are not installed yet.
-    /// One can opt in this option to disable the default behavior. However,
-    /// it is not recommended to do so since it clearly breaks the dependency
-    /// relationship, and may stop the dependents from working properly.
-    NoDependencies,
-
-    /// Do not upgrade packages.
-    ///
-    /// This option is not intended to be used with the [`OnlyUpgrade`][1] option.
-    ///
-    /// [1]: SyncOption::OnlyUpgrade
-    NoUpgrade,
 
     /// Force operations on held packages.
     ///
@@ -95,15 +45,93 @@ pub enum SyncOption {
     /// Packages will be held again after the replace or upgrade operation.
     EscapeHold,
 
-    /// Replace packages.
+    /// Ignore local cache and force package download.
     ///
-    /// Use this option to assume YES on replacing replaceable packages.
-    Replace,
+    /// # Note
+    ///
+    /// This option is not intended to be used with the [`Offline`][1]
+    /// option.
+    ///
+    /// [1]: SyncOption::Offline
+    IgnoreCache,
+
+    /// Ignore transaction failure.
+    ///
+    /// The sync operation processes packages in the transaction one by one
+    /// according to the dependency order. By default, the transaction will be
+    /// aborted if any failure occurs during the operation.
+    ///
+    /// # Note
+    ///
+    /// This option can be used to ignore the failure and continue the operation
+    /// to commit the remaining packages in the transaction.
+    ///
+    /// When a failure occurs, the operation will be stopped immediately and
+    /// a rollback will be performed on the exact package causing the failure
+    /// while successfully committed packages will be kept be as they are. The
+    /// rest of the unpocessed packages will be skipped, and the error will be
+    /// returned.
+    ///
+    /// **NO rollback will be performed if this option is enabled**, which means
+    /// there may be broken packages being committed to the system.
+    IgnoreFailure,
+
+    /// Do not install dependencies.
+    ///
+    /// # Note
+    ///
+    /// By default, dependencies of the pending installation package will be
+    /// resolved and installed **recursively** if they are not installed yet.
+    /// One can opt in this option to disable the default behavior. However,
+    /// it is not recommended to do so since it clearly breaks the dependency
+    /// relationship, and may stop the dependents from working properly.
+    NoDependencies,
+
+    /// Stop checking hash of downloaded packages.
+    ///
+    /// # Note
+    ///
+    /// Integrity check helps to ensure the downloaded packages are not corrupted
+    /// or tampered. Hash check will be performed by default. In some cases, user
+    /// may want to skip the check to force the installation or upgrade of the
+    /// packages. By opting in this option, the hash check will be skipped.
+    ///
+    /// It is highly **NOT** recommended to use this option unless you really
+    /// know what you are doing.
+    NoHashCheck,
+
+    /// Do not upgrade packages.
+    ///
+    /// This option is not intended to be used with the [`OnlyUpgrade`][1] option.
+    ///
+    /// [1]: SyncOption::OnlyUpgrade
+    NoUpgrade,
 
     /// Do not replace packages.
     ///
-    /// Use this option to assume NO on replacing replaceable packages.
+    /// # Note
+    ///
+    /// When a package is installed and a same-named package is proposed to be
+    /// installed, a replace operation will be performed if the proposed package
+    /// is from a different bucket from the installed one.
+    ///
+    /// By opting in this option, the replace operation will be suppressed.
     NoReplace,
+
+    /// Offline mode.
+    ///
+    /// # Note
+    ///
+    /// This option is useful when user wants to install or upgrade packages
+    /// with existing local cached packages. By opting in this option and having
+    /// valid caches prepared, network access can be avoided to perform the sync
+    /// operation. However, the transaction may fail if there is any package file
+    /// missing or invalid cache.
+    ///
+    /// This option is basically the opposite of the [`IgnoreCache`][1] option.
+    ///
+    /// [1]: SyncOption::IgnoreCache
+    Offline,
 
     /// Upgrade packages only.
     ///
@@ -172,50 +200,59 @@ pub enum SyncOption {
 #[derive(Clone)]
 pub struct Transaction {
     /// Packages that will be installed with the transaction.
-    install: LazyCell<Vec<Package>>,
+    install: OnceCell<Vec<Package>>,
 
     /// Packages that will be upgraded with the transaction.
-    upgrade: LazyCell<Vec<Package>>,
+    upgrade: OnceCell<Vec<Package>>,
 
     /// Packages that will be replaced with the transaction.
-    replace: LazyCell<Vec<Package>>,
+    replace: OnceCell<Vec<Package>>,
 
     /// Packages that will be removed with the transaction.
-    remove: LazyCell<Vec<Package>>,
+    remove: OnceCell<Vec<Package>>,
 
     /// Total download size of the transaction.
-    download_size: LazyCell<DownloadSize>,
+    download_size: OnceCell<DownloadSize>,
 }
 
 impl Transaction {
     fn new() -> Transaction {
         Transaction {
-            install: LazyCell::new(),
-            upgrade: LazyCell::new(),
-            replace: LazyCell::new(),
-            remove: LazyCell::new(),
-            download_size: LazyCell::new(),
+            install: OnceCell::new(),
+            upgrade: OnceCell::new(),
+            replace: OnceCell::new(),
+            remove: OnceCell::new(),
+            download_size: OnceCell::new(),
         }
     }
 
-    fn set_install(&mut self, packages: Vec<Package>) {
-        self.install.replace(packages);
+    fn set_install(&self, packages: Vec<Package>) {
+        let _ = self.install.set(packages);
     }
 
-    fn set_upgrade(&mut self, packages: Vec<Package>) {
-        self.upgrade.replace(packages);
+    fn set_upgrade(&self, packages: Vec<Package>) {
+        let _ = self.upgrade.set(packages);
     }
 
-    fn set_replace(&mut self, packages: Vec<Package>) {
-        self.replace.replace(packages);
+    fn set_replace(&self, packages: Vec<Package>) {
+        let _ = self.replace.set(packages);
     }
 
-    fn set_remove(&mut self, packages: Vec<Package>) {
-        self.remove.replace(packages);
+    fn set_remove(&self, packages: Vec<Package>) {
+        let _ = self.remove.set(packages);
     }
 
     fn set_download_size(&self, download_size: DownloadSize) -> bool {
-        self.download_size.fill(download_size).is_ok()
+        self.download_size.set(download_size).is_ok()
+    }
+
+    fn add_view(&self) -> Vec<&Package> {
+        self.install_view()
+            .into_iter()
+            .chain(self.upgrade_view().into_iter())
+            .chain(self.replace_view().into_iter())
+            .flatten()
+            .collect::<Vec<_>>()
     }
 
     /// Get packages that will be installed with the transaction.
@@ -225,7 +262,7 @@ impl Transaction {
     /// A reference to the vector of packages that will be installed or `None`
     /// if no packages will be installed.
     pub fn install_view(&self) -> Option<&Vec<Package>> {
-        self.install.borrow()
+        self.install.get()
     }
 
     /// Get packages that will be upgraded with the transaction.
@@ -235,7 +272,7 @@ impl Transaction {
     /// A reference to the vector of packages that will be upgraded or `None`
     /// if no packages will be upgraded.
     pub fn upgrade_view(&self) -> Option<&Vec<Package>> {
-        self.upgrade.borrow()
+        self.upgrade.get()
     }
 
     /// Get packages that will be replaced with the transaction.
@@ -245,7 +282,7 @@ impl Transaction {
     /// A reference to the vector of packages that will be replaced or `None`
     /// if no packages will be replaced.
     pub fn replace_view(&self) -> Option<&Vec<Package>> {
-        self.replace.borrow()
+        self.replace.get()
     }
 
     /// Get packages that will be removed with the transaction.
@@ -255,7 +292,7 @@ impl Transaction {
     /// A reference to the vector of packages that will be removed or `None`
     /// if no packages will be removed.
     pub fn remove_view(&self) -> Option<&Vec<Package>> {
-        self.remove.borrow()
+        self.remove.get()
     }
 
     /// Get the total download size of the transaction.
@@ -265,7 +302,7 @@ impl Transaction {
     /// A `DownloadSize` reference that contains the total download size of the
     /// transaction.
     pub fn download_size(&self) -> Option<&DownloadSize> {
-        self.download_size.borrow()
+        self.download_size.get()
     }
 }
 
@@ -280,8 +317,16 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
     let mut packages = vec![];
 
     let only_upgrade = options.contains(&SyncOption::OnlyUpgrade);
+    let escape_hold = options.contains(&SyncOption::EscapeHold);
+
     if only_upgrade {
         packages = query::query_installed(session, queries, &[QueryOption::Upgradable])?;
+
+        // Replace the packages with their upgradable references.
+        packages = packages
+            .into_iter()
+            .map(|p| p.upgradable().cloned().unwrap())
+            .collect::<Vec<_>>();
     } else {
         let synced = query::query_synced(session, &["*"], &[])?;
 
@@ -301,11 +346,23 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
                 0 => return Err(Error::PackageNotFound(query.to_owned())),
                 1 => {
                     let p = matched.pop().unwrap();
+
+                    if p.is_held() && !escape_hold {
+                        // Skipping held package returns nothing to frontend...
+                        continue;
+                    }
+
                     if !packages.contains(&p) {
                         packages.push(p);
                     }
                 }
                 _ => {
+                    let is_held = matched.iter().any(|p| p.is_held());
+
+                    if is_held && !escape_hold {
+                        continue;
+                    }
+
                     resolve::select_candidate(session, &mut matched)?;
                     let p = matched.pop().unwrap();
                     if !packages.contains(&p) {
@@ -320,7 +377,7 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
         return Ok(());
     }
 
-    let mut transaction = Transaction::default();
+    let transaction = Transaction::default();
 
     let no_dependencies = options.contains(&SyncOption::NoDependencies);
     if !no_dependencies {
@@ -345,7 +402,6 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
 
     let no_upgrade = options.contains(&SyncOption::NoUpgrade);
     if !no_upgrade && !upgradable.is_empty() {
-        let escape_hold = options.contains(&SyncOption::EscapeHold);
         if !escape_hold {
             let (_held, upgradable): (Vec<_>, Vec<_>) =
                 upgradable.into_iter().partition(|p| p.is_held());
@@ -365,42 +421,24 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
 
     let reuse_cache = !options.contains(&SyncOption::IgnoreCache);
 
-    let empty = vec![];
-    let install = transaction.install_view().unwrap_or(&empty);
-    let upgrade = transaction.upgrade_view().unwrap_or(&empty);
-    let replace = transaction.replace_view().unwrap_or(&empty);
-    let packages = install
-        .iter()
-        .chain(upgrade.iter())
-        .chain(replace.iter())
-        .collect::<Vec<_>>();
-
-    debug!(
-        "transaction packages ({}): [{}]",
-        packages.len(),
-        packages
-            .iter()
-            .map(|p| p.name())
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
-
+    let packages = transaction.add_view();
     if packages.is_empty() {
         return Ok(());
     }
 
     let mut set = download::PackageSet::new(session, &packages, reuse_cache)?;
-    let mut no_download_needed = false;
 
     let assume_yes = options.contains(&SyncOption::AssumeYes);
-    let no_download_size = options.contains(&SyncOption::NoDownloadSize);
-    if !(assume_yes || no_download_size) {
+    let offline = options.contains(&SyncOption::Offline);
+    let mut should_offline = true;
+
+    if !offline {
         if let Some(tx) = session.emitter() {
             let _ = tx.send(Event::PackageDownloadSizingStart);
         }
 
         let download_size = set.calculate_download_size()?;
-        no_download_needed = download_size.total == 0;
+        should_offline = download_size.total == 0;
         transaction.set_download_size(download_size);
     }
 
@@ -427,7 +465,7 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
         }
     }
 
-    if !no_download_needed {
+    if !should_offline {
         if let Some(tx) = session.emitter() {
             let _ = tx.send(Event::PackageDownloadStart);
         }
@@ -439,9 +477,88 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
         }
     }
 
+    let no_hash_check = options.contains(&SyncOption::NoHashCheck);
+    if !no_hash_check {
+        if let Some(tx) = session.emitter() {
+            let _ = tx.send(Event::PackageIntegrityCheckStart);
+        }
+
+        let config = session.config();
+        let cache_root = config.cache_path();
+
+        let mut buf = [0; 1024 * 64];
+
+        for &pkg in packages.iter() {
+            if pkg.version() == "nightly" {
+                debug!("Skip hash check for nightly package '{}'", pkg.name());
+                continue;
+            }
+
+            let files = pkg.download_filenames();
+            let hashes = pkg.download_hashes();
+            let files_cnt = files.len();
+
+            for (idx, (filename, hash)) in files.into_iter().zip(hashes.into_iter()).enumerate() {
+                let path = cache_root.join(filename);
+                let mut file = std::fs::File::open(path)?;
+                let (algo, hash) = hash.split_once(':').unwrap_or(("sha256", hash));
+                let mut hasher = ChecksumBuilder::new().algo(algo)?.build();
+
+                if let Some(tx) = session.emitter() {
+                    let progress = format!("{} ({}/{})", pkg.name(), idx + 1, files_cnt);
+                    let _ = tx.send(Event::PackageIntegrityCheckProgress(progress));
+                }
+
+                loop {
+                    let len = file.read(&mut buf)?;
+                    if len == 0 {
+                        break;
+                    }
+                    hasher.consume(&buf[..len]);
+                }
+
+                let actual = hasher.finalize();
+                if actual != hash {
+                    let name = pkg.name().to_owned();
+                    let url = pkg.download_urls()[idx].to_owned();
+                    let expected = hash.to_owned();
+                    let ctx = super::HashMismatchContext::new(name, url, expected, actual);
+                    return Err(Error::HashMismatch(ctx));
+                }
+            }
+        }
+
+        if let Some(tx) = session.emitter() {
+            let _ = tx.send(Event::PackageIntegrityCheckDone);
+        }
+    }
+
     let download_only = options.contains(&SyncOption::DownloadOnly);
     if !download_only {
         // TODO: commit transcation
+        // let config = session.config();
+        // let apps_dir = config.root_path().join("apps");
+
+        // for &pkg in packages.iter() {
+        //     if let Some(tx) = session.emitter() {
+        //         let _ = tx.send(Event::PackageCommitStart(pkg.name().to_owned()));
+        //     }
+
+        //     let working_dir = apps_dir.join(pkg.name()).join(pkg.version());
+        //     internal::fs::ensure_dir(&working_dir)?;
+
+        //     let files = pkg.download_filenames();
+
+        //     for filename in files.iter() {
+        //         let src = config.cache_path().join(filename);
+        //         let dst = working_dir.join(filename);
+
+        //         // replace existing file
+        //         let _ = std::fs::remove_file(&dst);
+        //         std::fs::copy(src, dst)?;
+
+        //     }
+        // }
     }
 
     Ok(())
@@ -519,7 +636,7 @@ pub fn remove(session: &Session, queries: &[&str], options: &[SyncOption]) -> Fa
         let _ = tx.send(Event::PackageResolveDone);
     }
 
-    let mut transaction = Transaction::default();
+    let transaction = Transaction::default();
 
     // TODO: PowerShell hosting with execution context is not supported yet.
     // Perhaps at present we could call Scoop to do the removal for packages
@@ -533,7 +650,7 @@ pub fn remove(session: &Session, queries: &[&str], options: &[SyncOption]) -> Fa
     if !assume_yes {
         if let Some(tx) = session.emitter() {
             if tx
-                .send(Event::PromptTransactionNeedConfirm(transaction.clone()))
+                .send(Event::PromptTransactionNeedConfirm(transaction))
                 .is_ok()
             {
                 let rx = session.receiver().unwrap();

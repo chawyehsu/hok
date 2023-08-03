@@ -1,6 +1,11 @@
 #![allow(unused_assignments)]
 use clap::ArgMatches;
-use crossterm::{cursor, style::Stylize, ExecutableCommand};
+use crossterm::{
+    cursor,
+    style::Stylize,
+    terminal::{Clear, ClearType},
+    ExecutableCommand,
+};
 use libscoop::{operation, Event, Session, SyncOption};
 use std::io::Write;
 
@@ -25,6 +30,10 @@ pub fn cmd_install(matches: &ArgMatches, session: &Session) -> Result<()> {
         options.push(SyncOption::EscapeHold);
     }
 
+    if matches.get_flag("ignore-failure") {
+        options.push(SyncOption::IgnoreFailure);
+    }
+
     if matches.get_flag("ignore-cache") {
         options.push(SyncOption::IgnoreCache);
     }
@@ -33,16 +42,20 @@ pub fn cmd_install(matches: &ArgMatches, session: &Session) -> Result<()> {
         options.push(SyncOption::NoUpgrade);
     }
 
-    if matches.get_flag("yes-replace") {
-        options.push(SyncOption::Replace);
-    }
-
     if matches.get_flag("no-replace") {
         options.push(SyncOption::NoReplace);
     }
 
-    if matches.get_flag("no-download-size") {
-        options.push(SyncOption::NoDownloadSize);
+    if matches.get_flag("offline") {
+        options.push(SyncOption::Offline);
+    }
+
+    if matches.get_flag("independent") {
+        options.push(SyncOption::NoDependencies);
+    }
+
+    if matches.get_flag("no-hash-check") {
+        options.push(SyncOption::NoHashCheck);
     }
 
     let rx = session.event_bus().receiver();
@@ -69,6 +82,25 @@ pub fn cmd_install(matches: &ArgMatches, session: &Session) -> Result<()> {
                     dlprogress.update(ident, url, filename, dltotal, dlnow);
                 }
                 Event::PackageDownloadDone => {}
+                Event::PackageIntegrityCheckStart => println!("Checking package integrity..."),
+                Event::PackageIntegrityCheckProgress(ctx) => {
+                    let mut stdout = std::io::stdout();
+                    stdout
+                        .execute(cursor::MoveToPreviousLine(1))
+                        .unwrap()
+                        .execute(Clear(ClearType::CurrentLine))
+                        .unwrap();
+                    println!("Checking package integrity...{}", ctx.dark_grey());
+                }
+                Event::PackageIntegrityCheckDone => {
+                    let mut stdout = std::io::stdout();
+                    stdout
+                        .execute(cursor::MoveToPreviousLine(1))
+                        .unwrap()
+                        .execute(Clear(ClearType::CurrentLine))
+                        .unwrap();
+                    println!("Checking package integrity...{}", "Ok".green());
+                }
                 Event::PromptPackageCandidate(pkgs) => {
                     let name = pkgs[0].split_once('/').unwrap().1;
                     println!("Found multiple candidates for package '{}':\n", name);
