@@ -190,7 +190,7 @@ pub(crate) fn query_installed(
                         });
 
                         let package = Package::from(name, bucket, manifest);
-                        package.fill_install_state(state);
+                        package.fill_install_state(state.clone());
 
                         // The query has finished, the package has been found
                         // and crafted. We can now apply some extra filters.
@@ -223,6 +223,8 @@ pub(crate) fn query_installed(
                                         if is_upgradable {
                                             let origin_pkg =
                                                 Package::from(name, bucket, origin_manifest);
+                                            origin_pkg.fill_install_state(state);
+
                                             package.fill_upgradable(origin_pkg);
                                         } else {
                                             // the package is not upgradable,
