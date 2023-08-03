@@ -1,5 +1,5 @@
 use flume::{Receiver, Sender};
-use lazycell::LazyCell;
+use once_cell::unsync::OnceCell;
 use std::cell::{Ref, RefCell, RefMut};
 use std::path::Path;
 
@@ -18,10 +18,10 @@ pub struct Session {
     config: RefCell<Config>,
 
     /// Full duplex channel for event transmission back and forth
-    event_bus: LazyCell<EventBus>,
+    event_bus: OnceCell<EventBus>,
 
     /// User agent for the session
-    pub(crate) user_agent: LazyCell<String>,
+    pub(crate) user_agent: OnceCell<String>,
 }
 
 impl Default for Session {
@@ -52,8 +52,8 @@ impl Session {
         let config = RefCell::new(Config::init());
         Session {
             config,
-            event_bus: LazyCell::new(),
-            user_agent: LazyCell::new(),
+            event_bus: OnceCell::new(),
+            user_agent: OnceCell::new(),
         }
     }
 
@@ -75,8 +75,8 @@ impl Session {
 
         Ok(Session {
             config,
-            event_bus: LazyCell::new(),
-            user_agent: LazyCell::new(),
+            event_bus: OnceCell::new(),
+            user_agent: OnceCell::new(),
         })
     }
 
@@ -113,17 +113,17 @@ impl Session {
     ///
     /// [1]: crate::Event
     pub fn event_bus(&self) -> &EventBus {
-        self.event_bus.borrow_with(EventBus::new)
+        self.event_bus.get_or_init(EventBus::new)
     }
 
     /// Get an outbound sender to emit events.
     pub(crate) fn emitter(&self) -> Option<Sender<Event>> {
-        self.event_bus.borrow().map(|bus| bus.inner_sender())
+        self.event_bus.get().map(|bus| bus.inner_sender())
     }
 
     /// Get an inbound receiver to reveive events.
     pub(crate) fn receiver(&self) -> Option<&Receiver<Event>> {
-        self.event_bus.borrow().map(|bus| bus.inner_receiver())
+        self.event_bus.get().map(|bus| bus.inner_receiver())
     }
 
     /// Set the user agent for the session.
@@ -138,7 +138,7 @@ impl Session {
     /// This method will return an error if the user agent has already been set.
     pub fn set_user_agent(&self, user_agent: &str) -> Fallible<()> {
         self.user_agent
-            .fill(user_agent.to_owned())
+            .set(user_agent.to_owned())
             .map_err(|_| Error::UserAgentAlreadySet)
     }
 }

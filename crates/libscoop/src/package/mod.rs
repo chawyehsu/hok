@@ -4,7 +4,7 @@ pub(crate) mod query;
 pub(crate) mod resolve;
 pub(crate) mod sync;
 
-use lazycell::LazyCell;
+use once_cell::unsync::OnceCell;
 use std::path::Path;
 
 pub use manifest::{InstallInfo, License, Manifest};
@@ -26,17 +26,17 @@ pub struct Package {
     pub manifest: Manifest,
 
     #[serde(skip)]
-    origin: LazyCell<OriginateFrom>,
+    origin: OnceCell<OriginateFrom>,
 
     /// The install state of the package.
     #[serde(skip)]
-    install_state: LazyCell<InstallState>,
+    install_state: OnceCell<InstallState>,
 
     /// The upgradable package, if any.
     ///
     /// This field is never serialized.
     #[serde(skip)]
-    upgradable: LazyCell<Option<Box<Package>>>,
+    upgradable: OnceCell<Option<Box<Package>>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -88,9 +88,9 @@ impl Package {
             bucket: bucket.to_owned(),
             name: name.to_owned(),
             manifest,
-            origin: LazyCell::new(),
-            install_state: LazyCell::new(),
-            upgradable: LazyCell::new(),
+            origin: OnceCell::new(),
+            install_state: OnceCell::new(),
+            upgradable: OnceCell::new(),
         }
     }
 
@@ -211,13 +211,17 @@ impl Package {
             .collect::<Vec<_>>()
     }
 
+    pub(crate) fn download_hashes(&self) -> Vec<&str> {
+        self.manifest.hash()
+    }
+
     /// Get the installed bucket of this package.
     ///
     /// # Returns
     ///
     /// The installed bucket of this package, if any.
     pub fn installed_bucket(&self) -> Option<&str> {
-        match self.install_state.borrow() {
+        match self.install_state.get() {
             None => None,
             Some(state) => match state {
                 InstallState::NotInstalled => None,
@@ -234,7 +238,7 @@ impl Package {
     ///
     /// The installed version of this package, if any.
     pub fn installed_version(&self) -> Option<&str> {
-        match self.install_state.borrow() {
+        match self.install_state.get() {
             None => None,
             Some(state) => match state {
                 InstallState::NotInstalled => None,
@@ -250,7 +254,7 @@ impl Package {
     /// Only installed package can be held, therefore this method will always
     /// return `false` if the package is not installed.
     pub fn is_held(&self) -> bool {
-        match self.install_state.borrow() {
+        match self.install_state.get() {
             None => false,
             Some(state) => match state {
                 InstallState::NotInstalled => false,
@@ -267,7 +271,7 @@ impl Package {
     /// Check if the package is strictly installed, which means the package is
     /// installed from the bucket it belongs to rather than from other buckets.
     pub fn is_strictly_installed(&self) -> bool {
-        match self.install_state.borrow() {
+        match self.install_state.get() {
             None => false,
             Some(state) => match state {
                 InstallState::NotInstalled => false,
@@ -295,7 +299,7 @@ impl Package {
     ///
     /// The upgradable version when the package is upgradable, otherwise `None`.
     pub fn upgradable_version(&self) -> Option<&str> {
-        let origin_pkg = self.upgradable.borrow();
+        let origin_pkg = self.upgradable.get();
 
         if let Some(Some(pkg)) = origin_pkg {
             return Some(pkg.version());
@@ -318,7 +322,7 @@ impl Package {
     /// The reference to the upgradable package of this package when it is
     /// upgradable, otherwise `None`.
     pub fn upgradable(&self) -> Option<&Package> {
-        if let Some(Some(pkg)) = self.upgradable.borrow() {
+        if let Some(Some(pkg)) = self.upgradable.get() {
             return Some(pkg.as_ref());
         }
         None
@@ -364,13 +368,13 @@ impl Package {
             },
         };
 
-        let _ = self.origin.fill(origin);
-        let _ = self.install_state.fill(state);
+        let _ = self.origin.set(origin);
+        let _ = self.install_state.set(state);
     }
 
     pub(crate) fn fill_upgradable(&self, upgradable: Package) {
         let upgradable = Some(Box::new(upgradable));
-        let _ = self.upgradable.fill(upgradable);
+        let _ = self.upgradable.set(upgradable);
     }
 }
 

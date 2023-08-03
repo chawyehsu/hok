@@ -1,8 +1,8 @@
 use curl::easy::{Easy, List};
 use curl::multi::Multi;
 use flume::Sender;
-use lazycell::LazyCell;
 use log::debug;
+use once_cell::unsync::OnceCell;
 use std::{
     collections::HashMap,
     fs::{File, OpenOptions},
@@ -30,12 +30,12 @@ pub struct PackageSet<'a> {
     session: &'a Session,
 
     /// Packages with intent to download.
-    packages: &'a [&'a Package],
+    pub packages: &'a [&'a Package],
 
     /// Multi handle for curl.
     multi: Multi,
 
-    caches: LazyCell<HashMap<String, PackageCache<'a>>>,
+    caches: OnceCell<HashMap<String, PackageCache<'a>>>,
 
     /// Whether to reuse cached files.
     reuse_cache: bool,
@@ -111,6 +111,8 @@ impl<'a> PackageSet<'a> {
     ) -> Fallible<PackageSet<'a>> {
         let mut multi = Multi::new();
 
+        // TODO: configurable max connections
+        multi.set_max_total_connections(6)?;
         multi.set_max_host_connections(4)?;
         multi.pipelining(false, true)?;
 
@@ -118,13 +120,13 @@ impl<'a> PackageSet<'a> {
             session,
             packages,
             multi,
-            caches: LazyCell::new(),
+            caches: OnceCell::new(),
             reuse_cache,
         })
     }
 
     fn load_cache(&self) {
-        if self.caches.filled() {
+        if self.caches.get().is_some() {
             return;
         }
 
@@ -181,12 +183,12 @@ impl<'a> PackageSet<'a> {
             caches.insert(pkg.ident(), pacakge_cache);
         }
 
-        let _ = self.caches.fill(caches);
+        let _ = self.caches.set(caches);
     }
 
     /// Download packages.
-    pub fn download(&self) -> Fallible<()> {
-        if !self.caches.filled() {
+    pub fn download(&mut self) -> Fallible<()> {
+        if self.caches.get().is_none() {
             self.load_cache();
         }
 
@@ -196,13 +198,13 @@ impl<'a> PackageSet<'a> {
         let user_agent = self
             .session
             .user_agent
-            .borrow()
+            .get()
             .map(|s| s.as_str())
             .unwrap_or(DEFAULT_USER_AGENT);
 
         let mut handles = HashMap::new();
         let mut token_ctx = HashMap::new();
-        let package_caches = self.caches.borrow().unwrap();
+        let package_caches = self.caches.get_mut().unwrap();
 
         // map download tmp files to their final names
         let mut filepaths = vec![];
@@ -253,13 +255,10 @@ impl<'a> PackageSet<'a> {
 
                 let path = cache_root.join(filename);
                 let tmp = cache_root.join(format!("{}.download", filename));
-                if path.exists() {
-                    let _ = std::fs::remove_file(&path);
-                }
 
-                if tmp.exists() {
-                    let _ = std::fs::remove_file(&tmp);
-                }
+                // remove possible existing files
+                let _ = std::fs::remove_file(&path);
+                let _ = std::fs::remove_file(&tmp);
 
                 filepaths.push((tmp.clone(), path.clone()));
 
@@ -313,8 +312,11 @@ impl<'a> PackageSet<'a> {
     }
 
     /// Calculate download size.
+    ///
+    /// This function is actually a pre-download process, which will try to
+    /// fetch the remote file size of each package file.
     pub fn calculate_download_size(&mut self) -> Fallible<DownloadSize> {
-        if !self.caches.filled() {
+        if self.caches.get().is_none() {
             self.load_cache();
         }
 
@@ -323,13 +325,13 @@ impl<'a> PackageSet<'a> {
         let user_agent = self
             .session
             .user_agent
-            .borrow()
+            .get()
             .map(|s| s.as_str())
             .unwrap_or(DEFAULT_USER_AGENT);
 
         let mut handles = HashMap::new();
         let mut token_ctx = HashMap::new();
-        let package_caches = self.caches.borrow_mut().unwrap();
+        let package_caches = self.caches.get_mut().unwrap();
 
         for (pidx, &pkg) in self.packages.iter().enumerate() {
             // if the package is upgradable, use the upgradable reference instead
@@ -483,46 +485,6 @@ fn progress(
     // change.
     tx.send(Event::PackageDownloadProgress(ctx)).is_ok()
 }
-
-// fn setup_working_dir(session: &Session, package: &Package) -> Fallible<(PathBuf, Vec<PathBuf>)> {
-//     let files = package
-//         .manifest
-//         .url()
-//         .into_iter()
-//         .map(|url| {
-//             session.config().cache_path.join(format!(
-//                 "{}#{}#{}",
-//                 package.name,
-//                 package.version(),
-//                 fs::filenamify(url)
-//             ))
-//         })
-//         .collect::<Vec<_>>();
-
-//     let version = match package.manifest.is_nightly() {
-//         false => package.manifest.version().to_owned(),
-//         true => {
-//             let date = chrono::Local::now().format("%Y%m%d");
-//             format!("nightly-{}", date)
-//         }
-//     };
-
-//     let working_dir = session
-//         .config()
-//         .root_path
-//         .join(format!("apps/{}/{}", package.name, version));
-//     fs::ensure_dir(&working_dir)?;
-
-//     for src in files.iter() {
-//         let dst = working_dir.join(src.file_name().unwrap());
-//         std::fs::copy(&src, &dst)?;
-//     }
-
-//     let ret = (working_dir, files);
-
-//     // Return the last file as the fname
-//     Ok(ret)
-// }
 
 // #[derive(Debug)]
 // struct ChunkedRange {
