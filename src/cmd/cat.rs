@@ -1,4 +1,5 @@
 use clap::ArgMatches;
+use crossterm::style::Stylize;
 use libscoop::{operation, QueryOption, Session};
 use std::{io::Write, path::Path, process::Command};
 
@@ -40,7 +41,7 @@ pub fn cmd_cat(matches: &ArgMatches, session: &Session) -> Result<()> {
                 }
 
                 let num = parsed.unwrap();
-                if num >= result.len() {
+                if num >= length {
                     eprintln!("Invalid input.");
                     return Ok(());
                 }
@@ -60,14 +61,13 @@ pub fn cmd_cat(matches: &ArgMatches, session: &Session) -> Result<()> {
                 }
             };
 
-            if length > 1 {
-                println!();
-            }
+            let path = package.manfest_path();
+            println!("{}:", path.display().to_string().green());
 
             let mut child = Command::new("cmd")
                 .arg("/C")
                 .arg(cat)
-                .arg(package.manfest_path())
+                .arg(path)
                 .args(cat_args)
                 .spawn()?;
             child.wait()?;
