@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::internal::dag::CyclicError;
+use crate::{internal::dag::CyclicError, package::HashMismatchContext};
 
 pub type Fallible<T> = Result<T, Error>;
 
@@ -19,9 +19,11 @@ pub enum Error {
     #[error("'{0}' is not a known bucket, <repo> is required")]
     BucketAddRemoteRequired(String),
 
+    /// Bucket not found error
     #[error("bucket '{0}' does not exist")]
     BucketNotFound(String),
 
+    /// Bare bucket error
     #[error("bare bucket '{0}' is no longer supported")]
     BareBucketFound(String),
 
@@ -41,15 +43,13 @@ pub enum Error {
     #[error("User agent already set")]
     UserAgentAlreadySet,
 
-    #[error("error")]
-    HashMismatch,
+    /// Hash mismatch error
+    #[error("{0}")]
+    HashMismatch(HashMismatchContext),
 
     /// Invalid cache file error
     #[error("error")]
     InvalidCacheFile { path: PathBuf },
-
-    #[error("error")]
-    InvalidHashValue(String),
 
     /// Throw when receiving an invalid answer from the frontend.
     #[error("invalid answer")]
@@ -60,6 +60,7 @@ pub enum Error {
     #[error("Could not find package named '{0}'")]
     PackageNotFound(String),
 
+    /// Package dependent found error
     #[error("Found dependent(s):\n{}", .0.iter().map(|(d, p)| format!("'{}' requires '{}'", d, p)).collect::<Vec<_>>().join("\n"))]
     PackageDependentFound(Vec<(String, String)>),
 
@@ -84,6 +85,10 @@ pub enum Error {
     /// Cycle dependency error
     #[error(transparent)]
     CyclicDependency(#[from] CyclicError),
+
+    /// Scoop hash error
+    #[error(transparent)]
+    Hash(#[from] scoop_hash::Error),
 
     /// Curl error
     #[error(transparent)]

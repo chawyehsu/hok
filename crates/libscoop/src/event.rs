@@ -96,6 +96,15 @@ pub enum Event {
     /// Package integrity check is started.
     PackageIntegrityCheckStart,
 
+    /// Package integrity check has made some progress.
+    PackageIntegrityCheckProgress(String),
+
+    /// Package integrity check is finished.
+    PackageIntegrityCheckDone,
+
+    /// Package is started to be committed.
+    PackageCommitStart(String),
+
     /// Package sync operation is finished.
     PackageSyncDone,
 

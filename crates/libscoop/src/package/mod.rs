@@ -5,7 +5,7 @@ pub(crate) mod resolve;
 pub(crate) mod sync;
 
 use once_cell::unsync::OnceCell;
-use std::path::Path;
+use std::{fmt, path::Path};
 
 pub use manifest::{InstallInfo, License, Manifest};
 pub use query::QueryOption;
@@ -392,4 +392,58 @@ pub(super) fn extract_name<S: AsRef<str>>(input: S) -> String {
         .map(|(_, n)| n)
         .unwrap_or(input.as_ref())
         .to_owned()
+}
+
+/// Hash mismatch context.
+#[derive(Clone, Debug)]
+pub struct HashMismatchContext {
+    name: String,
+    url: String,
+    expected: String,
+    actual: String,
+}
+
+impl fmt::Display for HashMismatchContext {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Hash mismatch for package '{}':\n     Url: {}\nExpected: {}\n  Actual: {}",
+            self.name(),
+            self.url(),
+            self.expected(),
+            self.actual()
+        )
+    }
+}
+
+impl HashMismatchContext {
+    /// Create a new hash mismatch context.
+    pub fn new(name: String, url: String, expected: String, actual: String) -> HashMismatchContext {
+        HashMismatchContext {
+            name,
+            url,
+            expected,
+            actual,
+        }
+    }
+
+    /// name of the package.
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    /// url of corresponding hash mismatched file.
+    pub fn url(&self) -> &str {
+        self.url.as_str()
+    }
+
+    /// Expected hash.
+    pub fn expected(&self) -> &str {
+        self.expected.as_str()
+    }
+
+    /// Actual hash.
+    pub fn actual(&self) -> &str {
+        self.actual.as_str()
+    }
 }
