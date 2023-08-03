@@ -7,7 +7,7 @@ use crossterm::{
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::{collections::HashMap, io::stdout};
 
-static BAR_FMT: &str = " {wide_msg} {total_bytes:>12} [{bar:>30}] {percent:>3}%";
+static BAR_FMT: &str = " {wide_msg} {total_bytes:>12} [{bar:>20}] {percent:>3}%";
 
 /// Multiple progress bars with own context.
 pub struct MultiProgressUI {
