@@ -32,8 +32,11 @@ thiserror = "1.0"
 
 [dependencies.scoop-hash]
 version = "0.1.0-beta.2"
-# features = ["rustcrypto"]
 path = "../scoop_hash"
+
+[features]
+default = []
+rustcrypto-hash = ["scoop-hash/rustcrypto"]
 
 # Archive
 # infer = "0.9.0"
