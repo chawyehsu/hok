@@ -1,2 +1,4 @@
 /target
 flamegraph.svg
+bench.ps1
+sandbox.wsb

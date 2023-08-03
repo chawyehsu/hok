@@ -1,0 +1,102 @@
+#Requires -Version 5.1
+
+Set-StrictMode -Version Latest
+
+$Script:SCOOP_INSTALLER_URL = 'https://get.scoop.sh'
+$Script:PROXY = '{{proxy}}'
+
+function Test-IsInSandbox {
+    $env:USERNAME -eq 'WDAGUtilityAccount'
+}
+
+function Test-CommandAvailable {
+    param (
+        [Parameter(Mandatory = $True, Position = 0)]
+        [String] $Command
+    )
+    return [Boolean](Get-Command $Command -ErrorAction SilentlyContinue)
+}
+
+function Reset-Network {
+    if (!($Script:PROXY -eq '')) {
+        $env:HTTP_PROXY = $PROXY
+        $env:HTTPS_PROXY = $PROXY
+    }
+}
+
+function Install-Scoop {
+    Write-Host 'Installing scoop...'
+
+    if (!($Script:PROXY -eq '')) {
+        Invoke-RestMethod -Uri $Script:SCOOP_INSTALLER_URL -Proxy $Script:PROXY -OutFile 'C:\install.ps1'
+        C:\install.ps1 -Proxy $Script:PROXY
+    } else {
+        Invoke-RestMethod -Uri $Script:SCOOP_INSTALLER_URL -OutFile 'C:\install.ps1'
+        C:\install.ps1
+    }
+
+    if (!(Test-CommandAvailable 'scoop')) {
+        Write-Host 'Scoop not installed, exiting'
+        exit
+    }
+
+    if (!($Script:PROXY -eq '')) {
+        $proxyHost = $Script:PROXY -replace 'https?://', '' -replace '/$', ''
+        scoop config proxy $proxyHost
+    }
+
+    scoop config show_update_log false
+    scoop install git
+
+    # https://github.com/desktop/desktop/issues/3260
+    # https://stackoverflow.com/questions/45556189/
+    git config --global http.sslBackend 'openssl'
+
+    scoop update
+    scoop bucket add extras
+    scoop bucket add dorado https://github.com/chawyehsu/dorado
+
+    scoop install vcredist2022 hyperfine hok scoop-search
+
+    # Adding more buckets for benchmarking
+    scoop bucket add versions
+    scoop bucket add java
+    scoop bucket add php
+    scoop bucket add games
+    scoop bucket add nonportable
+    scoop bucket add nerd-fonts
+    scoop bucket add nirsoft
+    scoop bucket add sysinternals
+    scoop bucket add tests https://github.com/ScoopInstaller/Tests
+
+    Clear-Host
+
+    Write-Host 'hok version:' -ForegroundColor DarkCyan
+    Start-Process 'hok.exe' -ArgumentList '-V' -NoNewWindow -Wait
+
+    Write-Host 'Benchmarking scoop bucket list' -ForegroundColor DarkCyan
+    Start-Process 'hyperfine.exe' -ArgumentList '--warmup', '3', '"scoop bucket list"', '"hok bucket list"' -NoNewWindow -Wait
+
+    Write-Host 'Benchmarking scoop list' -ForegroundColor DarkCyan
+    Start-Process 'hyperfine.exe' -ArgumentList '--warmup', '3', '"scoop list"', '"hok list"' -NoNewWindow -Wait
+
+    Write-Host 'Benchmarking scoop search' -ForegroundColor DarkCyan
+    Start-Process 'hyperfine.exe' -ArgumentList '--warmup', '3', '"scoop search google"', '"scoop-search google"', '"hok search google"' -NoNewWindow -Wait
+}
+
+function Start-Sandbox {
+    if (!(Test-IsInSandbox)) {
+        Write-Host 'Not in sandbox, exiting'
+        exit
+    }
+
+    Reset-Network
+    Install-Scoop
+}
+
+$oldErrorActionPreference = $ErrorActionPreference
+$ErrorActionPreference = 'Stop'
+
+Start-Sandbox
+
+$ErrorActionPreference = $oldErrorActionPreference

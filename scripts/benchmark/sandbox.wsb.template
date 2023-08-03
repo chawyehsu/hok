@@ -1,0 +1,15 @@
+<Configuration>
+  <vGPU>Disable</vGPU>
+  <Networking>Enable</Networking>
+  <MemoryInMB>{{memory}}</MemoryInMB>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>{{host}}</HostFolder>
+      <SandboxFolder>C:\workspace</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>explorer.exe C:\workspace\start.cmd</Command>
+  </LogonCommand>
+</Configuration>
