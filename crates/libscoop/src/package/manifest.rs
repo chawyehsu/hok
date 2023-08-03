@@ -1005,6 +1005,24 @@ impl License {
     }
 }
 
+impl fmt::Display for License {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let url = self.url();
+
+        if let Some(url) = url {
+            write!(f, "{} ({})", self.identifier, url)
+        } else if self.is_spdx() {
+            write!(
+                f,
+                "{} (https://spdx.org/licenses/{}.html)",
+                self.identifier, self.identifier
+            )
+        } else {
+            write!(f, "{}", self.identifier)
+        }
+    }
+}
+
 impl Installer {
     #[inline]
     pub fn args(&self) -> Option<Vec<&str>> {
