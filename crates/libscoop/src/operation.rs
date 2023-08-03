@@ -1,4 +1,3 @@
-#![allow(unused)]
 //! Operations that can be performed on a Scoop instance.
 //!
 //! This module contains publicly available operations that can be executed on
@@ -209,37 +208,42 @@ pub fn cache_list(session: &Session, query: &str) -> Fallible<Vec<CacheFile>> {
     let is_wildcard_query = query.eq("*") || query.is_empty();
     let config = session.config();
     let cache_dir = config.cache_path();
-    let mut entries = vec![];
+    let mut files = vec![];
 
-    if cache_dir.exists() {
-        entries = cache_dir
-            .read_dir()?
-            .filter_map(Result::ok)
-            .filter_map(|de| {
-                let is_file = de.file_type().unwrap().is_file();
-                if is_file {
-                    if let Ok(item) = CacheFile::from(de.path()) {
-                        if !is_wildcard_query {
-                            let matched = item
-                                .package_name()
-                                .to_lowercase()
-                                .contains(&query.to_lowercase());
-                            if matched {
+    match cache_dir.read_dir() {
+        Err(err) => {
+            debug!("failed to read cache dir ({})", err);
+        }
+        Ok(entires) => {
+            files = entires
+                .filter_map(|de| {
+                    if let Ok(entry) = de {
+                        let is_file = entry.file_type().unwrap().is_file();
+                        if is_file {
+                            if let Ok(item) = CacheFile::from(entry.path()) {
+                                if !is_wildcard_query {
+                                    let matched = item
+                                        .package_name()
+                                        .to_lowercase()
+                                        .contains(&query.to_lowercase());
+                                    if matched {
+                                        return Some(item);
+                                    } else {
+                                        return None;
+                                    }
+                                }
+
                                 return Some(item);
-                            } else {
-                                return None;
                             }
                         }
-
-                        return Some(item);
                     }
-                }
-                None
-            })
-            .collect::<Vec<_>>();
+                    None
+                })
+                .collect::<Vec<_>>();
+        }
     }
 
-    Ok(entries)
+    Ok(files)
 }
 
 /// Remove cache files by query.

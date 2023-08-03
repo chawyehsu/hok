@@ -44,7 +44,7 @@ impl CacheFile {
 
     /// Get the tmp path of this cache file
     #[inline]
-    pub fn tmp_path(&self) -> PathBuf {
+    pub(crate) fn tmp_path(&self) -> PathBuf {
         let mut temp = self.path.clone().into_os_string();
         temp.push(".download");
         PathBuf::from(temp)
