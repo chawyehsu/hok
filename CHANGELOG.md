@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.1.0-beta.2](https://github.com/chawyehsu/hok/compare/v0.1.0-beta.1...v0.1.0-beta.2) (2023-08-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* **libscoop:** `SyncOption::NoDownloadSize` becomes `SyncOption::Offline`
+
+### Features
+
+* **hok|cat:** show manifest path ([7e06467](https://github.com/chawyehsu/hok/commit/7e064672ebd6aa2009f1db49ea6a0f8704139be3))
+* **hok:** show bucket manifest count ([d71e193](https://github.com/chawyehsu/hok/commit/d71e193be2cc20598e53b08947635f67a1409399))
+* **libscoop|download:** support injecting cookie defined in manifest ([aec7fdc](https://github.com/chawyehsu/hok/commit/aec7fdc851aee1673170182f7d382a069d514649))
+* **libscoop|download:** write to temp file in downloading ([d79e598](https://github.com/chawyehsu/hok/commit/d79e5989aa01b1d49cc02003692e2f4b46991ca0))
+* **libscoop|event:** added integrity check event and error type ([888afbb](https://github.com/chawyehsu/hok/commit/888afbba203b80dfd4accf57fbc99dc1b348d3e3))
+* **libscoop|manifest:** impl Display for License ([e91ff0e](https://github.com/chawyehsu/hok/commit/e91ff0ec48a295a91d771e7256e542e9cab74846))
+* **libscoop|resolve:** allow to select installed candidate ([8fb0ec3](https://github.com/chawyehsu/hok/commit/8fb0ec39509128498be1bcbeb3fcddb5edb16838))
+* **libscoop|sync:** added SyncOption::EscapeHold for package remove ([ca8fad7](https://github.com/chawyehsu/hok/commit/ca8fad7ffbd1dd1cb0a6d1e03f924e63c5db3364))
+* **libscoop:** added package integrity check logic ([57869f7](https://github.com/chawyehsu/hok/commit/57869f763e5a1a9c3668b3028d46787e5ce0e04d))
+* **libscoop:** scoop-hash features passthrough ([cb027ce](https://github.com/chawyehsu/hok/commit/cb027cedd98de15aa17602234b824b240c2fcc2c))
+* **scoop-hash:** support switching hashing backend ([d38658e](https://github.com/chawyehsu/hok/commit/d38658ef8785df92189b29df7094dadfc609e14c))
+* **scoop-hash:** use builder pattern ([87ca347](https://github.com/chawyehsu/hok/commit/87ca3475bd4d5cb947c4ee2702807f944d92c729))
+
+
+### Bug Fixes
+
+* **hok|list:** only print upgradable when the flag is used ([558d9d3](https://github.com/chawyehsu/hok/commit/558d9d39603d85657986da43f8c98372ac938e30))
+* **hok:** accumulate downloaded bytes properly ([d6fabc8](https://github.com/chawyehsu/hok/commit/d6fabc89aa0bfa1428328bddc248c11fe2e9d8e9))
+* **libscoop:** package resolving is infallible when OnlyUpgrade is used ([cabd52b](https://github.com/chawyehsu/hok/commit/cabd52bdb1659bb835ad60d9074b8bbdaf345ad0))
+* **libscoop:** set install state for package's upgradable reference ([63a54f7](https://github.com/chawyehsu/hok/commit/63a54f7a36ac1cdcb612437d05c752a97ed9a9e3))
+* **libscoop:** use upgradable package reference when available ([9dfd93f](https://github.com/chawyehsu/hok/commit/9dfd93fcf58980a113bec1eb781f414c30489de9))
+
+
+### Performance Improvements
+
+* **libscoop:** 5x speedup on package querying ([90a8815](https://github.com/chawyehsu/hok/commit/90a881550df4c3196cd185ab34e4621f854a41b7))
+
 ## [0.1.0-beta.1](https://github.com/chawyehsu/hok/compare/v0.1.0-alpha.3...v0.1.0-beta.1) (2023-07-30)
 
 
