@@ -32,19 +32,19 @@ Usage: hok.exe <COMMAND>
 
 Commands:
   bucket     Manage manifest buckets
-  cache      List or remove download caches
-  cat        Display manifest content of a package
+  cache      Package cache management
+  cat        Inspect the manifest of a package
   cleanup    Cleanup apps by removing old versions
-  config     Configuration manipulations
-  hold       Hold package(s) to disable updates
-  home       Open the homepage of given package
-  info       Display information about a package
+  config     Configuration management
+  hold       Hold package(s) to disable changes
+  home       Browse the homepage of a package
+  info       Show package(s) basic information
   install    Install package(s)
   list       List installed package(s)
   search     Search available package(s)
-  unhold     Unhold package(s) to enable updates
+  unhold     Unhold package(s) to enable changes
   uninstall  Uninstall package(s)
-  update     Fetch and update all buckets
+  update     Fetch and update subscribed buckets
   upgrade    Upgrade installed package(s)
   help       Print this message or the help of the given subcommand(s)
 
