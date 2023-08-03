@@ -31,6 +31,7 @@ pub fn cmd_config(matches: &ArgMatches, session: &Session) -> Result<()> {
                 .map(|s| s.as_str())
                 .unwrap_or_default();
             operation::config_set(session, key, value)?;
+            println!("Config '{}' has been set to '{}'", key, value);
             Ok(())
         }
         Some(("unset", args)) => {
@@ -39,6 +40,7 @@ pub fn cmd_config(matches: &ArgMatches, session: &Session) -> Result<()> {
                 .map(|s| s.as_str())
                 .unwrap_or_default();
             operation::config_set(session, key, "")?;
+            println!("Config '{}' has been unset", key);
             Ok(())
         }
         _ => unreachable!(),

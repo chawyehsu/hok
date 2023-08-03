@@ -54,7 +54,7 @@ pub fn build() -> Command {
         )
         .subcommand(
             Command::new("cache")
-                .about("List or remove download caches")
+                .about("Package cache management")
                 .arg_required_else_help(true)
                 .subcommand(
                     Command::new("list")
@@ -84,7 +84,7 @@ pub fn build() -> Command {
         )
         .subcommand(
             Command::new("cat")
-                .about("Display manifest content of a package")
+                .about("Inspect the manifest of a package")
                 .arg_required_else_help(true)
                 .arg(
                     Arg::new("package")
@@ -111,7 +111,7 @@ pub fn build() -> Command {
         )
         .subcommand(
             Command::new("config")
-                .about("Configuration manipulations")
+                .about("Configuration management")
                 .arg_required_else_help(true)
                 .subcommand(
                     Command::new("edit").about("Edit the config file [default editor: notepad]"),
@@ -145,7 +145,7 @@ pub fn build() -> Command {
         )
         .subcommand(
             Command::new("hold")
-                .about("Hold package(s) to disable updates")
+                .about("Hold package(s) to disable changes")
                 .arg_required_else_help(true)
                 .arg(
                     Arg::new("package")
@@ -156,17 +156,17 @@ pub fn build() -> Command {
         )
         .subcommand(
             Command::new("home")
-                .about("Open the homepage of given package")
+                .about("Browse the homepage of a package")
                 .arg_required_else_help(true)
                 .arg(Arg::new("package").help("The package name").required(true)),
         )
         .subcommand(
             Command::new("info")
-                .about("Display information about a package")
+                .about("Show package(s) basic information")
                 .arg_required_else_help(true)
                 .arg(
-                    Arg::new("package")
-                        .help("Name of the package to be inspected")
+                    Arg::new("query")
+                        .help("The query string (regex supported)")
                         .required(true),
                 ),
         )
@@ -323,7 +323,7 @@ pub fn build() -> Command {
         )
         .subcommand(
             Command::new("unhold")
-                .about("Unhold package(s) to enable updates")
+                .about("Unhold package(s) to enable changes")
                 .arg_required_else_help(true)
                 .arg(
                     Arg::new("package")
@@ -381,7 +381,7 @@ pub fn build() -> Command {
         )
         .subcommand(
             Command::new("update")
-                .about("Fetch and update all buckets")
+                .about("Fetch and update subscribed buckets")
                 .alias("u"),
         )
         .subcommand(

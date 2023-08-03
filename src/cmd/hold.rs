@@ -11,7 +11,7 @@ pub fn cmd_hold(matches: &ArgMatches, session: &Session) -> Result<()> {
         .unwrap_or_default();
 
     for name in packages {
-        print!("Holding {}... ", name);
+        print!("Holding {}...", name);
         match operation::package_hold(session, name, true) {
             Ok(..) => {
                 println!("{}", "Ok".green());

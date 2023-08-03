@@ -11,7 +11,7 @@ pub fn cmd_unhold(matches: &ArgMatches, session: &Session) -> Result<()> {
         .unwrap_or_default();
 
     for name in packages {
-        print!("Unholding {}... ", name);
+        print!("Unholding {}...", name);
         match operation::package_hold(session, name, false) {
             Ok(..) => {
                 println!("{}", "Ok".green());
