@@ -265,7 +265,7 @@ pub(crate) fn query_synced(
 ) -> Fallible<Vec<Package>> {
     let is_explicit_mode = options.contains(&QueryOption::Explicit);
     let is_wildcard_query = queries.contains(&"*") || queries.is_empty();
-    let buckets = crate::operation::bucket_list(session)?;
+    let buckets = crate::bucket::bucket_added(session)?;
     let apps_dir = session.config().root_path().join("apps");
     // build matchers
     let mut matchers: Vec<(Option<String>, Box<dyn Matcher + Send + Sync>)> = vec![];
@@ -297,9 +297,9 @@ pub(crate) fn query_synced(
                 let bucket_packages = manifest_files
                     .into_iter()
                     .par_bridge()
-                    .filter_map(|path| {
-                        let filename = path.file_stem().unwrap();
-                        let name = filename.to_str().unwrap();
+                    .filter_map(|entry| {
+                        let filename = entry.file_name();
+                        let name = filename.to_str().unwrap().strip_suffix(".json").unwrap();
 
                         // Here we can do some pre-filtering by package name, if there
                         // isn't any wildcard query and no extra query requested on
@@ -318,7 +318,7 @@ pub(crate) fn query_synced(
                             return None;
                         }
 
-                        if let Ok(manifest) = Manifest::parse(&path) {
+                        if let Ok(manifest) = Manifest::parse(entry.path()) {
                             let bucket = bucket.name();
 
                             let mut unmatched = true;
@@ -371,23 +371,21 @@ pub(crate) fn query_synced(
                             // The query has finished, the package has been found,
                             // the last step is to check if the package is installed.
                             let mut path = apps_dir.join(name);
-                            if path.exists() {
-                                path.push("current");
-                                path.push("install.json");
-                                if let Ok(install_info) = InstallInfo::parse(&path) {
-                                    path.pop();
-                                    path.push("manifest.json");
-                                    if let Ok(install_manifest) = Manifest::parse(path) {
-                                        let state =
-                                            InstallState::Installed(InstallStateInstalled {
-                                                version: install_manifest.version().to_owned(),
-                                                bucket: install_info.bucket().map(|s| s.to_owned()),
-                                                arch: install_info.arch().to_owned(),
-                                                held: install_info.is_held(),
-                                                url: install_info.url().map(|s| s.to_owned()),
-                                            });
-                                        package.fill_install_state(state);
-                                    }
+                            path.push("current");
+                            path.push("install.json");
+
+                            if let Ok(install_info) = InstallInfo::parse(&path) {
+                                path.pop();
+                                path.push("manifest.json");
+                                if let Ok(install_manifest) = Manifest::parse(path) {
+                                    let state = InstallState::Installed(InstallStateInstalled {
+                                        version: install_manifest.version().to_owned(),
+                                        bucket: install_info.bucket().map(|s| s.to_owned()),
+                                        arch: install_info.arch().to_owned(),
+                                        held: install_info.is_held(),
+                                        url: install_info.url().map(|s| s.to_owned()),
+                                    });
+                                    package.fill_install_state(state);
                                 }
                             } else {
                                 package.fill_install_state(InstallState::NotInstalled);

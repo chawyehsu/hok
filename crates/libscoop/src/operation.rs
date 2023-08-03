@@ -73,29 +73,17 @@ pub fn bucket_add(session: &Session, name: &str, remote_url: &str) -> Fallible<(
 ///
 /// # Returns
 ///
-/// A list of added buckets. Buckets cannot be parsed will be filtered out.
+/// A list of added buckets sorted by name.Buckets cannot be parsed will be
+/// filtered out.
 ///
 /// # Errors
 ///
 /// I/O errors will be returned if the `buckets` directory is not readable.
 pub fn bucket_list(session: &Session) -> Fallible<Vec<Bucket>> {
-    let mut buckets = vec![];
-    let buckets_dir = session.config().root_path().join("buckets");
-
-    if buckets_dir.exists() {
-        let entries = buckets_dir
-            .read_dir()?
-            .filter_map(Result::ok)
-            .filter(|entry| entry.file_type().unwrap().is_dir());
-        for entry in entries {
-            let path = entry.path();
-            match Bucket::from(&path) {
-                Ok(bucket) => buckets.push(bucket),
-                Err(err) => debug!("failed to parse bucket {} ({})", path.display(), err),
-            }
-        }
-    }
-    Ok(buckets)
+    crate::bucket::bucket_added(session).map(|mut buckets| {
+        buckets.sort_by_key(|b| b.name().to_owned());
+        buckets
+    })
 }
 
 /// Get a list of known (built-in) buckets.
@@ -118,7 +106,7 @@ pub fn bucket_list_known() -> Vec<(&'static str, &'static str)> {
 ///
 /// [1]: crate::Error::ConfigInUse
 pub fn bucket_update(session: &Session) -> Fallible<()> {
-    let buckets = bucket_list(session)?;
+    let buckets = crate::bucket::bucket_added(session)?;
 
     if buckets.is_empty() {
         return Ok(());

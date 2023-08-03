@@ -1,10 +1,12 @@
-use rayon::prelude::{ParallelBridge, ParallelIterator};
+use log::debug;
+use once_cell::sync::OnceCell;
+use rayon::prelude::{IntoParallelIterator, ParallelBridge, ParallelIterator};
+use std::fs::DirEntry;
 use std::path::{Path, PathBuf};
 
-use crate::{
-    error::{Error, Fallible},
-    internal::git,
-};
+use crate::error::{Error, Fallible};
+use crate::internal;
+use crate::Session;
 
 /// Scoop bucket representation.
 ///
@@ -27,22 +29,7 @@ pub struct Bucket {
     ///
     /// Non-git bucket is also supported by Scoop, mostly it is a local directory
     /// which does not have a remote url, and bucket update is not supported.
-    remote_url: Option<String>,
-
-    /// The directory type of the bucket.
-    dtype: BucketDirectoryType,
-}
-
-/// Bucket directory type.
-#[derive(Clone, Copy, Debug)]
-#[non_exhaustive]
-pub enum BucketDirectoryType {
-    /// Bare bucket
-    V1,
-    /// `bucket` subdirectory
-    V2,
-    /// `bucket` subdirectory with nested categories
-    V3,
+    remote_url: OnceCell<Option<String>>,
 }
 
 impl Bucket {
@@ -62,42 +49,15 @@ impl Bucket {
             .file_name()
             .map(|n| n.to_str().unwrap().to_string())
             .unwrap();
+
         if !path.exists() {
             return Err(Error::BucketNotFound(name));
         }
 
-        let mut remote_url = None;
-        if path.is_dir() && path.join(".git").exists() {
-            let check_git = git::remote_url_of(path.as_path(), "origin");
-
-            if let Ok(some) = check_git {
-                remote_url = some;
-            }
-        }
-
-        let nested_dir = path.join("bucket");
-        let is_nested = nested_dir.exists() && nested_dir.is_dir();
-        let dtype = match is_nested {
-            false => BucketDirectoryType::V1,
-            true => {
-                let mut dtype = BucketDirectoryType::V2;
-                let entries = nested_dir.read_dir()?;
-
-                for entry in entries.flatten() {
-                    // assume it's a v3 bucket if there is any subdirectory
-                    if entry.path().is_dir() {
-                        dtype = BucketDirectoryType::V3;
-                        break;
-                    }
-                }
-                dtype
-            }
-        };
         let bucket = Bucket {
             path,
             name,
-            remote_url,
-            dtype,
+            remote_url: OnceCell::new(),
         };
 
         Ok(bucket)
@@ -124,7 +84,9 @@ impl Bucket {
     /// is broken.
     #[inline]
     pub fn remote_url(&self) -> Option<&str> {
-        self.remote_url.as_deref()
+        self.remote_url
+            .get_or_init(|| internal::git::remote_url_of(self.path(), "origin").unwrap_or(None))
+            .as_deref()
     }
 
     /// Get the manifest path of the given package name.
@@ -134,104 +96,80 @@ impl Bucket {
     /// The path of the manifest file, none if the package is not in the bucket.
     pub fn path_of_manifest(&self, name: &str) -> Option<PathBuf> {
         let filename = format!("{}.json", name);
-        let path = match self.dtype {
-            BucketDirectoryType::V1 => self.path.join(filename),
-            BucketDirectoryType::V2 => {
-                let mut path = self.path.join("bucket");
-                path.push(filename);
-                path
-            }
-            BucketDirectoryType::V3 => {
+
+        let mut path = self.path().to_path_buf();
+        path.push(&filename);
+
+        if path.exists() {
+            return Some(path);
+        } else {
+            path.pop();
+            path.push("bucket");
+            path.push(&filename);
+
+            if path.exists() {
+                return Some(path);
+            } else {
                 let first = name.chars().take(1).last().unwrap();
-                // manifest name must start with an alphanumeric character
                 let category = if first.is_ascii_lowercase() {
                     first.to_string()
                 } else {
                     "#".to_owned()
                 };
-                let mut path = self.path.join("bucket");
-                path.push(category);
-                path.push(filename);
-                path
-            }
-        };
 
-        if path.exists() {
-            Some(path)
-        } else {
-            None
+                path.pop();
+                path.push(&category);
+                path.push(&filename);
+
+                if path.exists() {
+                    return Some(path);
+                }
+            }
         }
+
+        None
     }
 
     /// Get manifests from the bucket.
     ///
     /// # Returns
     ///
-    /// a list of PathBufs of manifest files.
+    /// a list of DirEntry of manifest files.
     ///
     /// # Errors
     ///
     /// I/O errors will be returned if the bucket directory is not readable.
-    pub fn manifests(&self) -> Fallible<Vec<PathBuf>> {
-        let json_files = match self.dtype {
-            BucketDirectoryType::V1 => {
-                let path = self.path.as_path();
-                path.read_dir()?
-                    .par_bridge()
-                    .filter_map(std::io::Result::ok)
-                    .filter(|de| {
-                        let path = de.path();
-                        let name = path.file_name().unwrap().to_str().unwrap();
-                        // Ignore npm package config file, that said, there will
-                        // be no package named `package`, it's a reserved name.
-                        path.is_file() && name.ends_with(".json") && name != "package.json"
-                    })
-                    .map(|de| de.path())
-                    .collect::<Vec<_>>()
-            }
-            BucketDirectoryType::V2 => {
-                let path = self.path.join("bucket");
-                path.read_dir()?
-                    .par_bridge()
-                    .filter_map(std::io::Result::ok)
-                    .filter(|de| {
-                        let path = de.path();
-                        let name = path.file_name().unwrap().to_str().unwrap();
-                        path.is_file() && name.ends_with(".json") && name != "package.json"
-                    })
-                    .map(|de| de.path())
-                    .collect::<Vec<_>>()
-            }
-            BucketDirectoryType::V3 => {
-                let path = self.path.join("bucket");
-                path.read_dir()?
-                    .par_bridge()
-                    .filter_map(std::io::Result::ok)
-                    .filter(|de| {
-                        let path = de.path();
-                        let name = path.file_name().unwrap().to_str().unwrap();
-                        path.is_dir() && !name.starts_with('.')
-                    })
-                    .flat_map(|de| -> Fallible<Vec<PathBuf>> {
-                        let path = de.path();
-                        let entries = path
-                            .read_dir()?
-                            .par_bridge()
-                            .filter_map(std::io::Result::ok)
-                            .filter(|de| {
-                                let path = de.path();
-                                let name = path.file_name().unwrap().to_str().unwrap();
-                                path.is_file() && name.ends_with(".json") && name != "package.json"
-                            })
-                            .map(|de| de.path())
-                            .collect::<Vec<_>>();
-                        Ok(entries)
-                    })
+    pub(crate) fn manifests(&self) -> Fallible<Vec<DirEntry>> {
+        let mut path = self.path().to_owned();
+        path.push("bucket");
+
+        let iter = if let Ok(entries) = par_read_dir(&path) {
+            let (dirs, files): (Vec<DirEntry>, Vec<DirEntry>) =
+                entries.partition(|de| de.file_type().unwrap().is_dir());
+
+            // If the inner `bucket` directory contains subdirectories then it
+            // is considered as a bucket with categories and we need to search
+            // all subdirectories for manifest files.
+            //
+            // Category support was introduced in Scoop v0.3.0:
+            // https://github.com/ScoopInstaller/Scoop/pull/5119
+            if dirs.is_empty() {
+                files.into_par_iter()
+            } else {
+                dirs.into_par_iter()
+                    .filter_map(|de| par_read_dir(&de.path()).ok())
                     .flatten()
                     .collect::<Vec<_>>()
+                    .into_par_iter()
             }
+        } else {
+            path.pop();
+            par_read_dir(&path)?.collect::<Vec<_>>().into_par_iter()
         };
-        Ok(json_files)
+
+        let ret = iter.filter(is_manifest).collect::<Vec<_>>();
+
+        Ok(ret)
     }
 
     /// Get manifest count of the bucket.
@@ -247,6 +185,60 @@ impl Bucket {
     pub fn manifest_count(&self) -> Fallible<usize> {
         Ok(self.manifests()?.len())
     }
+}
+
+/// Helper function to interate entries in a directory in parallel.
+fn par_read_dir(path: &Path) -> std::io::Result<impl ParallelIterator<Item = DirEntry>> {
+    Ok(path.read_dir()?.par_bridge().filter_map(|de| de.ok()))
+}
+
+/// Helper function to check if a directory entry is a manifest file.
+fn is_manifest(dir_entry: &DirEntry) -> bool {
+    let filename = dir_entry.file_name();
+    let name = filename.to_str().unwrap();
+    let is_file = dir_entry.file_type().unwrap().is_file();
+    // Ignore npm package config file, that said, there will
+    // be no package named `package`, it's a reserved name.
+    is_file && name.ends_with(".json") && name != "package.json"
+}
+
+/// Get a list of added buckets.
+///
+/// # Note
+///
+/// The returned list are unsorted.
+pub fn bucket_added(session: &Session) -> Fallible<Vec<Bucket>> {
+    let mut buckets = vec![];
+    let buckets_dir = session.config().root_path().join("buckets");
+
+    match buckets_dir.read_dir() {
+        Err(err) => {
+            debug!("failed to read buckets dir ({})", err);
+        }
+        Ok(entries) => {
+            buckets = entries
+                .par_bridge()
+                .filter_map(|entry| {
+                    if let Ok(entry) = entry {
+                        let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+                        let path = entry.path();
+
+                        if is_dir {
+                            match Bucket::from(&path) {
+                                Err(err) => {
+                                    debug!("failed to parse bucket {} ({})", path.display(), err)
+                                }
+                                Ok(bucket) => return Some(bucket),
+                            }
+                        }
+                    }
+                    None
+                })
+                .collect::<Vec<_>>();
+        }
+    };
+
+    Ok(buckets)
 }
 
 /// Bucket update progress context.
