@@ -69,6 +69,64 @@ cargo build
 cargo run -- help
 ```
 
+## Performance
+
+Hok (also the libscoop backend) aims to provide a faster yet powerful alternative
+to the original Scoop. Here are some random benchmarks tested with v0.1.0-beta.2
+in a Windows Sandbox environment on my PC (AMD Ryzen 5 2600, Windows 10).
+
+```
+hok version:
+hok 0.1.0-beta.2
+
+Benchmarking scoop bucket list
+Benchmark 1: scoop bucket list
+  Time (mean ± σ):      5.030 s ±  0.269 s    [User: 5.785 s, System: 3.101 s]
+  Range (min … max):    4.751 s …  5.676 s    10 runs
+
+Benchmark 2: hok bucket list
+  Time (mean ± σ):     142.0 ms ±  18.1 ms    [User: 156.1 ms, System: 188.5 ms]
+  Range (min … max):   123.4 ms … 190.7 ms    21 runs
+
+Summary
+  hok bucket list ran
+   35.43 ± 4.91 times faster than scoop bucket list
+
+Benchmarking scoop list
+Benchmark 1: scoop list
+  Time (mean ± σ):      3.472 s ±  0.134 s    [User: 4.990 s, System: 2.005 s]
+  Range (min … max):    3.285 s …  3.660 s    10 runs
+
+Benchmark 2: hok list
+  Time (mean ± σ):      47.3 ms ±  31.6 ms    [User: 14.7 ms, System: 39.7 ms]
+  Range (min … max):    33.1 ms … 256.0 ms    68 runs
+
+Summary
+  hok list ran
+   73.42 ± 49.15 times faster than scoop list
+
+Benchmarking scoop search
+Benchmark 1: scoop search google
+  Time (mean ± σ):     20.688 s ±  0.373 s    [User: 17.764 s, System: 7.032 s]
+  Range (min … max):   20.279 s … 21.625 s    10 runs
+
+Benchmark 2: scoop-search google
+  Time (mean ± σ):     258.4 ms ±  31.2 ms    [User: 168.8 ms, System: 563.4 ms]
+  Range (min … max):   223.8 ms … 305.1 ms    10 runs
+
+Benchmark 3: hok search google
+  Time (mean ± σ):      69.0 ms ±  22.9 ms    [User: 71.3 ms, System: 87.9 ms]
+  Range (min … max):    44.3 ms … 197.3 ms    44 runs
+
+Summary
+  hok search google ran
+    3.75 ± 1.33 times faster than scoop-search google
+  299.91 ± 99.87 times faster than scoop search google
+```
+
+You may run the benchmarks yourself using provided benchmark scripts in the
+`scripts` directory, feel free to share your results.
+
 ## Roadmap
 
 TBD
