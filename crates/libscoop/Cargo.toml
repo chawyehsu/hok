@@ -11,9 +11,6 @@ license = "MIT OR Apache-2.0"
 edition = "2021"
 readme = "README.md"
 
-[package.metadata.docs.rs]
-default-target = "x86_64-pc-windows-msvc"
-
 [dependencies]
 chrono = "0.4"
 curl = { version = "0.4", features = ["static-curl"] }
