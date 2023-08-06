@@ -356,7 +356,6 @@ pub fn package_query(
     options: Vec<QueryOption>,
     installed: bool,
 ) -> Fallible<Vec<Package>> {
-    let mut packages = vec![];
     // remove possible duplicates
     let mut queries = HashSet::<&str>::from_iter(queries)
         .into_iter()
@@ -366,7 +365,7 @@ pub fn package_query(
         queries.push("*");
     }
 
-    packages = if installed {
+    let mut packages = if installed {
         package::query::query_installed(session, &queries, &options)?
     } else {
         package::query::query_synced(session, &queries, &options)?
