@@ -7,7 +7,6 @@ use std::{
     path::Path,
     result,
 };
-use sysinfo::{ProcessExt, System, SystemExt};
 
 use crate::Result;
 
@@ -67,28 +66,4 @@ pub fn cmd_cleanup(matches: &ArgMatches, session: &Session) -> Result<()> {
     // println!("{}", "Everything is shiny now!".green());
 
     Ok(())
-}
-
-fn running_apps(path: &Path) -> Vec<String> {
-    // static REGEX_APPS_PATH: Lazy<Regex> = Lazy::new(|| {
-    //     RegexBuilder::new(r".*?apps[\\/]+(?P<app>[a-zA-Z0-9-_.]+)[\\/]+.*")
-    //         .build()
-    //         .unwrap()
-    // });
-
-    let mut system = System::default();
-    system.refresh_processes();
-
-    // Find all running processes of installed Scoop apps.
-    let mut proc_names = system
-        .processes()
-        .values()
-        .filter_map(|p| match p.exe().starts_with(path) {
-            false => None,
-            true => Some(p.name().to_owned()),
-        })
-        .collect::<Vec<_>>();
-    proc_names.sort();
-    proc_names.dedup();
-    proc_names
 }
