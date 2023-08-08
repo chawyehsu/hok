@@ -73,6 +73,22 @@ pub fn cmd_uninstall(matches: &ArgMatches, session: &Session) -> Result<()> {
                         }
                     }
                 }
+                Event::PackageCommitStart(ctx) => {
+                    println!("Uninstalling {}...", ctx);
+                }
+                Event::PackageShortcutRemoveProgress(ctx) => {
+                    println!("Removing shortcut {}", ctx);
+                }
+                Event::PackageShimRemoveProgress(ctx) => {
+                    println!("Removing shim '{}'", ctx);
+                }
+                Event::PackagePersistPurgeStart => {
+                    println!("Removing persisted data...");
+                }
+                Event::PackageCommitDone(ctx) => {
+                    let msg = format!("'{}' was uninstalled.", ctx);
+                    println!("{}", msg.dark_green());
+                }
                 Event::PackageSyncDone => break,
                 _ => {}
             }
@@ -80,9 +96,7 @@ pub fn cmd_uninstall(matches: &ArgMatches, session: &Session) -> Result<()> {
     });
 
     operation::package_sync(session, queries, options)?;
-
     handle.join().unwrap();
 
-    eprintln!("Not implemented yet.");
     Ok(())
 }
