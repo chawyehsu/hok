@@ -41,12 +41,4 @@ impl CacheFile {
     pub fn version(&self) -> &str {
         self.file_name().splitn(3, '#').collect::<Vec<_>>()[1]
     }
-
-    /// Get the tmp path of this cache file
-    #[inline]
-    pub(crate) fn tmp_path(&self) -> PathBuf {
-        let mut temp = self.path.clone().into_os_string();
-        temp.push(".download");
-        PathBuf::from(temp)
-    }
 }

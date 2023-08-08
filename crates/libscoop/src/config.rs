@@ -135,8 +135,19 @@ pub struct ConfigInner {
     #[serde(skip_serializing_if = "Option::is_none")]
     use_lessmsi: Option<bool>,
 
+    /// Disable `current` version junction creation.
+    ///
+    /// The 'current' version alias will not be used. Shims and shortcuts will
+    /// point to specific version instead.
+    ///
+    /// This config was introduced in Jan, 2017 with the name `NO_JUNCTIONS`:
+    /// https://github.com/ScoopInstaller/Scoop/commit/a14ffdb5
+    ///
+    /// It was renamed to `no_junction` in Aug, 2022 (later in release v0.3.0):
+    /// https://github.com/ScoopInstaller/Scoop/pull/5116
+    #[serde(alias = "no_junctions")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    no_junctions: Option<bool>,
+    no_junction: Option<bool>,
 
     /// A list of private hosts.
     ///
@@ -146,7 +157,8 @@ pub struct ConfigInner {
     /// if you want to access a private GitHub repository, you need to add the
     /// host to this list with 'match' and 'headers' strings.
     ///
-    /// Refer to: https://github.com/ScoopInstaller/Scoop/pull/4254
+    /// This config was introduced in Feb, 2021:
+    /// https://github.com/ScoopInstaller/Scoop/pull/4254
     #[serde(skip_serializing_if = "Option::is_none")]
     private_hosts: Option<Vec<PrivateHosts>>,
 
@@ -211,6 +223,12 @@ impl Config {
     #[inline]
     pub fn root_path(&self) -> &Path {
         self.root_path.as_path()
+    }
+
+    /// Get the `no_junction` config.
+    #[inline]
+    pub fn no_junction(&self) -> bool {
+        self.no_junction.unwrap_or_default()
     }
 
     /// Get the `proxy` setting.
@@ -313,7 +331,7 @@ impl Default for Config {
             last_update: Default::default(),
             show_manifest: Default::default(),
             use_lessmsi: Default::default(),
-            no_junctions: Default::default(),
+            no_junction: Default::default(),
             private_hosts: Default::default(),
             proxy: Default::default(),
             // default_root_path: default::root_path(),
@@ -403,7 +421,7 @@ pub(crate) fn possible_config_paths() -> Vec<PathBuf> {
 mod default {
     use std::path::{Path, PathBuf};
 
-    use crate::internal::normalize_path;
+    use crate::internal::path::normalize_path;
 
     /// Join the given `path` to `$HOME` and return a new [`PathBuf`].
     #[inline]

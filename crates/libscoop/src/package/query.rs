@@ -164,7 +164,7 @@ pub(crate) fn query_installed(
                                 }
 
                                 if options.contains(&QueryOption::Binary) {
-                                    let binaries = manifest.executables().unwrap_or_default();
+                                    let binaries = manifest.shims().unwrap_or_default();
                                     let binary_matched = matchers
                                         .iter()
                                         .any(|(_, m)| binaries.iter().any(|&b| m.is_match(b)));
@@ -353,7 +353,7 @@ pub(crate) fn query_synced(
                                     }
 
                                     if options.contains(&QueryOption::Binary) {
-                                        let binaries = manifest.executables().unwrap_or_default();
+                                        let binaries = manifest.shims().unwrap_or_default();
                                         let binary_matched = matchers
                                             .iter()
                                             .any(|(_, m)| binaries.iter().any(|&b| m.is_match(b)));

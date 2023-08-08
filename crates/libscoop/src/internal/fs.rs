@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use once_cell::sync::Lazy;
 use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
@@ -10,7 +11,6 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use crate::error::Fallible;
-use crate::Error;
 
 /// Ensure given `path` exist.
 pub fn ensure_dir<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
@@ -53,37 +53,6 @@ pub fn walk_dir_json<P: AsRef<Path>>(path: P) -> io::Result<Vec<PathBuf>> {
         })
         .map(|de| de.path())
         .collect::<Vec<_>>())
-}
-
-/// Return the Leaf, i.e. file name (with extension), or directory name
-/// of given path.
-#[inline(always)]
-pub fn leaf<P: AsRef<Path> + ?Sized>(path: &P) -> String {
-    path.as_ref()
-        .file_name()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string()
-}
-
-/// Return the LeafBase, i.e. file name without extension, for given file path.
-///
-/// If the given path is a directory, it returns the [Leaf] of the path instead.
-///
-/// [Leaf]: self::leaf
-#[inline]
-pub fn leaf_base<P: AsRef<Path> + ?Sized>(path: &P) -> String {
-    if path.as_ref().is_file() {
-        path.as_ref()
-            .file_stem()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string()
-    } else {
-        self::leaf(path.as_ref())
-    }
 }
 
 /// Convert a string to a valid safe filename.

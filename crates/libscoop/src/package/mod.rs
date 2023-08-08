@@ -5,7 +5,7 @@ pub(crate) mod resolve;
 pub(crate) mod sync;
 
 use once_cell::unsync::OnceCell;
-use std::{fmt, path::Path};
+use std::fmt;
 
 pub use manifest::{InstallInfo, License, Manifest};
 pub use query::QueryOption;
@@ -23,7 +23,7 @@ pub struct Package {
     name: String,
 
     /// The manifest of this package.
-    pub manifest: Manifest,
+    manifest: Manifest,
 
     #[serde(skip)]
     origin: OnceCell<OriginateFrom>,
@@ -268,6 +268,11 @@ impl Package {
         self.installed_version().is_some()
     }
 
+    #[inline]
+    pub fn is_nightly(&self) -> bool {
+        self.version() == "nightly"
+    }
+
     /// Check if the package is strictly installed, which means the package is
     /// installed from the bucket it belongs to rather than from other buckets.
     pub fn is_strictly_installed(&self) -> bool {
@@ -283,14 +288,14 @@ impl Package {
         }
     }
 
-    /// Get the path of the manifest file of this package.
+    /// Get the manifest of this package.
     ///
     /// # Returns
     ///
-    /// The path of the manifest file of this package.
+    /// The manifest reference of this package.
     #[inline]
-    pub fn manfest_path(&self) -> &Path {
-        self.manifest.path()
+    pub fn manifest(&self) -> &Manifest {
+        &self.manifest
     }
 
     /// Get the upgradable version of this package.
@@ -328,13 +333,29 @@ impl Package {
         None
     }
 
-    /// Get the shims of this package.
+    /// Get shims defined in this package.
     ///
     /// # Returns
     ///
-    /// A list of filenames, of shims of this package, if any.
+    /// A list of shims defined in this package.
     pub fn shims(&self) -> Option<Vec<&str>> {
-        self.manifest.executables()
+        self.manifest.shims()
+    }
+
+    pub fn supported_arch(&self) -> Vec<String> {
+        let mut ret = vec![];
+        if let Some(arch) = self.manifest.architecture() {
+            if arch.ia32.is_some() {
+                ret.push("ia32".to_string());
+            }
+            if arch.amd64.is_some() {
+                ret.push("amd64".to_string());
+            }
+            if arch.aarch64.is_some() {
+                ret.push("aarch64".to_string());
+            }
+        }
+        ret
     }
 
     /// Check if this package has used powershell script hooks in its manifest.

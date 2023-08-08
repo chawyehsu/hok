@@ -90,15 +90,21 @@ pub struct ManifestSpec {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub post_uninstall: Option<Vectorized<String>>,
 
+    /// The `bin` field is used to define binaries that need to be shimmed/added
+    /// to the `shimes` directory.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bin: Option<Vectorized<Vectorized<String>>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub env_add_path: Option<Vectorized<String>>,
 
+    /// The `env_set` field is used to define environment variables that should
+    /// be set during installation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub env_set: Option<HashMap<String, String>>,
 
+    /// The `shortcuts` field is used to define shortcuts that need to be created
+    /// in the `Scoop Apps` directory.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shortcuts: Option<Vec<Vec<String>>>,
 
@@ -239,34 +245,50 @@ pub struct Autoupdate {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ArchitectureSpec {
+    /// Same as `ManifestSpec::bin`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bin: Option<Vectorized<Vectorized<String>>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub checkver: Option<Checkver>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub env_add_path: Option<Vectorized<String>>,
+
+    /// Same as `ManifestSpec::env_set`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub env_set: Option<HashMap<String, String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extract_dir: Option<Vectorized<String>>,
+
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_vertorized_hash")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub installer: Option<Installer>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub post_install: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub post_uninstall: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pre_install: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pre_uninstall: Option<Vectorized<String>>,
+
+    /// Same as `ManifestSpec::shortcuts`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shortcuts: Option<Vec<Vec<String>>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uninstaller: Option<Uninstaller>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<Vectorized<String>>,
 }
@@ -700,7 +722,7 @@ impl Manifest {
             debug!("failed to parse manifest {}", path.display());
             e
         })?;
-        let path = internal::normalize_path(path);
+        let path = internal::path::normalize_path(path);
         // let mut checksum = scoop_hash::Checksum::new("sha256");
         // checksum.consume(&bytes);
         // let hash = checksum.result();
@@ -709,7 +731,7 @@ impl Manifest {
         Ok(Manifest { path, inner, hash })
     }
 
-    /// Return the JSON file path of this manifest.
+    /// Return the file path of this manifest.
     #[inline]
     pub fn path(&self) -> &Path {
         &self.path
@@ -719,11 +741,6 @@ impl Manifest {
     #[inline]
     pub fn version(&self) -> &str {
         self.inner.version.as_str()
-    }
-
-    #[inline]
-    pub fn is_nightly(&self) -> bool {
-        self.version() == "nightly"
     }
 
     /// Return the `description` of this manifest.
@@ -744,6 +761,11 @@ impl Manifest {
         &self.inner.license
     }
 
+    // #[inline]
+    // pub fn manifest_hash(&self) -> &str {
+    //     &self.hash
+    // }
+
     /// Return the `depends` of this manifest.
     ///
     /// This method returns the explicit dependencies defined in the manifest,
@@ -762,50 +784,11 @@ impl Manifest {
     }
 
     #[inline]
-    pub fn manifest_hash(&self) -> &str {
-        &self.hash
-    }
-
-    /// Return all executables of this manifest.
-    #[inline]
-    pub fn executables(&self) -> Option<Vec<&str>> {
-        match self.bin() {
-            None => None,
-            Some(shim_defs) => {
-                let mut bins = Vec::new();
-                for def in shim_defs {
-                    match def.len() {
-                        0 => unreachable!(),
-                        1 => bins.push(def[0]),
-                        _ => bins.push(def[1]),
-                    }
-                }
-                Some(bins)
-            }
-        }
-    }
-
-    pub fn supported_arch(&self) -> Vec<String> {
-        let mut ret = vec![];
-        if let Some(arch) = self.architecture() {
-            if arch.ia32.is_some() {
-                ret.push("ia32".to_string());
-            }
-            if arch.amd64.is_some() {
-                ret.push("amd64".to_string());
-            }
-            if arch.aarch64.is_some() {
-                ret.push("aarch64".to_string());
-            }
-        }
-        ret
-    }
-
-    #[inline]
     pub fn architecture(&self) -> Option<&Architecture> {
         self.inner.architecture.as_ref()
     }
 
+    /// Get `bin` field of this manifest.
     #[inline]
     pub fn bin(&self) -> Option<Vec<Vec<&str>>> {
         let ret = arch_specific_field!(self, bin);
@@ -823,62 +806,10 @@ impl Manifest {
         self.inner.cookie.as_ref()
     }
 
-    /// Returns the dependencies of this manifest.
-    ///
-    /// This method returns all dependencies including the implicit ones, while
-    /// [`depends`] returns the explicit dependencies defined in the `depends`
-    /// field of the manifest.
-    ///
-    /// # Note
-    ///
-    /// The format of the value of a dependency can be either `name` or
-    /// `bucket/name`, for example: `7zip` or `main/7zip`.
-    ///
-    /// [`depends`]: #method.depends
-    pub fn dependencies(&self) -> Vec<String> {
-        let mut deps = HashSet::new();
-
-        if let Some(raw_depends) = self.depends() {
-            deps.extend(raw_depends.into_iter().map(|s| s.to_owned()));
-        }
-
-        if self.innosetup() {
-            deps.insert("main/innounp".to_owned());
-        }
-
-        let hook_scripts = [
-            self.pre_install(),
-            self.post_install(),
-            self.installer().map(|i| i.script()).unwrap_or_default(),
-            self.uninstaller().map(|u| u.script()).unwrap_or_default(),
-            self.pre_uninstall(),
-            self.post_uninstall(),
-        ];
-
-        hook_scripts.into_iter().for_each(|s| {
-            if let Some(script_block) = s {
-                let s = script_block.join("\r\n");
-
-                if s.contains("Expand-7zipArchive") {
-                    deps.remove("main/7zip");
-                    deps.insert("7zip".to_owned());
-                }
-                if s.contains("Expand-MsiArchive") {
-                    deps.remove("lessmsi");
-                    deps.insert("main/lessmsi".to_owned());
-                }
-                if s.contains("Expand-InnoArchive") {
-                    deps.remove("innounp");
-                    deps.insert("main/innounp".to_owned());
-                }
-                if s.contains("Expand-DarkArchive") {
-                    deps.remove("dark");
-                    deps.insert("main/dark".to_owned());
-                }
-            }
-        });
-
-        deps.into_iter().collect()
+    /// Returns `env_set` defined in this manifest.
+    #[inline]
+    pub fn env_set(&self) -> Option<&HashMap<String, String>> {
+        arch_specific_field!(self, env_set)
     }
 
     #[inline]
@@ -937,8 +868,13 @@ impl Manifest {
     }
 
     #[inline]
-    pub fn shortcuts(&self) -> Option<&Vec<Vec<String>>> {
-        arch_specific_field!(self, shortcuts)
+    pub fn shortcuts(&self) -> Option<Vec<Vec<&str>>> {
+        let ret = arch_specific_field!(self, shortcuts);
+        ret.map(|v| {
+            v.iter()
+                .map(|v| v.iter().map(|s| s.as_str()).collect())
+                .collect()
+        })
     }
 
     /// Extract download urls from this manifest:
@@ -954,13 +890,6 @@ impl Manifest {
         ret.map(|v| v.devectorize()).unwrap_or_default()
     }
 
-    /// NOTE: this method will drop all urls without corresponding hash. That
-    /// means it will return an empty vector if no hash is found, typically a
-    /// package with a `nightly` version.
-    pub fn url_with_hash(&self) -> Vec<(&str, &str)> {
-        std::iter::zip(self.url(), self.hash()).collect()
-    }
-
     /// Extract file hashes from this manifest, in following order:
     ///
     /// - For `amd64` return "64bit" hashes if available else noarch hashes;
@@ -969,6 +898,91 @@ impl Manifest {
     pub fn hash(&self) -> Vec<&str> {
         let ret = arch_specific_field!(self, hash);
         ret.map(|v| v.devectorize()).unwrap_or_default()
+    }
+
+    /// Returns the dependencies of this manifest.
+    ///
+    /// This method returns all dependencies including the implicit ones, while
+    /// [`depends`] returns the explicit dependencies defined in the `depends`
+    /// field of the manifest.
+    ///
+    /// # Note
+    ///
+    /// The format of the value of a dependency can be either `name` or
+    /// `bucket/name`, for example: `7zip` or `main/7zip`.
+    ///
+    /// [`depends`]: #method.depends
+    pub(crate) fn dependencies(&self) -> Vec<String> {
+        let mut deps = HashSet::new();
+
+        if let Some(raw_depends) = self.depends() {
+            deps.extend(raw_depends.into_iter().map(|s| s.to_owned()));
+        }
+
+        if self.innosetup() {
+            deps.insert("main/innounp".to_owned());
+        }
+
+        let hook_scripts = [
+            self.pre_install(),
+            self.post_install(),
+            self.installer().map(|i| i.script()).unwrap_or_default(),
+            self.uninstaller().map(|u| u.script()).unwrap_or_default(),
+            self.pre_uninstall(),
+            self.post_uninstall(),
+        ];
+
+        hook_scripts.into_iter().for_each(|s| {
+            if let Some(script_block) = s {
+                let s = script_block.join("\r\n");
+
+                if s.contains("Expand-7zipArchive") {
+                    deps.remove("main/7zip");
+                    deps.insert("7zip".to_owned());
+                }
+                if s.contains("Expand-MsiArchive") {
+                    deps.remove("lessmsi");
+                    deps.insert("main/lessmsi".to_owned());
+                }
+                if s.contains("Expand-InnoArchive") {
+                    deps.remove("innounp");
+                    deps.insert("main/innounp".to_owned());
+                }
+                if s.contains("Expand-DarkArchive") {
+                    deps.remove("dark");
+                    deps.insert("main/dark".to_owned());
+                }
+            }
+        });
+
+        deps.into_iter().collect()
+    }
+
+    /// Get shims defined in this manifest.
+    ///
+    /// # Note
+    ///
+    /// While [`bin()`][1] method returns the raw `bin` field of the manifest,
+    /// this method returns the shim names defined in the `bin` field.
+    ///
+    /// [1]: #method.bin
+    pub(crate) fn shims(&self) -> Option<Vec<&str>> {
+        if let Some(shim_defs) = self.bin() {
+            let mut shims = Vec::with_capacity(shim_defs.len());
+            for def in shim_defs {
+                match def.len() {
+                    0 => {
+                        debug!("invalid shim definition: {:?}", def);
+                        continue;
+                    }
+                    1 => shims.push(def[0]),
+                    _ => shims.push(def[1]),
+                }
+            }
+            Some(shims)
+        } else {
+            None
+        }
     }
 }
 
@@ -994,14 +1008,6 @@ impl License {
     #[inline]
     pub fn url(&self) -> Option<&str> {
         self.url.as_deref()
-        // if self.is_spdx() && self.url.is_none() {
-        //     Some(format!(
-        //         "https://spdx.org/licenses/{}.html",
-        //         self.identifier()
-        //     ))
-        // } else {
-        //     self.url.clone()
-        // }
     }
 }
 

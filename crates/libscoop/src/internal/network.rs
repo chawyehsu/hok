@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use curl::easy::Easy;
 use std::time::Duration;
 

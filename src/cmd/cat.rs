@@ -61,7 +61,7 @@ pub fn cmd_cat(matches: &ArgMatches, session: &Session) -> Result<()> {
                 }
             };
 
-            let path = package.manfest_path();
+            let path = package.manifest().path();
             println!("{}:", path.display().to_string().green());
 
             let mut child = Command::new("cmd")
