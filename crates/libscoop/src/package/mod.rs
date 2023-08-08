@@ -358,8 +358,9 @@ impl Package {
         ret
     }
 
-    /// Check if this package has used powershell script hooks in its manifest.
-    pub(crate) fn has_ps_script(&self) -> bool {
+    /// Check if this package defines install hooks (powershell scripts) in its
+    /// manifest.
+    pub(crate) fn has_install_script(&self) -> bool {
         [
             self.manifest.pre_install(),
             self.manifest.post_install(),
@@ -367,6 +368,15 @@ impl Package {
                 .installer()
                 .map(|i| i.script())
                 .unwrap_or_default(),
+        ]
+        .into_iter()
+        .any(|h| h.is_some())
+    }
+
+    /// Check if this package defines uninstall hooks (powershell scripts) in its
+    /// manifest.
+    pub(crate) fn has_uninstall_script(&self) -> bool {
+        [
             self.manifest
                 .uninstaller()
                 .map(|u| u.script())

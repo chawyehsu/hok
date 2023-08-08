@@ -37,11 +37,16 @@ mod bucket;
 mod cache;
 mod config;
 mod constant;
+mod env;
 mod error;
 mod event;
 mod internal;
 mod package;
+mod persist;
+mod psmodule;
 mod session;
+mod shim;
+mod shortcut;
 
 pub mod operation;
 

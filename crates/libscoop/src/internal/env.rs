@@ -24,9 +24,21 @@ pub fn set(key: &str, value: &str) -> Fallible<()> {
     let (env, _) = HKCU.create_subkey(path)?;
 
     if value.is_empty() {
-        env.delete_value(key)?;
+        // ignore error of deleting non-existent value
+        let _ = env.delete_value(key);
     } else {
         env.set_value(key, &value)?;
     }
     Ok(())
+}
+
+/// Get the value of the `PATH` environment variable as a list of paths.
+pub fn get_env_path_list() -> Fallible<Vec<String>> {
+    let env_path = get("PATH")?;
+    Ok(env_path
+        .into_string()
+        .unwrap()
+        .split(';')
+        .map(|s| s.to_owned())
+        .collect())
 }

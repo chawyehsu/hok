@@ -69,43 +69,88 @@ pub enum Event {
     /// Bucket update has made some progress.
     BucketUpdateProgress(BucketUpdateProgressContext),
 
-    /// Bucket update is finished.
+    /// Bucket update has finished.
     BucketUpdateDone,
 
-    /// Package resolving is started.
-    PackageResolveStart,
+    /// Package has started to be committed.
+    PackageCommitStart(String),
 
-    /// Package resolving is finished.
-    PackageResolveDone,
+    /// Package has been committed.
+    PackageCommitDone(String),
 
-    /// Calculating download size is started.
+    /// Calculating download size has started.
     PackageDownloadSizingStart,
 
-    /// Calculating download size is finished.
+    /// Calculating download size has finished.
     PackageDownloadSizingDone,
 
-    /// Package download is started.
+    /// Package download has started.
     PackageDownloadStart,
 
     /// Package download has made some progress.
     PackageDownloadProgress(PackageDownloadProgressContext),
 
-    /// Package download is finished.
+    /// Package download has finished.
     PackageDownloadDone,
 
-    /// Package integrity check is started.
+    /// Package environment path(s) removal has started.
+    PackageEnvPathRemoveStart,
+
+    /// Package environment path(s) removal has finished.
+    PackageEnvPathRemoveDone,
+
+    /// Package environment variable(s) removal has started.
+    PackageEnvVarRemoveStart,
+
+    /// Package environment variable(s) removal has finished.
+    PackageEnvVarRemoveDone,
+
+    /// Package integrity check has started.
     PackageIntegrityCheckStart,
 
     /// Package integrity check has made some progress.
     PackageIntegrityCheckProgress(String),
 
-    /// Package integrity check is finished.
+    /// Package integrity check has finished.
     PackageIntegrityCheckDone,
 
-    /// Package is started to be committed.
-    PackageCommitStart(String),
+    /// Package persist removal has started.
+    PackagePersistPurgeStart,
 
-    /// Package sync operation is finished.
+    /// Package persist removal has finished.
+    PackagePersistPurgeDone,
+
+    /// Package PowerShell module removal has started.
+    PackagePsModuleRemoveStart(String),
+
+    /// Package PowerShell module removal has finished.
+    PackagePsModuleRemoveDone,
+
+    /// Package resolving has started.
+    PackageResolveStart,
+
+    /// Package resolving has finished.
+    PackageResolveDone,
+
+    /// Package shim removal has started.
+    PackageShimRemoveStart,
+
+    /// Package shim removal has made some progress.
+    PackageShimRemoveProgress(String),
+
+    /// Package shim removal has finished.
+    PackageShimRemoveDone,
+
+    /// Package shortcut removal has started.
+    PackageShortcutRemoveStart,
+
+    /// Package shortcut removal has made some progress.
+    PackageShortcutRemoveProgress(String),
+
+    /// Package shortcut removal has finished.
+    PackageShortcutRemoveDone,
+
+    /// Package sync operation has finished.
     PackageSyncDone,
 
     /// Prompt the user to confirm the transaction.

@@ -95,6 +95,8 @@ pub struct ManifestSpec {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bin: Option<Vectorized<Vectorized<String>>>,
 
+    /// The `env_add_path` field is used to define path(s) that need to be added
+    /// to the `PATH` environment variable during installation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub env_add_path: Option<Vectorized<String>>,
 
@@ -108,11 +110,15 @@ pub struct ManifestSpec {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shortcuts: Option<Vec<Vec<String>>>,
 
+    /// The `persist` field is used to define files/directories that need to be
+    /// persisted during uninstallation.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub persist: Option<Vectorized<Vectorized<String>>>,
+    persist: Option<Vectorized<Vectorized<String>>>,
 
+    /// The `psmodule` field is used to define PowerShell module that need to
+    /// be imported during installation.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub psmodule: Option<Psmodule>,
+    psmodule: Option<Psmodule>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub suggest: Option<HashMap<String, Vectorized<String>>>,
@@ -160,12 +166,17 @@ pub struct Vectorized<T>(Vec<T>);
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Architecture {
+    /// Ia32 architecture specification.
     #[serde(rename = "32bit")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ia32: Option<ArchitectureSpec>,
+
+    /// Amd64 architecture specification.
     #[serde(rename = "64bit")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub amd64: Option<ArchitectureSpec>,
+
+    /// Aarch64 architecture specification.
     #[serde(rename = "arm64")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aarch64: Option<ArchitectureSpec>,
@@ -193,15 +204,17 @@ pub struct Uninstaller {
     pub script: Option<Vectorized<String>>,
 }
 
+/// PowerShell module information of a Scoop package.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Psmodule {
-    pub name: String,
+    name: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sourceforge {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project: Option<String>,
+
     pub path: String,
 }
 
@@ -210,21 +223,29 @@ pub struct Checkver {
     #[serde(alias = "re")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub regex: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+
     #[serde(alias = "jp")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub jsonpath: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub xpath: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reverse: Option<bool>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub replace: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub useragent: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub script: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sourceforge: Option<Sourceforge>,
 }
@@ -233,12 +254,16 @@ pub struct Checkver {
 pub struct Autoupdate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub architecture: Option<AutoupdateArchitecture>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extract_dir: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<Vectorized<HashExtraction>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub notes: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<Vectorized<String>>,
 }
@@ -252,6 +277,7 @@ pub struct ArchitectureSpec {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub checkver: Option<Checkver>,
 
+    /// Same as `ManifestSpec::env_add_path`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub env_add_path: Option<Vectorized<String>>,
 
@@ -806,6 +832,13 @@ impl Manifest {
         self.inner.cookie.as_ref()
     }
 
+    /// Returns `env_add_path` defined in this manifest.
+    #[inline]
+    pub fn env_add_path(&self) -> Option<Vec<&str>> {
+        let ret = arch_specific_field!(self, env_add_path);
+        ret.map(|v| v.devectorize())
+    }
+
     /// Returns `env_set` defined in this manifest.
     #[inline]
     pub fn env_set(&self) -> Option<&HashMap<String, String>> {
@@ -865,6 +898,18 @@ impl Manifest {
     #[inline]
     pub fn uninstaller(&self) -> Option<&Uninstaller> {
         arch_specific_field!(self, uninstaller)
+    }
+
+    /// Returns `persist` defined in this manifest.
+    #[inline]
+    pub fn persist(&self) -> Option<Vec<Vec<&str>>> {
+        self.inner.persist.as_ref().map(|v| v.devectorize())
+    }
+
+    /// Returns `psmodule` defined in this manifest.
+    #[inline]
+    pub fn psmodule(&self) -> Option<&Psmodule> {
+        self.inner.psmodule.as_ref()
     }
 
     #[inline]
@@ -1048,6 +1093,13 @@ impl Installer {
     #[inline]
     pub fn keep(&self) -> bool {
         self.keep.unwrap_or(false)
+    }
+}
+
+impl Psmodule {
+    /// Return the `name` of the PowerShell module.
+    pub fn name(&self) -> &str {
+        &self.name
     }
 }
 

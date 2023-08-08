@@ -17,8 +17,9 @@ pub fn ensure_dir<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
     std::fs::create_dir_all(path.as_ref())
 }
 
-pub fn remove_dir<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
-    remove_dir_all::remove_dir_all(path.as_ref())
+/// Remove given `path` recursively.
+pub fn remove_dir<P: AsRef<Path>>(path: P) -> io::Result<()> {
+    remove_dir_all::remove_dir_all(path)
 }
 
 /// Remove all files and subdirectories in given `path`.
@@ -82,4 +83,53 @@ where
         .truncate(true)
         .open(path)?;
     Ok(serde_json::to_writer_pretty(file, &data)?)
+}
+
+/// Remove a symlink at `lnk`.
+pub fn remove_symlink<P: AsRef<Path>>(lnk: P) -> io::Result<()> {
+    let lnk = lnk.as_ref();
+    let metadata = lnk.symlink_metadata()?;
+    let mut permissions = metadata.permissions();
+
+    // Remove possible readonly flag on the symlink added by `attrib +R` command
+    if permissions.readonly() {
+        // Remove readonly flag
+        permissions.set_readonly(false);
+        std::fs::set_permissions(lnk, permissions)?;
+    }
+
+    // We knew that `lnk` is a symlink but we don't know if it is a file or a
+    // directory. So we need to check its metadata to determine how to remove
+    // it. The file type of the symlink itself is always `FileType::Symlink`
+    // and `symlink_metadata::is_dir` always returns `false` for symlinks, so
+    // we have to check the metadata of the target file.
+    let target_metadata = lnk.metadata()?;
+
+    if target_metadata.is_dir() {
+        std::fs::remove_dir(lnk)
+    } else {
+        std::fs::remove_file(lnk)
+    }
+}
+
+/// Create a directory symlink at `lnk` pointing to `src`.
+pub fn symlink_dir<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result<()> {
+    // It is possible to create a symlink on Windows, but one of the following
+    // conditions must be met:
+    //
+    // Either: the process has the `SeCreateSymbolicLinkPrivilege` privilege,
+    // or: the OS is Windows 10 Creators Update or later and Developer Mode
+    // enabled.
+    //
+    // We prefer symlink over junction because:
+    // https://stackoverflow.com/questions/9042542/what-is-the-difference-between-ntfs-junction-points-and-symbolic-links
+    //
+    // Here we try to create a symlink first, and if it fails, we try to create
+    // a junction which does not require any special privilege and works on
+    // older versions of Windows.
+    if std::os::windows::fs::symlink_dir(src.as_ref(), lnk.as_ref()).is_err() {
+        junction::create(src, lnk)
+    } else {
+        Ok(())
+    }
 }

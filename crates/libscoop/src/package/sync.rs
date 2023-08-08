@@ -3,7 +3,10 @@ use once_cell::unsync::OnceCell;
 use scoop_hash::ChecksumBuilder;
 use std::io::Read;
 
-use crate::{error::Fallible, Error, Event, QueryOption, Session};
+use crate::{
+    env, error::Fallible, internal, persist, psmodule, shim, shortcut, Error, Event, QueryOption,
+    Session,
+};
 
 use super::{
     download::{self, DownloadSize},
@@ -535,6 +538,12 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
 
     let download_only = options.contains(&SyncOption::DownloadOnly);
     if !download_only {
+        // TODO: PowerShell hosting with execution context is not supported yet.
+        // Perhaps at present we could call Scoop to do the removal for packages
+        // using PS scripts...
+        let (_packages_with_script, _packages): (Vec<&Package>, Vec<&Package>) =
+            packages.iter().partition(|p| p.has_install_script());
+
         // TODO: commit transcation
         // let config = session.config();
         // let apps_dir = config.root_path().join("apps");
@@ -648,8 +657,15 @@ pub fn remove(session: &Session, queries: &[&str], options: &[SyncOption]) -> Fa
     // TODO: PowerShell hosting with execution context is not supported yet.
     // Perhaps at present we could call Scoop to do the removal for packages
     // using PS scripts...
-    let (_packages_with_script, _packages): (Vec<_>, Vec<_>) =
-        packages.iter().partition(|p| p.has_ps_script());
+    let (packages_with_script, _packages): (Vec<_>, Vec<_>) =
+        packages.iter().partition(|p| p.has_uninstall_script());
+
+    // TODO: support removal of packages with PowerShell script
+    if !packages_with_script.is_empty() {
+        let msg = format!("Found package(s) using PowerShell script:\n  {}\nRemoval of package with PowerShell script is not yet supported.",
+        packages_with_script.iter().map(|p| p.name()).collect::<Vec<_>>().join("  "));
+        return Err(Error::Custom(msg));
+    }
 
     transaction.set_remove(packages);
 
@@ -657,7 +673,7 @@ pub fn remove(session: &Session, queries: &[&str], options: &[SyncOption]) -> Fa
     if !assume_yes {
         if let Some(tx) = session.emitter() {
             if tx
-                .send(Event::PromptTransactionNeedConfirm(transaction))
+                .send(Event::PromptTransactionNeedConfirm(transaction.clone()))
                 .is_ok()
             {
                 let rx = session.receiver().unwrap();
@@ -677,8 +693,53 @@ pub fn remove(session: &Session, queries: &[&str], options: &[SyncOption]) -> Fa
         }
     }
 
-    // TODO: commit transcation
-    // let purge = options.contains(&SyncOption::Purge);
+    if let Some(packages) = transaction.remove_view() {
+        let purge = options.contains(&SyncOption::Purge);
+        let config = session.config();
+        let root_dir = config.root_path();
+
+        for package in packages.iter() {
+            if let Some(tx) = session.emitter() {
+                let _ = tx.send(Event::PackageCommitStart(package.name().to_owned()));
+            }
+
+            let app_dir = root_dir.join("apps").join(package.name());
+
+            // TODO: pre_uninstall
+            // TODO: uninstaller
+
+            shim::remove(session, package)?;
+            shortcut::remove(session, package)?;
+            psmodule::remove(session, package)?;
+            env::remove(session, package)?;
+            persist::unlink(session, package)?;
+
+            let current_lnk = app_dir.join("current");
+            internal::fs::remove_symlink(current_lnk)?;
+
+            // TODO: post_uninstall
+
+            // Remove the app directory
+            internal::fs::remove_dir(app_dir)?;
+
+            if purge {
+                if let Some(tx) = session.emitter() {
+                    let _ = tx.send(Event::PackagePersistPurgeStart);
+                }
+
+                let persist_dir = config.root_path().join("persist").join(package.name());
+                internal::fs::remove_dir(persist_dir)?;
+
+                if let Some(tx) = session.emitter() {
+                    let _ = tx.send(Event::PackagePersistPurgeDone);
+                }
+            }
+
+            if let Some(tx) = session.emitter() {
+                let _ = tx.send(Event::PackageCommitDone(package.name().to_owned()));
+            }
+        }
+    }
 
     Ok(())
 }
