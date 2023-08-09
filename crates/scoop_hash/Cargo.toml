@@ -43,6 +43,3 @@ criterion = "0.4"
 default = []
 # The "rustcrypto" feature enables hash implementations from RustCrypto's crates.
 rustcrypto = ["md-5", "sha1", "sha2"]
-
-[package.metadata.docs.rs]
-default-target = "x86_64-pc-windows-msvc"
