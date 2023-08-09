@@ -10,7 +10,8 @@ use std::{
     time::Duration,
 };
 
-use crate::{constant::DEFAULT_USER_AGENT, error::Fallible, Event, Session};
+use crate::constant::DEFAULT_USER_AGENT;
+use crate::{error::Fallible, internal, Event, Session};
 
 use super::Package;
 
@@ -208,6 +209,9 @@ impl<'a> PackageSet<'a> {
 
         // map download tmp files to their final names
         let mut filepaths = vec![];
+
+        // ensure cache dir exists
+        internal::fs::ensure_dir(&cache_root)?;
 
         for (pidx, (_, cache)) in package_caches.iter().enumerate() {
             // skip download if all files are cached and valid
