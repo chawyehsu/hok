@@ -3,7 +3,7 @@ name = "libscoop"
 description = "Rust library implementation of Scoop"
 homepage = "https://github.com/chawyehsu/hok"
 documentation = "https://docs.rs/libscoop"
-version = "0.1.0-beta.3"
+version = "0.1.0-beta.4"
 authors = ["Chawye Hsu <su+cratesio@chawyehsu.com>"]
 categories = ["command-line-utilities"]
 keywords = ["package-manager", "windows", "scoop"]
@@ -33,7 +33,7 @@ thiserror = "1.0"
 # zip = "0.6.2"
 
 [dependencies.scoop-hash]
-version = "0.1.0-beta.3"
+version = "0.1.0-beta.4"
 path = "../scoop_hash"
 
 [target.'cfg(windows)'.dependencies]
