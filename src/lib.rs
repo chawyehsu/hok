@@ -28,7 +28,8 @@ fn error<T: Display>(input: &T) -> io::Result<()> {
         .execute(SetForegroundColor(Color::Red))?
         .execute(Print("ERROR "))?
         .execute(SetForegroundColor(Color::Reset))?
-        .execute(Print(input))?;
+        .execute(Print(input))?
+        .execute(Print("\n"))?;
     Ok(())
 }
 
