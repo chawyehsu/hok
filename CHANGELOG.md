@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.1.0-beta.3](https://github.com/chawyehsu/hok/compare/v0.1.0-beta.2...v0.1.0-beta.3) (2023-08-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **libscoop|config:** `Package::manifest_path` is replaced by `manifest().path()`.
+
+### Features
+
+* **hok:** reflect basic support of uninstalling packages ([183cfd8](https://github.com/chawyehsu/hok/commit/183cfd8b54e8e96ce2e575240f3b7edb3183f005))
+* **libscoop|sync:** basic support of uninstalling packages ([b1f0f6b](https://github.com/chawyehsu/hok/commit/b1f0f6bd3c7ee61b846d60a70889c4033730b10a))
+
+
+### Bug Fixes
+
+* **hok:** print ending newline for error report ([d1f5682](https://github.com/chawyehsu/hok/commit/d1f56822a1db93cf566265b3ec44082794896422))
+* **libscoop|config:** correct `no_junction` field ([4bae700](https://github.com/chawyehsu/hok/commit/4bae700efa06b4d07506370e2eaace04ef747d3d))
+* **libscoop|query:** don't create empty apps dir ([7287bd5](https://github.com/chawyehsu/hok/commit/7287bd5672f6eb88ebb52acb928bfbcc6e87877a))
+* **libscoop:** added portability on non-windows ([3d1ffee](https://github.com/chawyehsu/hok/commit/3d1ffeeb39074a8c31cbb97891c082fd2a31a7fc))
+* **libscoop:** avoid forcing doc target as it will fail to build ([7674f8a](https://github.com/chawyehsu/hok/commit/7674f8aef2f1cdf952c96aed6f16dbb08f65f335))
+* **libscoop:** emit BucketUpdateDone event despite zero bucket ([dc4bdca](https://github.com/chawyehsu/hok/commit/dc4bdca39bec812073ca68f332d568e391736ef8))
+* **libscoop:** ensure cache dir exist before downloading ([485255e](https://github.com/chawyehsu/hok/commit/485255e926df58efd6e03881d430c8496c9a4adb))
+* **scoop-hash:** remove docsrs target ([b6ddd19](https://github.com/chawyehsu/hok/commit/b6ddd19f7c1f70754c70c3b1c6ca87c43e0e0754))
+
 ## [0.1.0-beta.2](https://github.com/chawyehsu/hok/compare/v0.1.0-beta.1...v0.1.0-beta.2) (2023-08-03)
 
 
