@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use once_cell::sync::Lazy;
 use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
@@ -123,6 +122,13 @@ pub fn remove_symlink<P: AsRef<Path>>(lnk: P) -> io::Result<()> {
 /// Create a directory symlink at `lnk` pointing to `src`.
 #[cfg(windows)]
 pub fn symlink_dir<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result<()> {
+    let src = src.as_ref();
+    let lnk = lnk.as_ref();
+    // Try to remove existing symlink, if any
+    let _ = remove_symlink(lnk)?;
+
+    // Ensure parent directory of `lnk` exists
+    ensure_dir(lnk.parent().unwrap())?;
     // It is possible to create a symlink on Windows, but one of the following
     // conditions must be met:
     //
@@ -136,7 +142,7 @@ pub fn symlink_dir<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result
     // Here we try to create a symlink first, and if it fails, we try to create
     // a junction which does not require any special privilege and works on
     // older versions of Windows.
-    if std::os::windows::fs::symlink_dir(src.as_ref(), lnk.as_ref()).is_err() {
+    if std::os::windows::fs::symlink_dir(src, lnk).is_err() {
         junction::create(src, lnk)
     } else {
         Ok(())
@@ -146,5 +152,62 @@ pub fn symlink_dir<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result
 /// Create a directory symlink at `lnk` pointing to `src`.
 #[cfg(unix)]
 pub fn symlink_dir<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result<()> {
-    std::os::unix::fs::symlink(src.as_ref(), lnk.as_ref())
+    std::os::unix::fs::symlink(src, lnk)
+}
+
+/// Create a file symlink at `lnk` pointing to `src`.
+#[cfg(windows)]
+pub fn symlink_file<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result<()> {
+    let src = src.as_ref();
+    let lnk = lnk.as_ref();
+    // Try to remove existing symlink, if any
+    let _ = remove_symlink(lnk)?;
+
+    // Ensure parent directory of `lnk` exists
+    ensure_dir(lnk.parent().unwrap())?;
+    // It is possible to create a symlink on Windows, but one of the following
+    // conditions must be met:
+    //
+    // Either: the process has the `SeCreateSymbolicLinkPrivilege` privilege,
+    // or: the OS is Windows 10 Creators Update or later and Developer Mode
+    // enabled.
+    //
+    // We prefer symlink hence we try to create a symlink first, and if it fails,
+    // a hard link will be created as a fallback.
+    if std::os::windows::fs::symlink_file(src, lnk).is_err() {
+        // Note that there are limitations of hard links:
+        // https://stackoverflow.com/questions/9042542/
+        std::fs::hard_link(src, lnk)
+    } else {
+        Ok(())
+    }
+}
+
+/// Create a file symlink at `lnk` pointing to `src`.
+#[cfg(unix)]
+pub fn symlink_file<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result<()> {
+    std::os::unix::fs::symlink(src, lnk)
+}
+
+/// Create a symlink at `lnk` pointing to `src`.
+/// This function will automatically determine if `src` is a file or a directory.
+#[cfg(windows)]
+pub fn symlink<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result<()> {
+    let src = src.as_ref();
+    let lnk = lnk.as_ref();
+
+    let metadata = src.metadata()?;
+
+    if metadata.file_type().is_dir() {
+        symlink_dir(src, lnk)
+    } else {
+        symlink_file(src, lnk)
+    }
+}
+
+/// Create a symlink at `lnk` pointing to `src`.
+/// This function will automatically determine if `src` is a file or a directory.
+#[cfg(unix)]
+pub fn symlink<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result<()> {
+    std::os::unix::fs::symlink(src, lnk)
 }
