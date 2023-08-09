@@ -108,6 +108,10 @@ pub fn bucket_update(session: &Session) -> Fallible<()> {
     let buckets = crate::bucket::bucket_added(session)?;
 
     if buckets.is_empty() {
+        if let Some(tx) = session.emitter() {
+            let _ = tx.send(Event::BucketUpdateDone);
+        }
+
         return Ok(());
     }
 
