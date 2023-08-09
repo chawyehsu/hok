@@ -86,6 +86,7 @@ where
 }
 
 /// Remove a symlink at `lnk`.
+#[cfg(windows)]
 pub fn remove_symlink<P: AsRef<Path>>(lnk: P) -> io::Result<()> {
     let lnk = lnk.as_ref();
     let metadata = lnk.symlink_metadata()?;
@@ -94,6 +95,7 @@ pub fn remove_symlink<P: AsRef<Path>>(lnk: P) -> io::Result<()> {
     // Remove possible readonly flag on the symlink added by `attrib +R` command
     if permissions.readonly() {
         // Remove readonly flag
+        #[allow(clippy::permissions_set_readonly_false)]
         permissions.set_readonly(false);
         std::fs::set_permissions(lnk, permissions)?;
     }
@@ -112,7 +114,14 @@ pub fn remove_symlink<P: AsRef<Path>>(lnk: P) -> io::Result<()> {
     }
 }
 
+/// Remove a symlink at `lnk`.
+#[cfg(unix)]
+pub fn remove_symlink<P: AsRef<Path>>(lnk: P) -> io::Result<()> {
+    std::fs::remove_file(lnk)
+}
+
 /// Create a directory symlink at `lnk` pointing to `src`.
+#[cfg(windows)]
 pub fn symlink_dir<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result<()> {
     // It is possible to create a symlink on Windows, but one of the following
     // conditions must be met:
@@ -132,4 +141,10 @@ pub fn symlink_dir<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result
     } else {
         Ok(())
     }
+}
+
+/// Create a directory symlink at `lnk` pointing to `src`.
+#[cfg(unix)]
+pub fn symlink_dir<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result<()> {
+    std::os::unix::fs::symlink(src.as_ref(), lnk.as_ref())
 }

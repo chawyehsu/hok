@@ -18,7 +18,6 @@ dirs = "5.0.1"
 flume = "0.10"
 futures = { version = "0.3", features = ["thread-pool"] }
 git2 = "0.17.2"
-junction = "1.0.0"
 log = "0.4"
 once_cell = "1.18.0"
 rayon = "1.7.0"
@@ -28,11 +27,14 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sysinfo = "0.29"
 thiserror = "1.0"
-winreg = "0.50"
 
 [dependencies.scoop-hash]
 version = "0.1.0-beta.3"
 path = "../scoop_hash"
+
+[target.'cfg(windows)'.dependencies]
+junction = "1.0.0"
+winreg = "0.50"
 
 [features]
 default = []
