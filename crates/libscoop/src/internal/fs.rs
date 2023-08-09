@@ -125,7 +125,7 @@ pub fn symlink_dir<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result
     let src = src.as_ref();
     let lnk = lnk.as_ref();
     // Try to remove existing symlink, if any
-    let _ = remove_symlink(lnk)?;
+    remove_symlink(lnk)?;
 
     // Ensure parent directory of `lnk` exists
     ensure_dir(lnk.parent().unwrap())?;
@@ -161,7 +161,7 @@ pub fn symlink_file<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Resul
     let src = src.as_ref();
     let lnk = lnk.as_ref();
     // Try to remove existing symlink, if any
-    let _ = remove_symlink(lnk)?;
+    remove_symlink(lnk)?;
 
     // Ensure parent directory of `lnk` exists
     ensure_dir(lnk.parent().unwrap())?;
