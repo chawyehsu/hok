@@ -36,6 +36,7 @@ pub fn build() -> Command {
                         Arg::new("known")
                             .help("List known buckets")
                             .short('k')
+                            .long("known")
                             .action(ArgAction::SetTrue),
                     ),
                 )
