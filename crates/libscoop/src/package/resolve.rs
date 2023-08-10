@@ -231,11 +231,10 @@ pub(crate) fn resolve_cascade(
                     .any(|p| !packages.contains(p) && !unneeded.contains(p));
 
                 if !needed {
-                    if escape_hold {
-                        unneeded.push(dep_pkg.to_owned());
-                    } else {
+                    if dep_pkg.is_held() && !escape_hold {
                         return Err(Error::PackageCascadeRemoveHold(dep_pkg.name().to_owned()));
                     }
+                    unneeded.push(dep_pkg.to_owned());
                 }
             }
 
