@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use crate::error::{Error, Fallible};
-use crate::internal::fs::write_json;
+use crate::internal;
 
 /// Builder pattern for generating [`Config`].
 pub struct ConfigBuilder {
@@ -205,7 +205,7 @@ impl Config {
     pub(crate) fn init() -> Config {
         let config = Config::default();
         // try to write the default config to the default path, error is ignored
-        let _ = write_json(default::config_path(), &config.inner);
+        let _ = internal::fs::write_json(default::config_path(), &config.inner);
         config
     }
 
@@ -298,7 +298,7 @@ impl Config {
 
     /// Commit config changes and save to the config file
     pub(crate) fn commit(&self) -> Fallible<()> {
-        write_json(&self.path, &self.inner)
+        internal::fs::write_json(&self.path, &self.inner)
     }
 
     /// Pretty print the config
@@ -395,9 +395,12 @@ pub(crate) fn possible_config_paths() -> Vec<PathBuf> {
                 // <app>\<current>\<app_name>\apps\<root> (in theory)
                 //                            ^^^^
                 if path.pop() {
+                    let check = internal::path::leaf(&path)
+                        .map(|n| n == "apps")
+                        .unwrap_or_default();
                     // <app>\<current>\<app_name>\apps\<root> (in theory)
                     //                                 ^^^^^
-                    if path.pop() {
+                    if check && path.pop() {
                         path.push("config.json");
 
                         // 2) config.json located in the `root` directory of
@@ -407,11 +410,11 @@ pub(crate) fn possible_config_paths() -> Vec<PathBuf> {
                 }
             }
         }
-
-        // 3) config.json located in the XDG_CONFIG_HOME directory, i.e.,
-        // `~/.config/scoop/config.json`
-        ret.push(default::config_path());
     }
+
+    // 3) config.json located in the XDG_CONFIG_HOME directory, i.e.,
+    // `~/.config/scoop/config.json`
+    ret.push(default::config_path());
 
     ret
 }
