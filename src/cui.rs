@@ -5,7 +5,10 @@ use crossterm::{
     ExecutableCommand,
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use std::{collections::HashMap, io::stdout};
+use std::{
+    collections::HashMap,
+    io::{stdout, Write},
+};
 
 static BAR_FMT: &str = " {wide_msg} {total_bytes:>12} [{bar:>20}] {percent:>3}%";
 
@@ -145,5 +148,22 @@ impl BucketUpdateUI {
         stdout
             .execute(cursor::MoveToPreviousLine(sorted.len() as u16))
             .unwrap();
+    }
+}
+
+/// Prompt user to continue or not.
+pub fn prompt_yes_no() -> bool {
+    loop {
+        print!("\nDo you want to continue? [y/N]: ");
+        std::io::stdout().flush().unwrap();
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).unwrap();
+        let c = input.trim_end();
+        if c.chars().count() == 1 {
+            let ch: char = c.chars().next().unwrap();
+            if ['y', 'Y', 'n', 'N'].contains(&ch) {
+                return ch == 'y' || ch == 'Y';
+            }
+        }
     }
 }

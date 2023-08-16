@@ -1,9 +1,8 @@
 use clap::ArgMatches;
 use crossterm::style::Stylize;
 use libscoop::{operation, Event, Session, SyncOption};
-use std::io::Write;
 
-use crate::Result;
+use crate::{cui, Result};
 
 pub fn cmd_uninstall(matches: &ArgMatches, session: &Session) -> Result<()> {
     let queries = matches
@@ -57,21 +56,8 @@ pub fn cmd_uninstall(matches: &ArgMatches, session: &Session) -> Result<()> {
                         println!("  {}", output);
                     }
 
-                    loop {
-                        print!("\nDo you want to continue? [y/N]: ");
-                        std::io::stdout().flush().unwrap();
-                        let mut input = String::new();
-                        std::io::stdin().read_line(&mut input).unwrap();
-                        //
-                        if input.chars().count() == 3 {
-                            let ch: char = input.chars().next().unwrap();
-                            if ['y', 'Y', 'n', 'N'].contains(&ch) {
-                                let ret = ch == 'y' || ch == 'Y';
-                                let _ = tx.send(Event::PromptTransactionNeedConfirmResult(ret));
-                                break;
-                            }
-                        }
-                    }
+                    let answer = cui::prompt_yes_no();
+                    let _ = tx.send(Event::PromptTransactionNeedConfirmResult(answer));
                 }
                 Event::PackageCommitStart(ctx) => {
                     println!("Uninstalling {}...", ctx);

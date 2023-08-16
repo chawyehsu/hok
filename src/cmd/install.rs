@@ -208,22 +208,8 @@ pub fn cmd_install(matches: &ArgMatches, session: &Session) -> Result<()> {
 
                     let mut stdout = std::io::stdout();
                     let _ = stdout.execute(cursor::Show);
-                    loop {
-                        print!("\nDo you want to continue? [y/N]: ");
-                        std::io::stdout().flush().unwrap();
-                        let mut input = String::new();
-                        std::io::stdin().read_line(&mut input).unwrap();
-                        //
-                        if input.chars().count() == 3 {
-                            let ch: char = input.chars().next().unwrap();
-                            if ['y', 'Y', 'n', 'N'].contains(&ch) {
-                                let ret = ch == 'y' || ch == 'Y';
-                                let _ = tx.send(Event::PromptTransactionNeedConfirmResult(ret));
-                                break;
-                            }
-                        }
-                    }
-
+                    let answer = cui::prompt_yes_no();
+                    let _ = tx.send(Event::PromptTransactionNeedConfirmResult(answer));
                     let _ = stdout.execute(cursor::Hide);
                 }
                 Event::PackageSyncDone => break,
