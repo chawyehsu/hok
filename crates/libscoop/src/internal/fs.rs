@@ -12,11 +12,13 @@ use std::path::PathBuf;
 use crate::error::Fallible;
 
 /// Ensure given `path` exist.
+#[inline]
 pub fn ensure_dir<P: AsRef<Path> + ?Sized>(path: &P) -> io::Result<()> {
     std::fs::create_dir_all(path.as_ref())
 }
 
 /// Remove given `path` recursively.
+#[inline]
 pub fn remove_dir<P: AsRef<Path>>(path: P) -> io::Result<()> {
     remove_dir_all::remove_dir_all(path)
 }
@@ -104,17 +106,24 @@ pub fn remove_symlink<P: AsRef<Path>>(lnk: P) -> io::Result<()> {
     // it. The file type of the symlink itself is always `FileType::Symlink`
     // and `symlink_metadata::is_dir` always returns `false` for symlinks, so
     // we have to check the metadata of the target file.
-    let target_metadata = lnk.metadata()?;
-
-    if target_metadata.is_dir() {
-        std::fs::remove_dir(lnk)
+    if let Ok(target_metadata) = lnk.metadata() {
+        if target_metadata.file_type().is_dir() {
+            std::fs::remove_dir(lnk)
+        } else {
+            std::fs::remove_file(lnk)
+        }
     } else {
-        std::fs::remove_file(lnk)
+        // We just can't get the metadata of the target file. It is possible
+        // that the target file doesn't exist (perhaps it has been deleted).
+        // The last thing we can do here is to use a mindless way to remove
+        // the symlink.
+        std::fs::remove_file(lnk).or_else(|_| std::fs::remove_dir(lnk))
     }
 }
 
 /// Remove a symlink at `lnk`.
 #[cfg(unix)]
+#[inline]
 pub fn remove_symlink<P: AsRef<Path>>(lnk: P) -> io::Result<()> {
     std::fs::remove_file(lnk)
 }
@@ -151,6 +160,7 @@ pub fn symlink_dir<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result
 
 /// Create a directory symlink at `lnk` pointing to `src`.
 #[cfg(unix)]
+#[inline]
 pub fn symlink_dir<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result<()> {
     std::os::unix::fs::symlink(src, lnk)
 }
@@ -175,7 +185,10 @@ pub fn symlink_file<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Resul
     // We prefer symlink hence we try to create a symlink first, and if it fails,
     // a hard link will be created as a fallback.
     if std::os::windows::fs::symlink_file(src, lnk).is_err() {
-        // Note that there are limitations of hard links:
+        // It might not be a good idea to use hard link as a fallback for symlink,
+        // which is absolutely not the same thing, but it is the best we can do
+        // here and it seems to be suitable for our use case. Note that there
+        // are *limitations* of hard links:
         // https://stackoverflow.com/questions/9042542/
         std::fs::hard_link(src, lnk)
     } else {
@@ -185,6 +198,7 @@ pub fn symlink_file<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Resul
 
 /// Create a file symlink at `lnk` pointing to `src`.
 #[cfg(unix)]
+#[inline]
 pub fn symlink_file<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result<()> {
     std::os::unix::fs::symlink(src, lnk)
 }
@@ -208,6 +222,7 @@ pub fn symlink<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result<()>
 /// Create a symlink at `lnk` pointing to `src`.
 /// This function will automatically determine if `src` is a file or a directory.
 #[cfg(unix)]
+#[inline]
 pub fn symlink<P: AsRef<Path>, Q: AsRef<Path>>(src: P, lnk: Q) -> io::Result<()> {
     std::os::unix::fs::symlink(src, lnk)
 }
