@@ -286,7 +286,7 @@ pub fn build() -> Command {
         .subcommand(
             Command::new("search")
                 .about("Search available package(s)")
-                .alias("s"),
+                .alias("s")
                 .long_about(
                     "Search available package(s) from synced buckets.\n\
                     The query is performed against package names by default, \
