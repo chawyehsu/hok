@@ -66,6 +66,8 @@ pub struct ManifestSpec {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<Vectorized<String>>,
 
+    /// The `extract_dir` field is used to define the directory to which the
+    /// archive should be extracted.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extract_dir: Option<Vectorized<String>>,
 
@@ -285,6 +287,7 @@ pub struct ArchitectureSpec {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub env_set: Option<HashMap<String, String>>,
 
+    /// Same as `ManifestSpec::extract_dir`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extract_dir: Option<Vectorized<String>>,
 
@@ -336,15 +339,20 @@ pub struct AutoupdateArchitecture {
 pub struct HashExtraction {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub find: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub regex: Option<String>,
+
     #[serde(alias = "jp")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub jsonpath: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub xpath: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mode: Option<HashExtractionMode>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
 }
@@ -353,8 +361,10 @@ pub struct HashExtraction {
 pub struct AutoupdateArchSpec {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extract_dir: Option<Vectorized<String>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<Vectorized<HashExtraction>>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<Vectorized<String>>,
 }
@@ -815,7 +825,6 @@ impl Manifest {
     }
 
     /// Get `bin` field of this manifest.
-    #[inline]
     pub fn bin(&self) -> Option<Vec<Vec<&str>>> {
         let ret = arch_specific_field!(self, bin);
         ret.map(|v| v.devectorize())
@@ -833,24 +842,23 @@ impl Manifest {
     }
 
     /// Returns `env_add_path` defined in this manifest.
-    #[inline]
     pub fn env_add_path(&self) -> Option<Vec<&str>> {
         let ret = arch_specific_field!(self, env_add_path);
         ret.map(|v| v.devectorize())
     }
 
     /// Returns `env_set` defined in this manifest.
-    #[inline]
     pub fn env_set(&self) -> Option<&HashMap<String, String>> {
         arch_specific_field!(self, env_set)
     }
 
-    #[inline]
+    /// Returns `extract_dir` defined in this manifest.
     pub fn extract_dir(&self) -> Option<Vec<&str>> {
         let ret = arch_specific_field!(self, extract_dir);
         ret.map(|v| v.devectorize())
     }
 
+    /// Returns `extract_to` defined in this manifest.
     #[inline]
     pub fn extract_to(&self) -> Option<Vec<&str>> {
         self.inner.extract_to.as_ref().map(|v| v.devectorize())
@@ -866,36 +874,30 @@ impl Manifest {
         self.inner.suggest.as_ref()
     }
 
-    #[inline]
     pub fn pre_install(&self) -> Option<Vec<&str>> {
         let ret = arch_specific_field!(self, pre_install);
         ret.map(|v| v.devectorize())
     }
 
-    #[inline]
     pub fn post_install(&self) -> Option<Vec<&str>> {
         let ret = arch_specific_field!(self, post_install);
         ret.map(|v| v.devectorize())
     }
 
-    #[inline]
     pub fn pre_uninstall(&self) -> Option<Vec<&str>> {
         let ret = arch_specific_field!(self, pre_uninstall);
         ret.map(|v| v.devectorize())
     }
 
-    #[inline]
     pub fn post_uninstall(&self) -> Option<Vec<&str>> {
         let ret = arch_specific_field!(self, post_uninstall);
         ret.map(|v| v.devectorize())
     }
 
-    #[inline]
     pub fn installer(&self) -> Option<&Installer> {
         arch_specific_field!(self, installer)
     }
 
-    #[inline]
     pub fn uninstaller(&self) -> Option<&Uninstaller> {
         arch_specific_field!(self, uninstaller)
     }
@@ -912,7 +914,6 @@ impl Manifest {
         self.inner.psmodule.as_ref()
     }
 
-    #[inline]
     pub fn shortcuts(&self) -> Option<Vec<Vec<&str>>> {
         let ret = arch_specific_field!(self, shortcuts);
         ret.map(|v| {
@@ -1128,10 +1129,7 @@ impl Vectorized<String> {
 
 impl Vectorized<Vectorized<String>> {
     pub fn devectorize(&self) -> Vec<Vec<&str>> {
-        self.0
-            .iter()
-            .map(|v| v.0.iter().map(|s| s.as_str()).collect())
-            .collect()
+        self.0.iter().map(|v| v.devectorize()).collect()
     }
 }
 
