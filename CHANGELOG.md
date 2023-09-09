@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.0-beta.4](https://github.com/chawyehsu/hok/compare/v0.1.0-beta.3...v0.1.0-beta.4) (2023-09-09)
+
+
+### Features
+
+* **hok:** added s shortcut for search command ([50c0bfc](https://github.com/chawyehsu/hok/commit/50c0bfcd6dd928dc105a4ec7afefb1d4e0aa97c7))
+
+
+### Bug Fixes
+
+* **hok:** added long format arg of listing known buckets ([658ef7d](https://github.com/chawyehsu/hok/commit/658ef7d9e799301bbd5807a195dd2f263933d5c1))
+* **hok:** fix 50c0bfc ([387fd66](https://github.com/chawyehsu/hok/commit/387fd66637d7e53d167a18be8a0fc9daf121475e))
+* **hok:** trim yes_no prompt input ([0a01f1e](https://github.com/chawyehsu/hok/commit/0a01f1e1ee65e50f9cc5e081d8daa734ea7770e4))
+* **libscoop|config:** default config path should be always returned ([d3040ad](https://github.com/chawyehsu/hok/commit/d3040adf732839bb0070f6585be5428ad0d25e73))
+* **libscoop|fs:** improve symlink removal logic ([398ef27](https://github.com/chawyehsu/hok/commit/398ef27fc280ded401e0e5fb5a9123d5a165b2af))
+* **libscoop|resolve:** correct pinned dependency cascade resolving ([660d3e2](https://github.com/chawyehsu/hok/commit/660d3e2da5bbe5218c45c8706282bfdbc2bfe760))
+
+
+### Performance Improvements
+
+* **libscoop|manifest:** defer hash validation ([d1ff3f6](https://github.com/chawyehsu/hok/commit/d1ff3f61a46b930771b0d4809fcf77ada2ac04c3))
+
 ## [0.1.0-beta.3](https://github.com/chawyehsu/hok/compare/v0.1.0-beta.2...v0.1.0-beta.3) (2023-08-09)
 
 
