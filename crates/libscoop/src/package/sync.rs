@@ -4,8 +4,8 @@ use scoop_hash::ChecksumBuilder;
 use std::io::Read;
 
 use crate::{
-    env, error::Fallible, internal, persist, psmodule, shim, shortcut, Error, Event, QueryOption,
-    Session,
+    constant::REGEX_HASH, env, error::Fallible, internal, persist, psmodule, shim, shortcut, Error,
+    Event, QueryOption, Session,
 };
 
 use super::{
@@ -503,7 +503,12 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
 
             for (idx, (filename, hash)) in files.into_iter().zip(hashes.into_iter()).enumerate() {
                 let path = cache_root.join(filename);
-                let mut file = std::fs::File::open(path)?;
+
+                if !REGEX_HASH.is_match(hash) {
+                    let msg = format!("Invalid hash '{}' in package '{}'", hash, pkg.name());
+                    return Err(Error::Custom(msg));
+                }
+
                 let (algo, hash) = hash.split_once(':').unwrap_or(("sha256", hash));
                 let mut hasher = ChecksumBuilder::new().algo(algo)?.build();
 
@@ -512,6 +517,7 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
                     let _ = tx.send(Event::PackageIntegrityCheckProgress(progress));
                 }
 
+                let mut file = std::fs::File::open(path)?;
                 loop {
                     let len = file.read(&mut buf)?;
                     if len == 0 {

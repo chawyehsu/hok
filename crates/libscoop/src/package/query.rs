@@ -6,7 +6,7 @@ use crate::{
     bucket::Bucket,
     constant::ISOLATED_PACKAGE_BUCKET,
     error::Fallible,
-    internal::{self, compare_versions},
+    internal::compare_versions,
     package::manifest::{InstallInfo, Manifest},
     Session,
 };

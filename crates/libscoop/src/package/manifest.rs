@@ -8,7 +8,7 @@ use std::io::Read;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
-use crate::constant::{REGEX_HASH, SPDX_LIST};
+use crate::constant::SPDX_LIST;
 use crate::error::Fallible;
 use crate::internal;
 
@@ -61,8 +61,6 @@ pub struct ManifestSpec {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<Vectorized<String>>,
 
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_vertorized_hash")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<Vectorized<String>>,
 
@@ -291,8 +289,6 @@ pub struct ArchitectureSpec {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extract_dir: Option<Vectorized<String>>,
 
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_vertorized_hash")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<Vectorized<String>>,
 
@@ -661,29 +657,6 @@ impl<'de> Deserialize<'de> for Checkver {
         }
 
         deserializer.deserialize_any(CheckverVisitor)
-    }
-}
-
-/// Custom deserializing function used to deserialize and validate the hash field
-fn deserialize_vertorized_hash<'de, D>(
-    deserializer: D,
-) -> Result<Option<Vectorized<String>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    if let Some(hashes) = Option::<Vectorized<String>>::deserialize(deserializer)? {
-        // validate hashes
-        for hash in hashes.0.iter().map(|s| s.as_str()) {
-            if !REGEX_HASH.is_match(hash) {
-                return Err(de::Error::invalid_value(
-                    de::Unexpected::Str(hash),
-                    &"a valid hash string",
-                ));
-            }
-        }
-        Ok(Some(hashes))
-    } else {
-        Ok(None)
     }
 }
 
