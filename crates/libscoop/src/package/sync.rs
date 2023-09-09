@@ -252,8 +252,8 @@ impl Transaction {
     fn add_view(&self) -> Vec<&Package> {
         self.install_view()
             .into_iter()
-            .chain(self.upgrade_view().into_iter())
-            .chain(self.replace_view().into_iter())
+            .chain(self.upgrade_view())
+            .chain(self.replace_view())
             .flatten()
             .collect::<Vec<_>>()
     }
