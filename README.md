@@ -9,6 +9,8 @@
 [![downloads][downloads-badge]][releases]
 [![docs-svg]][docs-url]
 
+[简体中文]
+
 ## Install
 
 🚧 **CAVEAT**: Under heavy development, interfaces may change without notice.
@@ -19,6 +21,8 @@ Assuming you have the original Scoop installed, simply run:
 scoop bucket add dorado https://github.com/chawyehsu/dorado
 scoop install dorado/hok
 ```
+
+Note this will add the `dorado` bucket I maintain to install Hok. Hok is experimental and it's currently only available in that bucket.
 
 ## Commands
 
@@ -148,3 +152,4 @@ For licenses of sub crates, see [COPYING](COPYING).
 [downloads-badge]: https://img.shields.io/github/downloads/chawyehsu/hok/total
 [docs-svg]: https://docs.rs/libscoop/badge.svg
 [docs-url]: https://docs.rs/libscoop
+[简体中文]: https://chawyehsu.com/blog/reimplementing-scoop-in-rust
