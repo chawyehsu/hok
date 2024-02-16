@@ -41,6 +41,10 @@ trait Matcher {
 }
 
 /// A matcher that does explicit match.
+///
+/// # Note
+///
+/// This matcher is case-insensitive.
 struct ExplicitMatcher<'a>(&'a str);
 
 /// A matcher that does regex match.
@@ -48,7 +52,7 @@ struct RegexMatcher(Regex);
 
 impl Matcher for ExplicitMatcher<'_> {
     fn is_match(&self, s: &str) -> bool {
-        self.0 == s
+        self.0.eq_ignore_ascii_case(s)
     }
 }
 
