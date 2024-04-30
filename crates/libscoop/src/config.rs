@@ -131,6 +131,9 @@ pub struct ConfigInner {
     #[serde(skip_serializing_if = "Option::is_none")]
     show_manifest: Option<bool>,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
+    use_isolated_path: Option<bool>,
+
     #[serde(alias = "msiextract_use_lessmsi")]
     #[serde(skip_serializing_if = "Option::is_none")]
     use_lessmsi: Option<bool>,
@@ -279,6 +282,13 @@ impl Config {
                     false => Some(value.to_string()),
                 }
             }
+            "use_isolated_path" => match is_unset {
+                true => self.inner.use_isolated_path = None,
+                false => match value.parse::<bool>() {
+                    Ok(value) => self.inner.use_isolated_path = Some(value),
+                    Err(_) => return Err(Error::ConfigValueInvalid(value.to_owned())),
+                },
+            },
             "use_lessmsi" => match is_unset {
                 true => self.inner.use_lessmsi = None,
                 false => match value.parse::<bool>() {
@@ -330,6 +340,7 @@ impl Default for Config {
             ignore_running_processes: Default::default(),
             last_update: Default::default(),
             show_manifest: Default::default(),
+            use_isolated_path: Default::default(),
             use_lessmsi: Default::default(),
             no_junction: Default::default(),
             private_hosts: Default::default(),
