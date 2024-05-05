@@ -37,8 +37,10 @@ crates by enabling the `rustcrypto` feature.
 scoop-hash = { version = "0.1", features = ["rustcrypto"] }
 ```
 
-Self-contained implementations are considerably slower than those from RustCrypto's
-crates, but they do not require any external dependencies and are more portable.
+Self-contained implementations are hand written _pure Rust soft_ implemented and
+considerably slower than those from RustCrypto's crates that may have SIMD or
+even ASM backends, but they do not require any external dependencies and are
+more portable.
 
 ## Bench
 
