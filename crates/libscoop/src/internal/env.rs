@@ -40,11 +40,12 @@ mod windows {
         let path = Path::new("Environment");
         let (env, _) = HKCU.create_subkey(path)?;
 
-        if value.is_none() {
-            // ignore error of deleting non-existent value
-            let _ = env.delete_value(key);
-        } else {
-            env.set_value(key, value.unwrap())?;
+        match value {
+            Some(value) => env.set_value(key, value)?,
+            None => {
+                // ignore error of deleting non-existent value
+                let _ = env.delete_value(key);
+            }
         }
         Ok(())
     }

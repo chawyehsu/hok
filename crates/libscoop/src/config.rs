@@ -208,7 +208,7 @@ pub enum IsolatedPath {
     Boolean(bool),
 
     /// string type of `use_isolated_path` indicating the environment variable name
-    Name(String),
+    Named(String),
 }
 
 impl FromStr for IsolatedPath {
@@ -226,7 +226,7 @@ impl FromStr for IsolatedPath {
         match s.as_str() {
             "true" => Ok(IsolatedPath::Boolean(true)),
             "false" => Ok(IsolatedPath::Boolean(false)),
-            _ => Ok(IsolatedPath::Name(s)),
+            _ => Ok(IsolatedPath::Named(s)),
         }
     }
 }
@@ -265,16 +265,22 @@ impl Config {
         self.no_junction.unwrap_or_default()
     }
 
-    /// Get the `proxy` setting.
+    /// Get the `proxy` config.
     #[inline]
     pub fn proxy(&self) -> Option<&str> {
         self.proxy.as_deref()
     }
 
-    /// Get the `cat_style` setting.
+    /// Get the `cat_style` config.
     #[inline]
     pub fn cat_style(&self) -> &str {
         self.cat_style.as_deref().unwrap_or_default()
+    }
+
+    /// Get the `use_isoloated_path` config.
+    #[inline]
+    pub fn use_isolated_path(&self) -> Option<&IsolatedPath> {
+        self.use_isolated_path.as_ref()
     }
 
     /// Update config key with new value.
