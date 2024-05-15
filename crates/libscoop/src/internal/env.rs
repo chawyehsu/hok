@@ -1,7 +1,17 @@
+use std::path::PathBuf;
+
+use crate::error::Fallible;
+
 #[cfg(unix)]
-pub use unix::{get, get_env_path_list, set};
+pub use unix::{get, set};
 #[cfg(windows)]
-pub use windows::{get, get_env_path_list, set};
+pub use windows::{get, set};
+
+/// Get the value of a path-like environment variable.
+pub fn get_path_like_env(name: &str) -> Fallible<Vec<PathBuf>> {
+    let paths = get(name)?;
+    Ok(std::env::split_paths(&paths).collect())
+}
 
 #[cfg(windows)]
 mod windows {
@@ -26,28 +36,17 @@ mod windows {
 
     /// Set the value of an environment variable.
     /// If the value is an empty string, the variable is deleted.
-    pub fn set(key: &str, value: &str) -> Fallible<()> {
+    pub fn set(key: &str, value: Option<&OsString>) -> Fallible<()> {
         let path = Path::new("Environment");
         let (env, _) = HKCU.create_subkey(path)?;
 
-        if value.is_empty() {
+        if value.is_none() {
             // ignore error of deleting non-existent value
             let _ = env.delete_value(key);
         } else {
-            env.set_value(key, &value)?;
+            env.set_value(key, value.unwrap())?;
         }
         Ok(())
-    }
-
-    /// Get the value of the `PATH` environment variable as a list of paths.
-    pub fn get_env_path_list() -> Fallible<Vec<String>> {
-        let env_path = get("PATH")?;
-        Ok(env_path
-            .into_string()
-            .unwrap()
-            .split(';')
-            .map(|s| s.to_owned())
-            .collect())
     }
 }
 
@@ -65,19 +64,8 @@ mod unix {
 
     /// Set the value of an environment variable.
     /// If the value is an empty string, the variable is deleted.
-    pub fn set(key: &str, value: &str) -> Fallible<()> {
+    pub fn set(key: &str, value: Option<&OsString>) -> Fallible<()> {
         // no-op
         Ok(())
-    }
-
-    /// Get the value of the `PATH` environment variable as a list of paths.
-    pub fn get_env_path_list() -> Fallible<Vec<String>> {
-        let env_path = get("PATH")?;
-        Ok(env_path
-            .into_string()
-            .unwrap()
-            .split(':')
-            .map(|s| s.to_owned())
-            .collect())
     }
 }
