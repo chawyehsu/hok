@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use crate::error::{Error, Fallible};
 use crate::internal;
@@ -132,7 +133,7 @@ pub struct ConfigInner {
     show_manifest: Option<bool>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    use_isolated_path: Option<bool>,
+    use_isolated_path: Option<IsolatedPath>,
 
     #[serde(alias = "msiextract_use_lessmsi")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -198,6 +199,36 @@ pub struct PrivateHosts {
 
     /// A string defining HTTP headers.
     headers: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum IsolatedPath {
+    /// boolean type of `use_isolated_path`
+    Boolean(bool),
+
+    /// string type of `use_isolated_path` indicating the environment variable name
+    Name(String),
+}
+
+impl FromStr for IsolatedPath {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.to_ascii_lowercase();
+
+        // `=` is not a valid character in environment variable names
+        // ref: https://learn.microsoft.com/en-us/windows/win32/procthread/environment-variables
+        if s.contains("=") {
+            return Err(Error::ConfigValueInvalid(s));
+        }
+
+        match s.as_str() {
+            "true" => Ok(IsolatedPath::Boolean(true)),
+            "false" => Ok(IsolatedPath::Boolean(false)),
+            _ => Ok(IsolatedPath::Name(s)),
+        }
+    }
 }
 
 impl Config {
@@ -284,7 +315,7 @@ impl Config {
             }
             "use_isolated_path" => match is_unset {
                 true => self.inner.use_isolated_path = None,
-                false => match value.parse::<bool>() {
+                false => match value.parse::<IsolatedPath>() {
                     Ok(value) => self.inner.use_isolated_path = Some(value),
                     Err(_) => return Err(Error::ConfigValueInvalid(value.to_owned())),
                 },
