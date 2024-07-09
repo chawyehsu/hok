@@ -139,6 +139,12 @@ pub struct ConfigInner {
     #[serde(skip_serializing_if = "Option::is_none")]
     use_lessmsi: Option<bool>,
 
+    /// Use SQLite to cache manifests.
+    ///
+    /// This config was introduced in Scoop v0.5.0 (Jul, 2024)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    use_sqlite_cache: Option<bool>,
+
     /// Disable `current` version junction creation.
     ///
     /// The 'current' version alias will not be used. Shims and shortcuts will
@@ -333,6 +339,13 @@ impl Config {
                     Err(_) => return Err(Error::ConfigValueInvalid(value.to_owned())),
                 },
             },
+            "use_sqlite_cache" => match is_unset {
+                true => self.inner.use_sqlite_cache = None,
+                false => match value.parse::<bool>() {
+                    Ok(value) => self.inner.use_sqlite_cache = Some(value),
+                    Err(_) => return Err(Error::ConfigValueInvalid(value.to_owned())),
+                },
+            },
             "proxy" => match value {
                 "" | "none" => self.inner.proxy = None,
                 _ => self.inner.proxy = Some(value.to_string()),
@@ -379,6 +392,7 @@ impl Default for Config {
             show_manifest: Default::default(),
             use_isolated_path: Default::default(),
             use_lessmsi: Default::default(),
+            use_sqlite_cache: Default::default(),
             no_junction: Default::default(),
             private_hosts: Default::default(),
             proxy: Default::default(),
