@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.0-beta.5](https://github.com/chawyehsu/hok/compare/v0.1.0-beta.4...v0.1.0-beta.5) (2024-07-09)
+
+
+### Features
+
+* **libscoop|config:** support `use_isolated_path` config ([1bb5ee7](https://github.com/chawyehsu/hok/commit/1bb5ee773867c490af8e21885acc87e84a33f40c))
+* **libscoop:** remove env paths under isolated_path mode correctly ([2f58173](https://github.com/chawyehsu/hok/commit/2f5817387006a9334f5a74bc7c17d7063e529108))
+* **libscoop:** support `use_sqlite_cache` config ([35c9577](https://github.com/chawyehsu/hok/commit/35c9577be0bf497e23c5857e350b7b5717b35645))
+
+
+### Bug Fixes
+
+* **libscoop|config:** support named `use_isolated_path` ([5e9a181](https://github.com/chawyehsu/hok/commit/5e9a18135ea309248e657c44bcf43a235833a7cf))
+* **libscoop:** case insensitive match on package querying ([5efde66](https://github.com/chawyehsu/hok/commit/5efde6661999bd6c7f6bff8d1d9e30d78db5564e))
+* **libscoop:** updated Config struct ([17e474a](https://github.com/chawyehsu/hok/commit/17e474a48a03f3c5281af203802a26f79e284e95))
+
 ## [0.1.0-beta.4](https://github.com/chawyehsu/hok/compare/v0.1.0-beta.3...v0.1.0-beta.4) (2023-09-09)
 
 
