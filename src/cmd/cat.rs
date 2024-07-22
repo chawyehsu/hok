@@ -56,8 +56,15 @@ pub fn cmd_cat(matches: &ArgMatches, session: &Session) -> Result<()> {
             let cat_args = match cat == "bat.exe" {
                 false => vec![],
                 true => {
+                    let mut args = vec!["--no-paging"];
                     let cat_style = config.cat_style();
-                    vec!["--no-paging", "--style", cat_style, "--language", "json"]
+                    if !cat_style.is_empty() {
+                        args.push("--style");
+                        args.push(cat_style);
+                    }
+                    args.push("--language");
+                    args.push("json");
+                    args
                 }
             };
 
