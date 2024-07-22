@@ -225,7 +225,7 @@ impl FromStr for IsolatedPath {
 
         // `=` is not a valid character in environment variable names
         // ref: https://learn.microsoft.com/en-us/windows/win32/procthread/environment-variables
-        if s.contains("=") {
+        if s.contains('=') {
             return Err(Error::ConfigValueInvalid(s));
         }
 

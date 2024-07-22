@@ -148,8 +148,8 @@ where
             .map(|(node, _)| node)
             .next()
             .cloned();
-        if node.is_some() {
-            Self::__unregister(&mut self.nodes, node.as_ref().unwrap());
+        if let Some(node) = &node {
+            Self::__unregister(&mut self.nodes, node);
         }
         node
     }

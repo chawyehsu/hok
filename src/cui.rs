@@ -136,7 +136,7 @@ impl BucketUpdateUI {
                     .unwrap()
                     .execute(Print(format!("{} {}\n", name, "Ok".green())))
                     .unwrap(),
-                BucketState::Failed(_) => stdout
+                BucketState::Failed(_err) => stdout
                     .execute(Clear(ClearType::CurrentLine))
                     .unwrap()
                     .execute(Print(format!("{} {}\n", name, "Err".red())))

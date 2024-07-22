@@ -430,7 +430,7 @@ impl<'a> PackageSet<'a> {
     }
 }
 
-fn set_cookie(easy: &mut Easy, cookie: &Vec<(&str, &str)>) -> Fallible<()> {
+fn set_cookie(easy: &mut Easy, cookie: &[(&str, &str)]) -> Fallible<()> {
     if !cookie.is_empty() {
         let mut header_cookie = String::from("Cookie: ");
         header_cookie.push_str(
