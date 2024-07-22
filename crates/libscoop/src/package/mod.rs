@@ -5,7 +5,7 @@ pub(crate) mod resolve;
 pub(crate) mod sync;
 
 use once_cell::unsync::OnceCell;
-use std::fmt;
+use std::{fmt, path::PathBuf};
 
 pub use manifest::{InstallInfo, License, Manifest};
 pub use query::QueryOption;
@@ -201,12 +201,21 @@ impl Package {
             .url()
             .into_iter()
             .map(|u| {
-                format!(
-                    "{}#{}#{}",
-                    self.name(),
-                    self.version(),
-                    internal::fs::filenamify(u)
-                )
+                let mut hasher = scoop_hash::ChecksumBuilder::new().sha256().build();
+                hasher.consume(u.as_bytes());
+                let mut hash = hasher.finalize();
+                hash.truncate(7);
+                let path = PathBuf::from(u);
+                let mut ext = path
+                    .extension()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                if !ext.is_empty() {
+                    ext.insert(0, '.');
+                }
+
+                format!("{}#{}#{}{}", self.name(), self.version(), hash, ext)
             })
             .collect::<Vec<_>>()
     }
