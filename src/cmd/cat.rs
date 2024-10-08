@@ -48,36 +48,28 @@ pub fn cmd_cat(matches: &ArgMatches, session: &Session) -> Result<()> {
                 &result[num]
             };
 
-            let cat = match is_program_available("bat.exe") {
-                true => "bat.exe",
-                false => "type",
-            };
-            let config = session.config();
-            let cat_args = match cat == "bat.exe" {
-                false => vec![],
-                true => {
-                    let mut args = vec!["--no-paging"];
-                    let cat_style = config.cat_style();
-                    if !cat_style.is_empty() {
-                        args.push("--style");
-                        args.push(cat_style);
-                    }
-                    args.push("--language");
-                    args.push("json");
-                    args
-                }
-            };
-
             let path = package.manifest().path();
             println!("{}:", path.display().to_string().green());
+            match is_program_available("bat.exe") {
+                false => {
+                    let content = std::fs::read_to_string(path)?;
+                    println!("{}", content.trim());
+                }
+                true => {
+                    let config = session.config();
+                    let mut cat_args = vec!["--no-paging"];
+                    let cat_style = config.cat_style();
+                    if !cat_style.is_empty() {
+                        cat_args.push("--style");
+                        cat_args.push(cat_style);
+                    }
+                    cat_args.push("--language");
+                    cat_args.push("json");
 
-            let mut child = Command::new("cmd")
-                .arg("/C")
-                .arg(cat)
-                .arg(path)
-                .args(cat_args)
-                .spawn()?;
-            child.wait()?;
+                    let mut child = Command::new("bat.exe").arg(path).args(cat_args).spawn()?;
+                    child.wait()?;
+                }
+            }
         }
     }
     Ok(())
