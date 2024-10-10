@@ -1,0 +1,2 @@
+bench.ps1.template linguist-language=PowerShell
+sandbox.wsb.template linguist-language=XML
