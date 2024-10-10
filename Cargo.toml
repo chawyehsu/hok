@@ -36,7 +36,7 @@ path = "./crates/libscoop"
 debug = false
 lto = "fat"
 panic = "abort"
-opt-level = "z"
+opt-level = 3
 strip = "symbols"
 codegen-units = 1
 
