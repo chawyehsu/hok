@@ -1,3 +1,8 @@
 {
-  "editor.formatOnSave": true
+  "editor.formatOnSave": true,
+  "files.associations": {
+    "*.ps1.template": "powershell",
+    "*.wsb.template": "xml",
+    "*.wsb": "xml"
+  }
 }
