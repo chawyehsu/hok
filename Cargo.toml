@@ -21,7 +21,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.3", features = ["wrap_help", "cargo"] }
-crossterm = "0.26"
+crossterm = "0.28"
 env_logger = "0.8.3"
 indicatif = "0.17.5"
 regex = "1.5.3"
