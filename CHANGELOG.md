@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.0-beta.6](https://github.com/chawyehsu/hok/compare/v0.1.0-beta.5...v0.1.0-beta.6) (2024-10-10)
+
+
+### Features
+
+* **libscoop:** Adpot new cache filename format ([15172a9](https://github.com/chawyehsu/hok/commit/15172a9f7ac35963d1f274e51a4a72de478546c1))
+
+
+### Bug Fixes
+
+* cargo clippy fix ([71a7596](https://github.com/chawyehsu/hok/commit/71a759605a5ea2b68093cf19f1f3fc8bfe3c15b8))
+* **hok:** Check if `cat_style` is empty ([4ed662e](https://github.com/chawyehsu/hok/commit/4ed662ed8bc5d35e3570a8daf1bb6fd92c429f40)), closes [#10](https://github.com/chawyehsu/hok/issues/10)
+* **hok:** Remove `type.exe` dep in `hok cat` ([47a42c5](https://github.com/chawyehsu/hok/commit/47a42c57c17276c7024baaf13479b88e4eac81a1))
+
 ## [0.1.0-beta.5](https://github.com/chawyehsu/hok/compare/v0.1.0-beta.4...v0.1.0-beta.5) (2024-07-09)
 
 
