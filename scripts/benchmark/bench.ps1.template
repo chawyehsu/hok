@@ -24,7 +24,7 @@ function Reset-Network {
     }
 }
 
-function Install-Scoop {
+function Start-Benchmark {
     Write-Host 'Installing scoop...'
 
     if (!($Script:PROXY -eq '')) {
@@ -56,7 +56,7 @@ function Install-Scoop {
     scoop bucket add extras
     scoop bucket add dorado https://github.com/chawyehsu/dorado
 
-    scoop install vcredist2022 hyperfine hok scoop-search
+    scoop install vcredist2022 hyperfine hok scoop-search sfsu
 
     # Adding more buckets for benchmarking
     scoop bucket add versions
@@ -68,20 +68,24 @@ function Install-Scoop {
     scoop bucket add nirsoft
     scoop bucket add sysinternals
     scoop bucket add tests https://github.com/ScoopInstaller/Tests
+    scoop bucket add retools https://github.com/TheCjw/scoop-retools
+
+    # Pre-initialize the sqlite cache
+    scoop config use_sqlite_cache true
 
     Clear-Host
 
-    Write-Host 'hok version:' -ForegroundColor DarkCyan
-    Start-Process 'hok.exe' -ArgumentList '-V' -NoNewWindow -Wait
+    Write-Host '# versions:' -ForegroundColor DarkCyan
+    Start-Process 'hok.exe' -ArgumentList 'list', 'hok', 'scoop-search', 'sfsu' -NoNewWindow -Wait
 
-    Write-Host 'Benchmarking scoop bucket list' -ForegroundColor DarkCyan
+    Write-Host '# Benchmarking scoop bucket list' -ForegroundColor DarkCyan
     Start-Process 'hyperfine.exe' -ArgumentList '--warmup', '3', '"scoop bucket list"', '"hok bucket list"' -NoNewWindow -Wait
 
-    Write-Host 'Benchmarking scoop list' -ForegroundColor DarkCyan
-    Start-Process 'hyperfine.exe' -ArgumentList '--warmup', '3', '"scoop list"', '"hok list"' -NoNewWindow -Wait
+    Write-Host '# Benchmarking scoop list' -ForegroundColor DarkCyan
+    Start-Process 'hyperfine.exe' -ArgumentList '--warmup', '3', '"scoop list"', '"sfsu list"', '"hok list"' -NoNewWindow -Wait
 
-    Write-Host 'Benchmarking scoop search' -ForegroundColor DarkCyan
-    Start-Process 'hyperfine.exe' -ArgumentList '--warmup', '3', '"scoop search google"', '"scoop-search google"', '"hok search google"' -NoNewWindow -Wait
+    Write-Host '# Benchmarking scoop search (sqlite_cache enabled)' -ForegroundColor DarkCyan
+    Start-Process 'hyperfine.exe' -ArgumentList '--warmup', '3', '"scoop search google"', '"scoop-search google"', '"sfsu search google"', '"hok search google"' -NoNewWindow -Wait
 }
 
 function Start-Sandbox {
@@ -91,7 +95,7 @@ function Start-Sandbox {
     }
 
     Reset-Network
-    Install-Scoop
+    Start-Benchmark
 }
 
 $oldErrorActionPreference = $ErrorActionPreference
