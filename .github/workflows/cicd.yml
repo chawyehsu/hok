@@ -10,7 +10,7 @@ permissions:
   pull-requests: write
 jobs:
   # format and lint check
-  style_check:
+  ci_style_check:
     name: Code Style Check
     runs-on: windows-latest
     env:
@@ -18,7 +18,7 @@ jobs:
       RUSTC_WRAPPER: sccache
     steps:
       - name: Checkout Source
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Rust Setup
         uses: dtolnay/rust-toolchain@stable
@@ -27,7 +27,7 @@ jobs:
           components: clippy, rustfmt
 
       - name: Cache Setup
-        uses: mozilla-actions/sccache-action@v0.0.3
+        uses: mozilla-actions/sccache-action@v0.0.6
 
       - name: Format Check
         run: cargo fmt -- --check
@@ -36,9 +36,9 @@ jobs:
         run: cargo clippy
 
   # tests and build
-  test_build:
+  ci_test_build:
     name: Test Build
-    needs: style_check
+    needs: ci_style_check
     strategy:
       fail-fast: false
       matrix:
@@ -52,7 +52,7 @@ jobs:
       RUSTC_WRAPPER: sccache
     steps:
       - name: Checkout Source
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Rust Setup
         uses: dtolnay/rust-toolchain@stable
@@ -61,18 +61,18 @@ jobs:
           target: ${{ matrix.target }}
 
       - name: Cache Setup
-        uses: mozilla-actions/sccache-action@v0.0.3
+        uses: mozilla-actions/sccache-action@v0.0.6
 
       - name: Tests Check
         run: cargo test --workspace
 
-      - name: Build Check
+      - name: Dev Build
         run: cargo build --locked --target ${{ matrix.target }}
 
   # Create/Update release PR
-  release_please:
+  cd_release_please:
     name: Release Please
-    needs: test_build
+    needs: ci_test_build
     runs-on: ubuntu-latest
     if: github.repository == 'chawyehsu/hok' && github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
@@ -86,11 +86,11 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
 
-  # Build artifacts
-  github_build:
+  # Build production artifacts
+  cd_release_build:
     name: Release Build
-    needs: release_please
-    if: ${{ needs.release_please.outputs.release_created == 'true' }}
+    needs: cd_release_please
+    if: ${{ needs.cd_release_please.outputs.release_created == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -114,7 +114,7 @@ jobs:
       RUSTC_WRAPPER: sccache
     steps:
       - name: Checkout Source
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Rust Setup
         uses: dtolnay/rust-toolchain@stable
@@ -123,14 +123,10 @@ jobs:
           target: ${{ matrix.target }}
 
       - name: Cache Setup
-        uses: mozilla-actions/sccache-action@v0.0.3
+        uses: mozilla-actions/sccache-action@v0.0.6
 
-      - name: Build
-        uses: actions-rs/cargo@v1.0.3
-        with:
-          command: build
-          args: --release --locked --target ${{ matrix.target }}
-          use-cross: ${{ matrix.os == 'ubuntu-latest' }}
+      - name: Production Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
 
       - name: Strip artifacts [Linux]
         if: matrix.os == 'ubuntu-latest'
@@ -161,30 +157,30 @@ jobs:
           cd -
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
           path: ${{ matrix.name }}
 
   # Create GitHub release with Rust build targets and release notes
-  upload_artifacts:
-    name: Create Release
-    needs: [release_please, github_build]
+  cd_attach_artifacts:
+    name: Release Artifacts
+    needs: [cd_release_please, cd_release_build]
     runs-on: ubuntu-latest
     steps:
       - name: Prepare Artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
 
       - name: Prepare Checksums
         run: for file in hok-*/hok-*; do openssl dgst -sha256 -r "$file" | awk '{print $1}' > "${file}.sha256"; done
 
       - name: Publish Release
-        run: gh release edit ${{ needs.release_please.outputs.tag_name }} --draft=false --repo=chawyehsu/hok
+        run: gh release edit ${{ needs.cd_release_please.outputs.tag_name }} --draft=false --repo=chawyehsu/hok
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Attach Artifacts
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: hok-*/hok-*
-          tag_name: ${{ needs.release_please.outputs.tag_name }}
+          tag_name: ${{ needs.cd_release_please.outputs.tag_name }}
