@@ -41,7 +41,7 @@ junction = "1.0.0"
 winreg = "0.50"
 
 [target.'cfg(unix)'.dependencies]
-openssl = { version = "0.10.56", features = ["vendored"] }
+openssl = { version = "0.10.66", features = ["vendored"] }
 
 [features]
 default = []
