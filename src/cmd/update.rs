@@ -1,9 +1,14 @@
+use clap::Parser;
 use crossterm::{cursor, ExecutableCommand};
 use libscoop::{operation, Event, Session};
 
 use crate::{cui, Result};
 
-pub fn cmd_update(_: &clap::ArgMatches, session: &Session) -> Result<()> {
+/// Fetch and update subscribed buckets
+#[derive(Debug, Parser)]
+pub struct Args {}
+
+pub fn execute(_: Args, session: &Session) -> Result<()> {
     let rx = session.event_bus().receiver();
 
     let handle = std::thread::spawn(move || {

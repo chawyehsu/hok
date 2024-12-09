@@ -5,7 +5,6 @@ use crossterm::{
 use libscoop::Session;
 use std::{fmt::Display, io};
 
-mod clap_app;
 mod cmd;
 mod cui;
 mod util;
@@ -43,38 +42,12 @@ fn report(err: anyhow::Error) {
     }
 }
 
-pub fn create_app(args: Vec<String>) -> bool {
+pub fn create_app() -> bool {
     let _ = create_logger();
-    let app = clap_app::build();
     let session = Session::default();
     let _ = session.set_user_agent("Scoop/1.0 (+http://scoop.sh/) Hok/0.1.0");
 
-    let ret = match app.try_get_matches_from(args) {
-        Err(e) => {
-            eprintln!("{}", e);
-            Ok(())
-        }
-        Ok(matches) => match matches.subcommand() {
-            Some(("bucket", matches)) => cmd::cmd_bucket(matches, &session),
-            Some(("cache", matches)) => cmd::cmd_cache(matches, &session),
-            Some(("cat", matches)) => cmd::cmd_cat(matches, &session),
-            Some(("cleanup", matches)) => cmd::cmd_cleanup(matches, &session),
-            Some(("config", matches)) => cmd::cmd_config(matches, &session),
-            Some(("hold", matches)) => cmd::cmd_hold(matches, &session),
-            Some(("home", matches)) => cmd::cmd_home(matches, &session),
-            Some(("info", matches)) => cmd::cmd_info(matches, &session),
-            Some(("install", matches)) => cmd::cmd_install(matches, &session),
-            Some(("list", matches)) => cmd::cmd_list(matches, &session),
-            Some(("search", matches)) => cmd::cmd_search(matches, &session),
-            Some(("unhold", matches)) => cmd::cmd_unhold(matches, &session),
-            Some(("uninstall", matches)) => cmd::cmd_uninstall(matches, &session),
-            Some(("update", matches)) => cmd::cmd_update(matches, &session),
-            Some(("upgrade", matches)) => cmd::cmd_upgrade(matches, &session),
-            _ => unimplemented!(),
-        },
-    };
-
-    match ret {
+    match cmd::start(&session) {
         Ok(_) => false,
         Err(e) => {
             report(e);

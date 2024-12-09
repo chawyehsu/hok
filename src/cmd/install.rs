@@ -1,5 +1,5 @@
 #![allow(unused_assignments)]
-use clap::ArgMatches;
+use clap::{ArgAction, Parser};
 use crossterm::{
     cursor,
     style::Stylize,
@@ -11,50 +11,85 @@ use std::io::Write;
 
 use crate::{cui, util, Result};
 
-pub fn cmd_install(matches: &ArgMatches, session: &Session) -> Result<()> {
-    let mut options = vec![];
-    let queries = matches
-        .get_many::<String>("package")
-        .map(|v| v.map(|s| s.as_str()).collect::<Vec<_>>())
-        .unwrap_or_default();
+/// Install package(s)
+#[derive(Debug, Parser)]
+#[clap(arg_required_else_help = true)]
+pub struct Args {
+    /// The package(s) to install
+    #[arg(required = true, action = ArgAction::Append)]
+    package: Vec<String>,
+    /// Download package(s) without performing installation
+    #[arg(short = 'd', long, action = ArgAction::SetTrue)]
+    download_only: bool,
+    /// Ignore failures to ensure a complete transaction
+    #[arg(short = 'f', long, action = ArgAction::SetTrue)]
+    ignore_failure: bool,
+    /// Leverage cache and suppress network access
+    #[arg(short = 'o', long, action = ArgAction::SetTrue)]
+    offline: bool,
+    /// Assume yes to all prompts and run non-interactively
+    #[arg(short = 'y', long, action = ArgAction::SetTrue)]
+    assume_yes: bool,
+    /// Ignore cache and force download
+    #[arg(short = 'D', long, action = ArgAction::SetTrue)]
+    ignore_cache: bool,
+    /// Do not install dependencies (may break packages)
+    #[arg(short = 'I', long, action = ArgAction::SetTrue)]
+    independent: bool,
+    /// Do not replace package(s)
+    #[arg(short = 'R', long, action = ArgAction::SetTrue)]
+    no_replace: bool,
+    /// Escape hold to allow changes on held package(s)
+    #[arg(short = 'S', long, action = ArgAction::SetTrue)]
+    escape_hold: bool,
+    /// Do not upgrade package(s)
+    #[arg(short = 'U', long, action = ArgAction::SetTrue)]
+    no_upgrade: bool,
+    /// Skip package integrity check
+    #[arg(long, action = ArgAction::SetTrue)]
+    no_hash_check: bool,
+}
 
-    if matches.get_flag("assume-yes") {
+pub fn execute(args: Args, session: &Session) -> Result<()> {
+    let mut options = vec![];
+
+    if args.assume_yes {
         options.push(SyncOption::AssumeYes);
     }
 
-    if matches.get_flag("download-only") {
+    if args.download_only {
         options.push(SyncOption::DownloadOnly);
     }
 
-    if matches.get_flag("escape-hold") {
+    if args.escape_hold {
         options.push(SyncOption::EscapeHold);
     }
 
-    if matches.get_flag("ignore-failure") {
+    if args.ignore_failure {
         options.push(SyncOption::IgnoreFailure);
     }
 
-    if matches.get_flag("ignore-cache") {
+    if args.ignore_cache {
         options.push(SyncOption::IgnoreCache);
     }
 
-    if matches.get_flag("no-upgrade") {
+    if args.no_upgrade {
         options.push(SyncOption::NoUpgrade);
     }
 
-    if matches.get_flag("no-replace") {
+    if args.no_replace {
         options.push(SyncOption::NoReplace);
     }
 
-    if matches.get_flag("offline") {
+    if args.offline {
         options.push(SyncOption::Offline);
     }
 
-    if matches.get_flag("independent") {
+    if args.independent {
         options.push(SyncOption::NoDependencies);
     }
 
-    if matches.get_flag("no-hash-check") {
+    if args.no_hash_check {
         options.push(SyncOption::NoHashCheck);
     }
 
@@ -218,6 +253,7 @@ pub fn cmd_install(matches: &ArgMatches, session: &Session) -> Result<()> {
         }
     });
 
+    let queries = args.package.iter().map(|s| s.as_str()).collect::<Vec<_>>();
     operation::package_sync(session, queries, options)?;
 
     handle.join().unwrap();

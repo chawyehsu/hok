@@ -1,16 +1,20 @@
-use clap::ArgMatches;
+use clap::{ArgAction, Parser};
 use crossterm::style::Stylize;
 use libscoop::{operation, Session};
 
 use crate::Result;
 
-pub fn cmd_hold(matches: &ArgMatches, session: &Session) -> Result<()> {
-    let packages = matches
-        .get_many::<String>("package")
-        .map(|v| v.map(|s| s.as_str()).collect::<Vec<_>>())
-        .unwrap_or_default();
+/// Hold package(s) to disable changes
+#[derive(Debug, Parser)]
+#[clap(arg_required_else_help = true)]
+pub struct Args {
+    /// The package(s) to be held
+    #[arg(required= true, action = ArgAction::Append)]
+    package: Vec<String>,
+}
 
-    for name in packages {
+pub fn execute(args: Args, session: &Session) -> Result<()> {
+    for name in &args.package {
         print!("Holding {}...", name);
         match operation::package_hold(session, name, true) {
             Ok(..) => {

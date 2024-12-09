@@ -1,4 +1,4 @@
-use clap::ArgMatches;
+use clap::{ArgAction, Parser};
 use crossterm::{
     cursor,
     style::Stylize,
@@ -9,30 +9,53 @@ use libscoop::{operation, Event, Session, SyncOption};
 
 use crate::{cui, util, Result};
 
-pub fn cmd_upgrade(matches: &ArgMatches, session: &Session) -> Result<()> {
-    let queries = matches
-        .get_many::<String>("package")
-        .map(|v| v.map(|s| s.as_str()).collect::<Vec<_>>())
-        .unwrap_or(vec!["*"]);
+/// Upgrade installed package(s)
+#[derive(Debug, Parser)]
+pub struct Args {
+    /// The package(s) to be upgraded (default: all except held)
+    #[arg(action = ArgAction::Append)]
+    package: Vec<String>,
+    /// Ignore failures to ensure a complete transaction
+    #[arg(short = 'f', long, action = ArgAction::SetTrue)]
+    ignore_failure: bool,
+    /// Leverage cache and suppress network access
+    #[arg(short = 'o', long, action = ArgAction::SetTrue)]
+    offline: bool,
+    /// Assume yes to all prompts and run non-interactively
+    #[arg(short = 'y', long, action = ArgAction::SetTrue)]
+    assume_yes: bool,
+    /// Escape hold to allow to upgrade held package(s)
+    #[arg(short = 'S', long, action = ArgAction::SetTrue)]
+    escape_hold: bool,
+    /// Skip package integrity check
+    #[arg(long, action = ArgAction::SetTrue)]
+    no_hash_check: bool,
+}
+
+pub fn execute(args: Args, session: &Session) -> Result<()> {
+    let mut queries = args.package.iter().map(|s| s.as_str()).collect::<Vec<_>>();
+    if queries.is_empty() {
+        queries.push("*");
+    }
     let mut options = vec![SyncOption::OnlyUpgrade];
 
-    if matches.get_flag("assume-yes") {
+    if args.assume_yes {
         options.push(SyncOption::AssumeYes);
     }
 
-    if matches.get_flag("escape-hold") {
+    if args.escape_hold {
         options.push(SyncOption::EscapeHold);
     }
 
-    if matches.get_flag("ignore-failure") {
+    if args.ignore_failure {
         options.push(SyncOption::IgnoreFailure);
     }
 
-    if matches.get_flag("offline") {
+    if args.offline {
         options.push(SyncOption::Offline);
     }
 
-    if matches.get_flag("no-hash-check") {
+    if args.no_hash_check {
         options.push(SyncOption::NoHashCheck);
     }
 

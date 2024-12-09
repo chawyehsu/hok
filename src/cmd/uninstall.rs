@@ -1,33 +1,54 @@
-use clap::ArgMatches;
+use clap::{ArgAction, Parser};
 use crossterm::style::Stylize;
 use libscoop::{operation, Event, Session, SyncOption};
 
 use crate::{cui, Result};
 
-pub fn cmd_uninstall(matches: &ArgMatches, session: &Session) -> Result<()> {
-    let queries = matches
-        .get_many::<String>("package")
-        .map(|v| v.map(|s| s.as_str()).collect::<Vec<_>>())
-        .unwrap_or_default();
+/// Uninstall package(s)
+#[derive(Debug, Parser)]
+#[clap(arg_required_else_help = true)]
+pub struct Args {
+    /// The package(s) to uninstall
+    #[arg(required = true, action = ArgAction::Append)]
+    package: Vec<String>,
+    /// Remove unneeded dependencies as well
+    #[arg(short = 'c', long, action = ArgAction::SetTrue)]
+    cascade: bool,
+    /// Purge package(s) persistent data as well
+    #[arg(short = 'p', long, action = ArgAction::SetTrue)]
+    purge: bool,
+    /// Assume yes to all prompts and run non-interactively
+    #[arg(short = 'y', long, action = ArgAction::SetTrue)]
+    assume_yes: bool,
+    /// Disable dependent check (may break other packages)
+    #[arg(long, action = ArgAction::SetTrue)]
+    no_dependent_check: bool,
+    /// Escape hold to allow to uninstall held package(s)
+    #[arg(short = 'S', long, action = ArgAction::SetTrue)]
+    escape_hold: bool,
+}
+
+pub fn execute(args: Args, session: &Session) -> Result<()> {
+    let queries = args.package.iter().map(|s| s.as_str()).collect::<Vec<_>>();
     let mut options = vec![SyncOption::Remove];
 
-    if matches.get_flag("assume-yes") {
+    if args.assume_yes {
         options.push(SyncOption::AssumeYes);
     }
 
-    if matches.get_flag("cascade") {
+    if args.cascade {
         options.push(SyncOption::Cascade);
     }
 
-    if matches.get_flag("no-dependent-check") {
+    if args.no_dependent_check {
         options.push(SyncOption::NoDependentCheck);
     }
 
-    if matches.get_flag("escape-hold") {
+    if args.escape_hold {
         options.push(SyncOption::EscapeHold);
     }
 
-    if matches.get_flag("purge") {
+    if args.purge {
         options.push(SyncOption::Purge);
     }
 
