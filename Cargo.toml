@@ -2,7 +2,7 @@
 name = "hok"
 description = "Hok is a CLI implementation of Scoop in Rust"
 repository = "https://github.com/chawyehsu/hok"
-version = "0.1.0-beta.6"
+version = "0.1.0-beta.7"
 authors = ["Chawye Hsu <su+cratesio@chawyehsu.com>"]
 license = "Apache-2.0"
 edition = "2021"
@@ -14,13 +14,10 @@ members = ["crates/libscoop", "crates/scoop_hash"]
 [lib]
 path = "src/lib.rs"
 
-[[bin]]
-name = "hok"
-path = "src/main.rs"
-
 [dependencies]
 anyhow = "1.0"
-clap = { version = "4.3", features = ["wrap_help", "cargo"] }
+clap = { version = "4.5", features = ["wrap_help", "cargo", "derive"] }
+clap_complete = "4.5.38"
 crossterm = "0.28"
 env_logger = "0.8.3"
 indicatif = "0.17.5"
@@ -28,7 +25,7 @@ regex = "1.5.3"
 remove_dir_all = "0.7.0"
 
 [dependencies.libscoop]
-version = "0.1.0-beta.6"
+version = "0.1.0-beta.7"
 features = ["rustcrypto-hash"]
 path = "./crates/libscoop"
 

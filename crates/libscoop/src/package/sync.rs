@@ -504,13 +504,7 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
             for (idx, (filename, hash)) in files.into_iter().zip(hashes.into_iter()).enumerate() {
                 let path = cache_root.join(filename);
 
-                if !REGEX_HASH.is_match(hash) {
-                    let msg = format!("Invalid hash '{}' in package '{}'", hash, pkg.name());
-                    return Err(Error::Custom(msg));
-                }
-
-                let (algo, hash) = hash.split_once(':').unwrap_or(("sha256", hash));
-                let mut hasher = ChecksumBuilder::new().algo(algo)?.build();
+                let mut hasher = ChecksumBuilder::new().algo(hash.algorithm())?.build();
 
                 if let Some(tx) = session.emitter() {
                     let progress = format!("{} ({}/{})", pkg.name(), idx + 1, files_cnt);
@@ -527,11 +521,12 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
                 }
 
                 let actual = hasher.finalize();
-                if actual != hash {
+                let expected = hash.value();
+                if actual != expected {
                     let name = pkg.name().to_owned();
                     let url = pkg.download_urls()[idx].to_owned();
-                    let expected = hash.to_owned();
-                    let ctx = super::HashMismatchContext::new(name, url, expected, actual);
+                    let ctx =
+                        super::HashMismatchContext::new(name, url, expected.to_owned(), actual);
                     return Err(Error::HashMismatch(ctx));
                 }
             }

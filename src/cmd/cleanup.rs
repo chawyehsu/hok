@@ -1,5 +1,5 @@
 #![allow(unused)]
-use clap::ArgMatches;
+use clap::{ArgAction, ArgMatches, Parser};
 use crossterm::style::Stylize;
 use libscoop::{operation, Session};
 use std::{
@@ -10,16 +10,24 @@ use std::{
 
 use crate::Result;
 
-pub fn cmd_cleanup(matches: &ArgMatches, session: &Session) -> Result<()> {
+/// Cleanup apps by removing old versions
+#[derive(Debug, Parser)]
+#[clap(arg_required_else_help = true)]
+pub struct Args {
+    /// Given named app(s) to be cleaned up
+    #[arg(action = ArgAction::Append)]
+    app: Vec<String>,
+    /// Remove download cache simultaneously
+    #[arg(short = 'k', long, action = ArgAction::SetTrue)]
+    cache: bool,
+}
+
+pub fn execute(args: Args, session: &Session) -> Result<()> {
     let config = session.config();
     let apps_path = config.root_path().join("apps");
     // let running_apps = running_apps(&apps_path);
 
-    let query = matches
-        .get_many::<String>("app")
-        .map(|v| v.map(|s| s.as_str()).collect::<Vec<_>>())
-        .unwrap_or_default()
-        .join(" ");
+    let query = args.app.join(" ");
 
     eprintln!("Not implemented yet.");
 

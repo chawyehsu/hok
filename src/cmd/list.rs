@@ -1,24 +1,35 @@
-use clap::ArgMatches;
+use clap::{ArgAction, Parser};
 use crossterm::style::Stylize;
 use libscoop::{operation, QueryOption, Session};
 
 use crate::Result;
 
-pub fn cmd_list(matches: &ArgMatches, session: &Session) -> Result<()> {
-    let queries = matches
-        .get_many::<String>("query")
-        .unwrap_or_default()
-        .map(|s| s.as_str())
-        .collect::<Vec<_>>();
-    let mut options = vec![];
-    let flag_held = matches.get_flag("held");
-    let flag_upgradable = matches.get_flag("upgradable");
+/// List installed package(s)
+#[derive(Debug, Parser)]
+pub struct Args {
+    /// The query string (regex supported by default)
+    #[arg(action = ArgAction::Append)]
+    query: Vec<String>,
+    /// Turn regex off and use explicit matching
+    #[arg(short = 'e', long, action = ArgAction::SetTrue)]
+    explicit: bool,
+    /// List upgradable package(s)
+    #[arg(short = 'u', long, action = ArgAction::SetTrue)]
+    upgradable: bool,
+    /// List held package(s)
+    #[arg(short = 'H', long, action = ArgAction::SetTrue)]
+    held: bool,
+}
 
-    if matches.get_flag("explicit") {
+pub fn execute(args: Args, session: &Session) -> Result<()> {
+    let queries = args.query.iter().map(|s| s.as_str()).collect::<Vec<_>>();
+    let mut options = vec![];
+
+    if args.explicit {
         options.push(QueryOption::Explicit);
     }
 
-    if flag_upgradable {
+    if args.upgradable {
         options.push(QueryOption::Upgradable);
     }
 
@@ -32,12 +43,12 @@ pub fn cmd_list(matches: &ArgMatches, session: &Session) -> Result<()> {
                 );
 
                 let held = pkg.is_held();
-                if flag_held && !held {
+                if args.held && !held {
                     continue;
                 }
 
                 let upgradable = pkg.upgradable_version();
-                if flag_upgradable && upgradable.is_some() {
+                if args.upgradable && upgradable.is_some() {
                     output.push_str(format!(" -> {}", upgradable.unwrap().blue()).as_str());
                 }
 

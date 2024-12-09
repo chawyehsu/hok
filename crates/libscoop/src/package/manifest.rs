@@ -8,7 +8,7 @@ use std::io::Read;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 
-use crate::constant::SPDX_LIST;
+use crate::constant::{REGEX_HASH, SPDX_LIST};
 use crate::error::Fallible;
 use crate::internal;
 
@@ -62,7 +62,7 @@ pub struct ManifestSpec {
     pub url: Option<Vectorized<String>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub hash: Option<Vectorized<String>>,
+    pub hash: Option<Vectorized<HashString>>,
 
     /// The `extract_dir` field is used to define the directory to which the
     /// archive should be extracted.
@@ -290,7 +290,7 @@ pub struct ArchitectureSpec {
     pub extract_dir: Option<Vectorized<String>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub hash: Option<Vectorized<String>>,
+    pub hash: Option<Vectorized<HashString>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub installer: Option<Installer>,
@@ -329,6 +329,14 @@ pub struct AutoupdateArchitecture {
     #[serde(rename = "arm64")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aarch64: Option<AutoupdateArchSpec>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub enum HashString {
+    Md5(String),
+    Sha1(String),
+    Sha256(String),
+    Sha512(String),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -500,7 +508,7 @@ impl<'de> Deserialize<'de> for License {
                         "url" => url = Some(value),
                         _ => {
                             // skip invalid fields
-                            map.next_value()?;
+                            map.next_value::<serde_json::Value>()?;
                             continue;
                         }
                     }
@@ -552,7 +560,7 @@ impl<'de> Deserialize<'de> for Sourceforge {
                         "path" => path = Ok(value),
                         _ => {
                             // skip invalid fields
-                            map.next_value()?;
+                            map.next_value::<serde_json::Value>()?;
                             continue;
                         }
                     }
@@ -566,6 +574,32 @@ impl<'de> Deserialize<'de> for Sourceforge {
         }
 
         deserializer.deserialize_any(SourceforgeVisitor)
+    }
+}
+
+impl<'de> Deserialize<'de> for HashString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct HashStringVisitor;
+        impl<'de> Visitor<'de> for HashStringVisitor {
+            type Value = HashString;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("a valid hash string")
+            }
+
+            #[inline]
+            fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                HashString::new(s).map_err(|e| E::custom(e))
+            }
+        }
+
+        deserializer.deserialize_any(HashStringVisitor)
     }
 }
 
@@ -636,7 +670,7 @@ impl<'de> Deserialize<'de> for Checkver {
                         "sourceforge" => sourceforge = Some(map.next_value()?),
                         _ => {
                             // skip invalid fields
-                            map.next_value()?;
+                            map.next_value::<serde_json::Value>()?;
                             continue;
                         }
                     }
@@ -727,9 +761,8 @@ impl Manifest {
         // to integrate. But I believe there should be an alternative to
         // `serde_json` which can parse JSON files much *faster*. Perhaps
         // `simd_json` can be the one. See https://github.com/serde-rs/json-benchmark
-        let inner: ManifestSpec = serde_json::from_slice(&bytes).map_err(|e| {
+        let inner: ManifestSpec = serde_json::from_slice(&bytes).inspect_err(|e| {
             debug!("failed to parse manifest {}", path.display());
-            e
         })?;
         let path = internal::path::normalize_path(path);
         // let mut checksum = scoop_hash::Checksum::new("sha256");
@@ -914,7 +947,7 @@ impl Manifest {
     /// - For `amd64` return "64bit" hashes if available else noarch hashes;
     /// - For `ia32` return "32bit" hashes if available else noarch hashes;
     /// - For `aarch64` return "arm64" hashes if available else noarch hashes.
-    pub fn hash(&self) -> Vec<&str> {
+    pub fn hash(&self) -> Vec<&HashString> {
         let ret = arch_specific_field!(self, hash);
         ret.map(|v| v.devectorize()).unwrap_or_default()
     }
@@ -1048,6 +1081,69 @@ impl fmt::Display for License {
     }
 }
 
+impl HashString {
+    /// Create a [`HashString`] representation.
+    pub fn new(raw: &str) -> Fallible<HashString> {
+        if !REGEX_HASH.is_match(raw) {
+            let msg = format!("invalid hash string: {}", raw);
+            return Err(crate::Error::Custom(msg));
+        }
+
+        let (algo, hash) = raw.split_once(':').unwrap_or(("sha256", raw));
+        let hash = hash.to_lowercase();
+        match algo {
+            "md5" => Ok(HashString::Md5(hash)),
+            "sha1" => Ok(HashString::Sha1(hash)),
+            "sha256" => Ok(HashString::Sha256(hash)),
+            "sha512" => Ok(HashString::Sha512(hash)),
+            _ => Err(crate::Error::Custom(format!(
+                "unsupported hash algorithm: {}",
+                algo
+            ))),
+        }
+    }
+
+    /// Return the hash algorithm.
+    ///
+    /// # Returns
+    ///
+    /// - `md5`
+    /// - `sha1`
+    /// - `sha256`
+    /// - `sha512`
+    pub fn algorithm(&self) -> &str {
+        match self {
+            HashString::Md5(_) => "md5",
+            HashString::Sha1(_) => "sha1",
+            HashString::Sha256(_) => "sha256",
+            HashString::Sha512(_) => "sha512",
+        }
+    }
+
+    /// Return the hash value.
+    pub fn value(&self) -> &str {
+        match self {
+            HashString::Md5(s) => s,
+            HashString::Sha1(s) => s,
+            HashString::Sha256(s) => s,
+            HashString::Sha512(s) => s,
+        }
+    }
+}
+
+impl fmt::Display for HashString {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = match self {
+            HashString::Md5(s) => format!("md5:{}", s),
+            HashString::Sha1(s) => format!("sha1:{}", s),
+            HashString::Sha256(s) => format!("sha256:{}", s),
+            HashString::Sha512(s) => format!("sha512:{}", s),
+        };
+
+        write!(f, "{}", s)
+    }
+}
+
 impl Installer {
     #[inline]
     pub fn args(&self) -> Option<Vec<&str>> {
@@ -1094,6 +1190,12 @@ impl Uninstaller {
     }
 }
 
+impl Vectorized<HashString> {
+    pub fn devectorize(&self) -> Vec<&HashString> {
+        self.0.iter().collect()
+    }
+}
+
 impl Vectorized<String> {
     pub fn devectorize(&self) -> Vec<&str> {
         self.0.iter().map(|s| s.as_str()).collect()
@@ -1136,9 +1238,8 @@ impl InstallInfo {
         let mut bytes = Vec::new();
         File::open(path)?.read_to_end(&mut bytes)?;
 
-        let info = serde_json::from_slice(&bytes).map_err(|e| {
+        let info = serde_json::from_slice(&bytes).inspect_err(|e| {
             debug!("failed to parse install_info {}", path.display());
-            e
         })?;
 
         Ok(info)

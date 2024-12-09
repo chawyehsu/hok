@@ -1,24 +1,51 @@
-use clap::ArgMatches;
+use clap::{ArgAction, Parser, Subcommand};
 use crossterm::style::Stylize;
 use libscoop::{operation, Session};
 use std::io::{stdout, Write};
 
 use crate::Result;
 
-pub fn cmd_bucket(matches: &ArgMatches, session: &Session) -> Result<()> {
-    match matches.subcommand() {
-        Some(("add", args)) => {
-            let name = args
-                .get_one::<String>("name")
-                .map(|s| s.as_str())
-                .unwrap_or_default();
-            let repo = args
-                .get_one::<String>("repo")
-                .map(|s| s.as_str())
-                .unwrap_or_default();
+/// Manage manifest buckets
+#[derive(Debug, Parser)]
+pub struct Args {
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum Command {
+    /// Add a bucket
+    #[clap(arg_required_else_help = true)]
+    Add {
+        /// The bucket name
+        name: String,
+        /// The bucket repository url (optional for known buckets)
+        repo: Option<String>,
+    },
+    /// List buckets
+    #[clap(alias = "ls")]
+    List {
+        /// List known buckets
+        #[arg(short = 'k', long, action = ArgAction::SetTrue)]
+        known: bool,
+    },
+    /// Remove bucket(s)
+    #[clap(alias = "rm")]
+    #[clap(arg_required_else_help = true)]
+    Remove {
+        /// The bucket name(s)
+        #[arg(required = true, action = ArgAction::Append)]
+        name: Vec<String>,
+    },
+}
+
+pub fn execute(args: Args, session: &Session) -> Result<()> {
+    match args.command {
+        Command::Add { name, repo } => {
             print!("Adding bucket {}... ", name);
             let _ = stdout().flush();
-            match operation::bucket_add(session, name, repo) {
+            let repo = repo.as_deref().unwrap_or_default();
+            match operation::bucket_add(session, name.as_str(), repo) {
                 Ok(..) => println!("{}", "Ok".green()),
                 Err(err) => {
                     println!("{}", "Err".red());
@@ -27,8 +54,7 @@ pub fn cmd_bucket(matches: &ArgMatches, session: &Session) -> Result<()> {
             }
             Ok(())
         }
-        Some(("list", args)) => {
-            let known = args.get_flag("known");
+        Command::List { known } => {
             if known {
                 for (name, repo) in operation::bucket_list_known() {
                     println!("{} {}", name.green(), repo);
@@ -51,15 +77,11 @@ pub fn cmd_bucket(matches: &ArgMatches, session: &Session) -> Result<()> {
                 }
             }
         }
-        Some(("remove", args)) => {
-            let names = args
-                .get_many::<String>("name")
-                .map(|v| v.map(|s| s.as_str()).collect::<Vec<_>>())
-                .unwrap_or_default();
-            for name in names {
+        Command::Remove { name } => {
+            for name in name {
                 print!("Removing bucket {}... ", name);
                 let _ = stdout().flush();
-                match operation::bucket_remove(session, name) {
+                match operation::bucket_remove(session, name.as_str()) {
                     Ok(..) => println!("{}", "Ok".green()),
                     Err(err) => {
                         println!("{}", "Err".red());
@@ -69,6 +91,5 @@ pub fn cmd_bucket(matches: &ArgMatches, session: &Session) -> Result<()> {
             }
             Ok(())
         }
-        _ => unreachable!(),
     }
 }

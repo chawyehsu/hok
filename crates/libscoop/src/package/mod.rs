@@ -7,7 +7,7 @@ pub(crate) mod sync;
 use once_cell::unsync::OnceCell;
 use std::{fmt, path::PathBuf};
 
-pub use manifest::{InstallInfo, License, Manifest};
+pub use manifest::{HashString, InstallInfo, License, Manifest};
 pub use query::QueryOption;
 pub use sync::SyncOption;
 
@@ -220,7 +220,7 @@ impl Package {
             .collect::<Vec<_>>()
     }
 
-    pub(crate) fn download_hashes(&self) -> Vec<&str> {
+    pub(crate) fn download_hashes(&self) -> Vec<&HashString> {
         self.manifest.hash()
     }
 
