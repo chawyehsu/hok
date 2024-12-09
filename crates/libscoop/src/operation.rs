@@ -18,12 +18,12 @@
 //! ```
 use chrono::{SecondsFormat, Utc};
 use futures::{executor::ThreadPool, task::SpawnExt};
-use log::debug;
 use std::{
     collections::HashSet,
     iter::FromIterator,
     sync::{Arc, Mutex},
 };
+use tracing::debug;
 
 use crate::{
     bucket::{Bucket, BucketUpdateProgressContext},

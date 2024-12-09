@@ -29,7 +29,6 @@
 //!
 //! [Scoop]: https://scoop.sh/
 //! [Hok]: https://github.com/chawyehsu/hok
-extern crate log;
 #[macro_use]
 extern crate serde;
 

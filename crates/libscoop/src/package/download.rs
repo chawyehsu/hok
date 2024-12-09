@@ -1,7 +1,6 @@
 use curl::easy::{Easy, List};
 use curl::multi::Multi;
 use flume::Sender;
-use log::debug;
 use once_cell::unsync::OnceCell;
 use std::{
     collections::HashMap,
@@ -9,6 +8,7 @@ use std::{
     io::Write,
     time::Duration,
 };
+use tracing::debug;
 
 use crate::constant::DEFAULT_USER_AGENT;
 use crate::{error::Fallible, internal, Event, Session};

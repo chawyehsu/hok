@@ -1,8 +1,8 @@
-use log::debug;
 use once_cell::sync::OnceCell;
 use rayon::prelude::{IntoParallelIterator, ParallelBridge, ParallelIterator};
 use std::fs::DirEntry;
 use std::path::{Path, PathBuf};
+use tracing::debug;
 
 use crate::error::{Error, Fallible};
 use crate::internal;

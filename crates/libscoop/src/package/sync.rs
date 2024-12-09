@@ -1,7 +1,7 @@
-use log::debug;
 use once_cell::unsync::OnceCell;
 use scoop_hash::ChecksumBuilder;
 use std::io::Read;
+use tracing::debug;
 
 use crate::{
     constant::REGEX_HASH, env, error::Fallible, internal, persist, psmodule, shim, shortcut, Error,
@@ -493,7 +493,7 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
 
         for &pkg in packages.iter() {
             if pkg.version() == "nightly" {
-                debug!("Skip hash check for nightly package '{}'", pkg.name());
+                debug!("skip hash check for nightly package '{}'", pkg.name());
                 continue;
             }
 

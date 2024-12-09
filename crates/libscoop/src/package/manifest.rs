@@ -1,4 +1,3 @@
-use log::debug;
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::{HashMap, HashSet};
@@ -7,6 +6,7 @@ use std::fs::File;
 use std::io::Read;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
+use tracing::debug;
 
 use crate::constant::{REGEX_HASH, SPDX_LIST};
 use crate::error::Fallible;

@@ -1,6 +1,6 @@
-use log::debug;
 use rayon::prelude::{ParallelBridge, ParallelIterator};
 use regex::{Regex, RegexBuilder};
+use tracing::debug;
 
 use crate::{
     bucket::Bucket,

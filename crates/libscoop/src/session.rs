@@ -1,8 +1,8 @@
 use flume::{Receiver, Sender};
-use log::debug;
 use once_cell::unsync::OnceCell;
 use std::cell::{Ref, RefCell, RefMut};
 use std::path::Path;
+use tracing::debug;
 
 use crate::{
     config::{possible_config_paths, Config, ConfigBuilder},
@@ -44,7 +44,7 @@ impl Session {
         // Try to load config from the possible config paths, once a successful
         // load is done, return the session immediately.
         for path in possible_config_paths() {
-            debug!("Trying to load config from {}", path.display());
+            debug!("trying to load config from {}", path.display());
             if let Ok(session) = Self::new_with(path) {
                 return session;
             }
