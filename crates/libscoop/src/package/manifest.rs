@@ -508,7 +508,7 @@ impl<'de> Deserialize<'de> for License {
                         "url" => url = Some(value),
                         _ => {
                             // skip invalid fields
-                            map.next_value()?;
+                            map.next_value::<serde_json::Value>()?;
                             continue;
                         }
                     }
@@ -560,7 +560,7 @@ impl<'de> Deserialize<'de> for Sourceforge {
                         "path" => path = Ok(value),
                         _ => {
                             // skip invalid fields
-                            map.next_value()?;
+                            map.next_value::<serde_json::Value>()?;
                             continue;
                         }
                     }
@@ -670,7 +670,7 @@ impl<'de> Deserialize<'de> for Checkver {
                         "sourceforge" => sourceforge = Some(map.next_value()?),
                         _ => {
                             // skip invalid fields
-                            map.next_value()?;
+                            map.next_value::<serde_json::Value>()?;
                             continue;
                         }
                     }
