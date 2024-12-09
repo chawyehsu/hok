@@ -595,7 +595,7 @@ impl<'de> Deserialize<'de> for HashString {
             where
                 E: de::Error,
             {
-                Ok(HashString::new(s).map_err(|e| E::custom(e))?)
+                HashString::new(s).map_err(|e| E::custom(e))
             }
         }
 
@@ -761,9 +761,8 @@ impl Manifest {
         // to integrate. But I believe there should be an alternative to
         // `serde_json` which can parse JSON files much *faster*. Perhaps
         // `simd_json` can be the one. See https://github.com/serde-rs/json-benchmark
-        let inner: ManifestSpec = serde_json::from_slice(&bytes).map_err(|e| {
+        let inner: ManifestSpec = serde_json::from_slice(&bytes).inspect_err(|e| {
             debug!("failed to parse manifest {}", path.display());
-            e
         })?;
         let path = internal::path::normalize_path(path);
         // let mut checksum = scoop_hash::Checksum::new("sha256");
@@ -1239,9 +1238,8 @@ impl InstallInfo {
         let mut bytes = Vec::new();
         File::open(path)?.read_to_end(&mut bytes)?;
 
-        let info = serde_json::from_slice(&bytes).map_err(|e| {
+        let info = serde_json::from_slice(&bytes).inspect_err(|e| {
             debug!("failed to parse install_info {}", path.display());
-            e
         })?;
 
         Ok(info)
