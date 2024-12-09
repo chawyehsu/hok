@@ -1,7 +1,7 @@
 [package]
 name = "hok"
 description = "Hok is a CLI implementation of Scoop in Rust"
-homepage = "https://github.com/chawyehsu/hok"
+repository = "https://github.com/chawyehsu/hok"
 version = "0.1.0-beta.7"
 authors = ["Chawye Hsu <su+cratesio@chawyehsu.com>"]
 license = "Apache-2.0"
