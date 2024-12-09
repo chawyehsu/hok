@@ -16,7 +16,8 @@ path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0"
-clap = { version = "4.3", features = ["wrap_help", "cargo", "derive"] }
+clap = { version = "4.5", features = ["wrap_help", "cargo", "derive"] }
+clap_complete = "4.5.38"
 crossterm = "0.28"
 env_logger = "0.8.3"
 indicatif = "0.17.5"

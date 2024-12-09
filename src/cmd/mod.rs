@@ -4,6 +4,7 @@ mod bucket;
 mod cache;
 mod cat;
 mod cleanup;
+mod completions;
 mod config;
 mod hold;
 mod home;
@@ -43,6 +44,7 @@ pub enum Command {
     Cache(cache::Args),
     Cat(cat::Args),
     Cleanup(cleanup::Args),
+    Completions(completions::Args),
     Config(config::Args),
     Hold(hold::Args),
     Home(home::Args),
@@ -69,6 +71,7 @@ pub fn start(session: &Session) -> Result<()> {
         Command::Cache(args) => cache::execute(args, session),
         Command::Cat(args) => cat::execute(args, session),
         Command::Cleanup(args) => cleanup::execute(args, session),
+        Command::Completions(args) => completions::execute(args),
         Command::Config(args) => config::execute(args, session),
         Command::Hold(args) => hold::execute(args, session),
         Command::Home(args) => home::execute(args, session),
