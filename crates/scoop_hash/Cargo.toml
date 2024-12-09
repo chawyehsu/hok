@@ -1,7 +1,7 @@
 [package]
 name = "scoop-hash"
 description = "Hashing library for libscoop"
-homepage = "https://github.com/chawyehsu/hok"
+repository = "https://github.com/chawyehsu/hok"
 version = "0.1.0-beta.7"
 authors = ["Chawye Hsu <su+cratesio@chawyehsu.com>"]
 categories = ["cryptography"]

@@ -1,7 +1,7 @@
 [package]
 name = "libscoop"
 description = "Rust library implementation of Scoop"
-homepage = "https://github.com/chawyehsu/hok"
+repository = "https://github.com/chawyehsu/hok"
 documentation = "https://docs.rs/libscoop"
 version = "0.1.0-beta.7"
 authors = ["Chawye Hsu <su+cratesio@chawyehsu.com>"]
