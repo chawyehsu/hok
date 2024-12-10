@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.1.0-beta.7](https://github.com/chawyehsu/hok/compare/v0.1.0-beta.6...v0.1.0-beta.7) (2024-12-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **libscoop:** switch to use `tracing` for logging
+* **libscoop:** `manifest.hash()` return type changed from `str` to `HashString`
+
+### Features
+
+* **hok:** add `hok completions` command to generate shell completion ([da1b6d8](https://github.com/chawyehsu/hok/commit/da1b6d8f409d8c7894872dab84e28cb8d1814fab))
+* **hok:** add global `--verbose` flag ([5fd0505](https://github.com/chawyehsu/hok/commit/5fd050584e80687452a6dde798824cd312e1b74a))
+
+
+### Bug Fixes
+
+* **libscoop:** hash checking should be case insensitive (fix [#18](https://github.com/chawyehsu/hok/issues/18)) ([b3afbef](https://github.com/chawyehsu/hok/commit/b3afbef0fd438844af786fa2484fb314d7da0227))
+
+
+### Code Refactoring
+
+* **libscoop:** switch to use `tracing` for logging ([d835c7f](https://github.com/chawyehsu/hok/commit/d835c7fb96db2e99ff1b726bb3e1e5f68b31c2f7))
+
 ## [0.1.0-beta.6](https://github.com/chawyehsu/hok/compare/v0.1.0-beta.5...v0.1.0-beta.6) (2024-10-10)
 
 
