@@ -23,7 +23,7 @@ use std::{
     iter::FromIterator,
     sync::{Arc, Mutex},
 };
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::{
     bucket::{Bucket, BucketUpdateProgressContext},
@@ -129,7 +129,7 @@ pub fn bucket_update(session: &Session) -> Fallible<()> {
 
         // There is no remote url for this bucket, so we just ignore it.
         if bucket.remote_url().is_none() {
-            debug!("ignored not updatable bucket {}", bucket.name());
+            info!("ignored non-updatable bucket '{}'", bucket.name());
             continue;
         }
 
@@ -216,7 +216,7 @@ pub fn cache_list(session: &Session, query: &str) -> Fallible<Vec<CacheFile>> {
 
     match cache_dir.read_dir() {
         Err(err) => {
-            debug!("failed to read cache dir ({})", err);
+            debug!("failed to read cache dir (err: {})", err);
         }
         Ok(entires) => {
             files = entires

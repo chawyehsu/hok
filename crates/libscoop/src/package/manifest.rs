@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::Read;
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::constant::{REGEX_HASH, SPDX_LIST};
 use crate::error::Fallible;
@@ -762,7 +762,7 @@ impl Manifest {
         // `serde_json` which can parse JSON files much *faster*. Perhaps
         // `simd_json` can be the one. See https://github.com/serde-rs/json-benchmark
         let inner: ManifestSpec = serde_json::from_slice(&bytes).inspect_err(|e| {
-            debug!("failed to parse manifest {}", path.display());
+            warn!("failed to parse manifest {} (err: {})", path.display(), e);
         })?;
         let path = internal::path::normalize_path(path);
         // let mut checksum = scoop_hash::Checksum::new("sha256");
@@ -1024,7 +1024,10 @@ impl Manifest {
             for def in shim_defs {
                 match def.len() {
                     0 => {
-                        debug!("invalid shim definition: {:?}", def);
+                        warn!(
+                            "invalid shim definition found in manifest {}",
+                            self.path().display()
+                        );
                         continue;
                     }
                     1 => shims.push(def[0]),
@@ -1239,7 +1242,11 @@ impl InstallInfo {
         File::open(path)?.read_to_end(&mut bytes)?;
 
         let info = serde_json::from_slice(&bytes).inspect_err(|e| {
-            debug!("failed to parse install_info {}", path.display());
+            warn!(
+                "failed to parse install_info {} (err: {})",
+                path.display(),
+                e
+            );
         })?;
 
         Ok(info)

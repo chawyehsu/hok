@@ -16,10 +16,6 @@ pub fn compare_versions<S: AsRef<str>>(ver_a: S, ver_b: S) -> std::cmp::Ordering
     let ver_b = ver_b.as_ref();
     let ver_a_parsed = ver_a.split(&['.', '-'][..]);
     let mut ver_b_parsed = ver_b.split(&['.', '-'][..]);
-    // debug!(
-    //     "ver_a_parsed: {:?}, ver_b_parsed: {:?}",
-    //     ver_a_parsed, ver_b_parsed
-    // );
 
     for a_part in ver_a_parsed {
         match ver_b_parsed.next() {

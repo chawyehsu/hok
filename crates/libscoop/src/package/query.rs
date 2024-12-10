@@ -1,6 +1,6 @@
 use rayon::prelude::{ParallelBridge, ParallelIterator};
 use regex::{Regex, RegexBuilder};
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::{
     bucket::Bucket,
@@ -97,7 +97,7 @@ pub(crate) fn query_installed(
     let mut ret = vec![];
     match apps_dir.read_dir() {
         Err(err) => {
-            debug!("failed to read apps dir ({})", err);
+            debug!("failed to read apps dir (err: {})", err);
         }
         Ok(entries) => {
             ret = entries
@@ -209,7 +209,7 @@ pub(crate) fn query_installed(
                                 // the upgradable option is requested.
                                 if options.contains(&QueryOption::Upgradable) {
                                     if bucket == ISOLATED_PACKAGE_BUCKET {
-                                        debug!("ignore isolated package '{}'", name);
+                                        info!("ignored isolated package '{}'", name);
                                         // isolated packages are not upgradable currently,
                                         // we may support it by live checking the origin
                                         // manifest via the path/url in install_info.

@@ -2,7 +2,7 @@ use once_cell::sync::OnceCell;
 use rayon::prelude::{IntoParallelIterator, ParallelBridge, ParallelIterator};
 use std::fs::DirEntry;
 use std::path::{Path, PathBuf};
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::error::{Error, Fallible};
 use crate::internal;
@@ -218,7 +218,7 @@ pub fn bucket_added(session: &Session) -> Fallible<Vec<Bucket>> {
 
     match buckets_dir.read_dir() {
         Err(err) => {
-            debug!("failed to read buckets dir ({})", err);
+            warn!("failed to read buckets dir (err: {})", err);
         }
         Ok(entries) => {
             buckets = entries
@@ -231,7 +231,11 @@ pub fn bucket_added(session: &Session) -> Fallible<Vec<Bucket>> {
                         if is_dir {
                             match Bucket::from(&path) {
                                 Err(err) => {
-                                    debug!("failed to parse bucket {} ({})", path.display(), err)
+                                    warn!(
+                                        "failed to parse bucket {} (err: {})",
+                                        path.display(),
+                                        err
+                                    )
                                 }
                                 Ok(bucket) => return Some(bucket),
                             }
