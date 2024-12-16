@@ -22,7 +22,7 @@ clap_complete = "4.5.38"
 crossterm = "0.28"
 indicatif = "0.17.9"
 regex = "1.5.3"
-remove_dir_all = "0.7.0"
+remove_dir_all = "1.0.0"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 [dependencies.libscoop]
