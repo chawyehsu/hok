@@ -350,7 +350,7 @@ impl<'a> PackageSet<'a> {
                 easy.get(true)?;
                 easy.url(url)?;
                 easy.follow_location(true)?;
-                easy.nobody(true)?;
+                easy.write_function(|data| Ok(data.len()))?;
                 easy.useragent(user_agent)?;
                 if let Some(proxy) = proxy {
                     easy.proxy(proxy)?;
