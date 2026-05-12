@@ -337,6 +337,13 @@ pub fn package_hold(session: &Session, name: &str, flag: bool) -> Fallible<()> {
     }
 }
 
+pub fn status(
+    session: &Session,
+    local_only: bool,
+) -> Fallible<crate::StatusReport> {
+    crate::status::collect_status(session, local_only)
+}
+
 /// Query packages.
 ///
 /// # Note
