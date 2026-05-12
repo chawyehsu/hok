@@ -46,6 +46,7 @@ mod psmodule;
 mod session;
 mod shim;
 mod shortcut;
+mod status;
 
 pub mod operation;
 
@@ -53,3 +54,9 @@ pub use error::Error;
 pub use event::Event;
 pub use package::{QueryOption, SyncOption};
 pub use session::Session;
+pub use status::{
+    collect_status,
+    StatusEntry,
+    StatusInfoFlag,
+    StatusReport,
+};

@@ -563,3 +563,24 @@ mod default {
         is_default(global_path().as_path(), path.as_ref())
     }
 }
+
+/// Get the default Scoop global path.
+#[inline]
+pub fn global_path() -> PathBuf {
+    let path = if let Some(path) = std::env::var_os("SCOOP_GLOBAL") {
+        PathBuf::from(path)
+    } else {
+        std::env::var_os("ProgramData")
+            .map(PathBuf::from)
+            .map(|p| p.join("scoop"))
+            .unwrap_or(PathBuf::from("C:/ProgramData/scoop"))
+    };
+
+    internal::path::normalize_path(path)
+}
+
+/// Check if the given `path` is equal to the `default` Scoop global path.
+#[inline]
+pub fn is_default_global_path<P: AsRef<Path>>(path: P) -> bool {
+    path.as_ref() == global_path()
+}

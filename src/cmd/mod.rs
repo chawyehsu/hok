@@ -17,6 +17,7 @@ mod info;
 mod install;
 mod list;
 mod search;
+mod status;
 mod unhold;
 mod uninstall;
 mod update;
@@ -66,6 +67,7 @@ pub enum Command {
     List(list::Args),
     #[clap(alias = "s")]
     Search(search::Args),
+    Status(status::Args),
     Unhold(unhold::Args),
     #[clap(alias = "rm", alias = "remove")]
     Uninstall(uninstall::Args),
@@ -96,6 +98,7 @@ pub fn start() -> Result<()> {
         Command::Install(args) => install::execute(args, &session),
         Command::List(args) => list::execute(args, &session),
         Command::Search(args) => search::execute(args, &session),
+        Command::Status(args) => status::execute(args, &session),
         Command::Unhold(args) => unhold::execute(args, &session),
         Command::Uninstall(args) => uninstall::execute(args, &session),
         Command::Update(args) => update::execute(args, &session),
