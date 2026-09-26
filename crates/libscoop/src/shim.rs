@@ -50,8 +50,8 @@ pub enum ShimType {
     Python,
 }
 
-impl Shim<'_> {
-    pub fn new(def: Vec<&str>) -> Shim {
+impl<'a> Shim<'a> {
+    pub fn new(def: Vec<&'a str>) -> Shim<'a> {
         let length = def.len();
         assert_ne!(length, 0);
 

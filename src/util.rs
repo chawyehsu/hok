@@ -36,3 +36,44 @@ pub fn humansize(length: u64, with_unit: bool) -> String {
         flength.to_string()
     }
 }
+
+use windows::Win32::Foundation::BOOL;
+use windows::Win32::Security::{
+    CheckTokenMembership, CreateWellKnownSid, WinBuiltinAdministratorsSid, PSID,
+    SECURITY_MAX_SID_SIZE,
+};
+
+pub(crate) fn is_admin() -> bool {
+    // DWORD-align the backing buffer for the SID returned by CreateWellKnownSid.
+    let mut sid_buffer = [0u32; (SECURITY_MAX_SID_SIZE as usize).div_ceil(size_of::<u32>())];
+    let sid = PSID(sid_buffer.as_mut_ptr().cast());
+    let mut sid_size = SECURITY_MAX_SID_SIZE;
+    let mut is_member = BOOL(0);
+
+    unsafe {
+        if CreateWellKnownSid(
+            WinBuiltinAdministratorsSid,
+            PSID::default(),
+            sid,
+            &mut sid_size,
+        )
+        .is_err()
+        {
+            return false;
+        }
+
+        // A null token handle checks the calling thread's effective token, falling back to the
+        // process token when the thread is not impersonating.
+        if CheckTokenMembership(
+            windows::Win32::Foundation::HANDLE::default(),
+            sid,
+            &mut is_member,
+        )
+        .is_err()
+        {
+            return false;
+        }
+    }
+
+    is_member.as_bool()
+}
