@@ -265,6 +265,12 @@ impl Config {
         self.root_path.as_path()
     }
 
+    /// Get the global Scoop installation directory.
+    #[inline]
+    pub fn global_path(&self) -> &Path {
+        self.inner.global_path.as_path()
+    }
+
     /// Get the `no_junction` config.
     #[inline]
     pub fn no_junction(&self) -> bool {
