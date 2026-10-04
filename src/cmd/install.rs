@@ -261,6 +261,5 @@ pub fn execute(args: Args, session: &Session) -> Result<()> {
     let mut stdout = std::io::stdout();
     let _ = stdout.execute(cursor::Show);
 
-    eprintln!("Not implemented yet.");
     Ok(())
 }

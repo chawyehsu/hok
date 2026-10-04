@@ -90,34 +90,38 @@ where
 #[cfg(windows)]
 pub fn remove_symlink<P: AsRef<Path>>(lnk: P) -> io::Result<()> {
     let lnk = lnk.as_ref();
-    let metadata = lnk.symlink_metadata()?;
-    let mut permissions = metadata.permissions();
+    match lnk.symlink_metadata() {
+        Ok(metadata) => {
+            let mut permissions = metadata.permissions();
 
-    // Remove possible readonly flag on the symlink added by `attrib +R` command
-    if permissions.readonly() {
-        // Remove readonly flag
-        #[allow(clippy::permissions_set_readonly_false)]
-        permissions.set_readonly(false);
-        std::fs::set_permissions(lnk, permissions)?;
-    }
+            // Remove possible readonly flag on the symlink added by `attrib +R` command
+            if permissions.readonly() {
+                #[allow(clippy::permissions_set_readonly_false)]
+                permissions.set_readonly(false);
+                std::fs::set_permissions(lnk, permissions)?;
+            }
 
-    // We knew that `lnk` is a symlink but we don't know if it is a file or a
-    // directory. So we need to check its metadata to determine how to remove
-    // it. The file type of the symlink itself is always `FileType::Symlink`
-    // and `symlink_metadata::is_dir` always returns `false` for symlinks, so
-    // we have to check the metadata of the target file.
-    if let Ok(target_metadata) = lnk.metadata() {
-        if target_metadata.file_type().is_dir() {
-            std::fs::remove_dir(lnk)
-        } else {
-            std::fs::remove_file(lnk)
+            // We knew that `lnk` is a symlink but we don't know if it is a file or a
+            // directory. So we need to check its metadata to determine how to remove
+            // it. The file type of the symlink itself is always `FileType::Symlink`
+            // and `symlink_metadata::is_dir` always returns `false` for symlinks, so
+            // we have to check the metadata of the target file.
+            if let Ok(target_metadata) = lnk.metadata() {
+                if target_metadata.file_type().is_dir() {
+                    std::fs::remove_dir(lnk)
+                } else {
+                    std::fs::remove_file(lnk)
+                }
+            } else {
+                // We just can't get the metadata of the target file. It is possible
+                // that the target file doesn't exist (perhaps it has been deleted).
+                // The last thing we can do here is to use a mindless way to remove
+                // the symlink.
+                std::fs::remove_file(lnk).or_else(|_| std::fs::remove_dir(lnk))
+            }
         }
-    } else {
-        // We just can't get the metadata of the target file. It is possible
-        // that the target file doesn't exist (perhaps it has been deleted).
-        // The last thing we can do here is to use a mindless way to remove
-        // the symlink.
-        std::fs::remove_file(lnk).or_else(|_| std::fs::remove_dir(lnk))
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
     }
 }
 

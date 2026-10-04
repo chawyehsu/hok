@@ -4,12 +4,13 @@ use std::io::Read;
 use tracing::{debug, info};
 
 use crate::{
-    constant::REGEX_HASH, env, error::Fallible, internal, persist, psmodule, shim, shortcut, Error,
-    Event, QueryOption, Session,
+    env, error::Fallible, internal, persist, psmodule, shim, shortcut, Error, Event, QueryOption,
+    Session,
 };
 
 use super::{
     download::{self, DownloadSize},
+    manifest::InstallInfo,
     query, resolve, Package,
 };
 
@@ -539,36 +540,286 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
 
     let download_only = options.contains(&SyncOption::DownloadOnly);
     if !download_only {
-        // TODO: PowerShell hosting with execution context is not supported yet.
-        // Perhaps at present we could call Scoop to do the removal for packages
-        // using PS scripts...
-        let (_packages_with_script, _packages): (Vec<&Package>, Vec<&Package>) =
-            packages.iter().partition(|p| p.has_install_script());
+        let config = session.config();
+        let apps_dir = config.root_path().join("apps");
 
-        // TODO: commit transcation
-        // let config = session.config();
-        // let apps_dir = config.root_path().join("apps");
+        // Log packages requiring PowerShell scripts that will be skipped
+        let script_pkgs = packages
+            .iter()
+            .filter(|p| p.has_install_script())
+            .map(|p| p.name().to_owned())
+            .collect::<Vec<_>>()
+            .join(", ");
+        if !script_pkgs.is_empty() {
+            info!(
+                "skipping packages requiring PowerShell scripts: {}",
+                script_pkgs
+            );
+        }
 
-        // for &pkg in packages.iter() {
-        //     if let Some(tx) = session.emitter() {
-        //         let _ = tx.send(Event::PackageCommitStart(pkg.name().to_owned()));
-        //     }
+        let packages_to_commit: Vec<&Package> = packages
+            .iter()
+            .filter(|p| !p.has_install_script())
+            .cloned()
+            .collect();
 
-        //     let working_dir = apps_dir.join(pkg.name()).join(pkg.version());
-        //     internal::fs::ensure_dir(&working_dir)?;
+        for pkg in packages_to_commit.iter() {
+            if let Some(tx) = session.emitter() {
+                let _ = tx.send(Event::PackageCommitStart(pkg.name().to_owned()));
+            }
 
-        //     let files = pkg.download_filenames();
+            let working_dir = apps_dir.join(pkg.name()).join(pkg.version());
+            internal::fs::ensure_dir(&working_dir)?;
 
-        //     for filename in files.iter() {
-        //         let src = config.cache_path().join(filename);
-        //         let dst = working_dir.join(filename);
+            let filenames = pkg.download_filenames();
 
-        //         // replace existing file
-        //         let _ = std::fs::remove_file(&dst);
-        //         std::fs::copy(src, dst)?;
+            let cache_root = config.cache_path();
 
-        //     }
-        // }
+            for filename in filenames.iter() {
+                let src = cache_root.join(filename);
+                if !src.exists() {
+                    continue;
+                }
+                let dst = working_dir.join(filename);
+                let _ = std::fs::remove_file(&dst);
+                std::fs::copy(&src, &dst)?;
+            }
+
+            // Extract archives in the working directory
+            extract_package(session, pkg, &working_dir)?;
+
+            // Handle extract_dir/extract_to from manifest
+            handle_extract_location(session, pkg, &working_dir)?;
+
+            // Create the 'current' symlink if not using no_junction
+            if !config.no_junction() {
+                let current_link = apps_dir.join(pkg.name()).join("current");
+                internal::fs::remove_symlink(&current_link)?;
+                internal::fs::symlink_dir(&working_dir, &current_link)?;
+            }
+
+            let install_subdir = if config.no_junction() {
+                pkg.version().to_string()
+            } else {
+                "current".to_string()
+            };
+            let install_base = apps_dir.join(pkg.name()).join(&install_subdir);
+
+            // Save manifest.json
+            let manifest_path = install_base.join("manifest.json");
+            let manifest_json = serde_json::to_string_pretty(pkg.manifest().inner())?;
+            std::fs::write(&manifest_path, manifest_json)?;
+
+            // Write install.json
+            let install_info = InstallInfo::new(
+                get_arch_string(pkg),
+                Some(pkg.bucket().to_owned()),
+                pkg.download_urls().first().map(|u| u.to_string()),
+            );
+            let install_json_path = install_base.join("install.json");
+            internal::fs::write_json(&install_json_path, &install_info)?;
+
+            // Set up persist directories
+            persist::link(session, pkg)?;
+
+            // Add shims
+            shim::add(session, pkg)?;
+
+            // Add shortcuts
+            shortcut::add(session, pkg)?;
+
+            // Import PowerShell modules
+            psmodule::add(session, pkg)?;
+
+            // Set environment variables and path
+            env::install(session, pkg)?;
+
+            if let Some(tx) = session.emitter() {
+                let _ = tx.send(Event::PackageCommitDone(pkg.name().to_owned()));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Get the architecture string for the current platform.
+fn get_arch_string(pkg: &Package) -> String {
+    if let Some(arch) = pkg.manifest().architecture() {
+        if cfg!(target_arch = "x86") {
+            return if arch.ia32.is_some() {
+                "32bit".to_string()
+            } else if arch.amd64.is_some() {
+                "64bit".to_string()
+            } else if arch.aarch64.is_some() {
+                "arm64".to_string()
+            } else {
+                get_runtime_arch()
+            };
+        }
+        if cfg!(target_arch = "x86_64") {
+            return if arch.amd64.is_some() {
+                "64bit".to_string()
+            } else if arch.ia32.is_some() {
+                "32bit".to_string()
+            } else if arch.aarch64.is_some() {
+                "arm64".to_string()
+            } else {
+                get_runtime_arch()
+            };
+        }
+        if cfg!(target_arch = "aarch64") {
+            return if arch.aarch64.is_some() {
+                "arm64".to_string()
+            } else if arch.amd64.is_some() {
+                "64bit".to_string()
+            } else if arch.ia32.is_some() {
+                "32bit".to_string()
+            } else {
+                get_runtime_arch()
+            };
+        }
+    }
+    get_runtime_arch()
+}
+
+/// Determine the runtime architecture string.
+fn get_runtime_arch() -> String {
+    if cfg!(target_arch = "x86_64") {
+        "64bit".to_string()
+    } else if cfg!(target_arch = "x86") {
+        "32bit".to_string()
+    } else if cfg!(target_arch = "aarch64") {
+        "arm64".to_string()
+    } else {
+        "64bit".to_string()
+    }
+}
+
+/// Extract downloaded archives in the working directory.
+fn extract_package(
+    session: &Session,
+    pkg: &Package,
+    working_dir: &std::path::Path,
+) -> Fallible<()> {
+    let filenames = pkg.download_filenames();
+    let config = session.config();
+    let cache_root = config.cache_path();
+
+    for filename in filenames.iter() {
+        let archive_path = working_dir.join(filename);
+        if !archive_path.exists() {
+            continue;
+        }
+
+        if let Some(format) = internal::archive::Format::detect(&archive_path) {
+            if let Some(tx) = session.emitter() {
+                let _ = tx.send(Event::PackageCommitStart(format!(
+                    "extracting archive for {}",
+                    pkg.name()
+                )));
+            }
+
+            // 7z can handle most formats; for tar.gz/tar.bz2 etc., we need to extract
+            // in two steps with 7z (first decompress, then untar)
+            let is_tar = filename.to_lowercase().ends_with(".tar");
+            let is_compressed_tar = filename.to_lowercase().ends_with(".tar.gz")
+                || filename.to_lowercase().ends_with(".tar.bz2")
+                || filename.to_lowercase().ends_with(".tgz")
+                || filename.to_lowercase().ends_with(".tbz2");
+
+            if is_tar || is_compressed_tar {
+                // 7z handles .tar files natively, and .tar.gz etc. automatically
+                internal::archive::extract(&archive_path, working_dir)?;
+            } else {
+                // Extract to a temporary subdirectory first
+                let extract_dir = working_dir.join(format!("__extract_{}", filename));
+                internal::archive::extract(&archive_path, &extract_dir)?;
+
+                // Move contents from extract_dir to working_dir
+                let entries = std::fs::read_dir(&extract_dir)?;
+                for entry in entries {
+                    let entry = entry?;
+                    let name = entry.file_name();
+                    let src = entry.path();
+                    let dst = working_dir.join(&name);
+                    if dst.exists() {
+                        let _ = std::fs::remove_file(&dst);
+                    }
+                    std::fs::rename(&src, &dst)?;
+                }
+                let _ = internal::fs::remove_dir(&extract_dir);
+            }
+
+            // Clean up the archive file after extraction
+            let _ = std::fs::remove_file(&archive_path);
+        }
+    }
+
+    Ok(())
+}
+
+/// Handle extract_dir and extract_to manifest fields.
+///
+/// - `extract_dir`: move extracted content into a subdirectory
+/// - `extract_to`: move extracted content to a different directory
+fn handle_extract_location(
+    session: &Session,
+    pkg: &Package,
+    working_dir: &std::path::Path,
+) -> Fallible<()> {
+    let config = session.config();
+    let apps_dir = config.root_path().join("apps");
+
+    if let Some(extract_dir) = pkg.manifest().extract_dir() {
+        // Move all extracted content into the extract_dir subdirectory
+        let target_dir = working_dir.join(extract_dir[0]);
+        internal::fs::ensure_dir(&target_dir)?;
+
+        let entries = std::fs::read_dir(working_dir)?;
+        for entry in entries {
+            let entry = entry?;
+            let name = entry.file_name();
+            let path = entry.path();
+            // Skip the target directory itself
+            if path == target_dir {
+                continue;
+            }
+            // Skip extracted archive filenames (cache-style)
+            if name.to_string_lossy().contains("#") {
+                continue;
+            }
+            let dest = target_dir.join(&name);
+            if dest.exists() {
+                let _ = std::fs::remove_file(&dest);
+            }
+            std::fs::rename(&path, &dest)?;
+        }
+    }
+
+    // extract_to is applied after extraction, moving content to a subdirectory
+    // within the app's directory (not the version dir)
+    if let Some(extract_to) = pkg.manifest().extract_to() {
+        let target_dir = apps_dir
+            .join(pkg.name())
+            .join(pkg.version())
+            .join(extract_to[0]);
+        internal::fs::ensure_dir(&target_dir)?;
+
+        let entries = std::fs::read_dir(working_dir)?;
+        for entry in entries {
+            let entry = entry?;
+            let name = entry.file_name();
+            let path = entry.path();
+            if path == target_dir {
+                continue;
+            }
+            let dest = target_dir.join(&name);
+            if dest.exists() {
+                let _ = std::fs::remove_file(&dest);
+            }
+            std::fs::rename(&path, &dest)?;
+        }
     }
 
     Ok(())

@@ -331,12 +331,21 @@ pub struct AutoupdateArchitecture {
     pub aarch64: Option<AutoupdateArchSpec>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug)]
 pub enum HashString {
     Md5(String),
     Sha1(String),
     Sha256(String),
     Sha512(String),
+}
+
+impl Serialize for HashString {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -777,6 +786,12 @@ impl Manifest {
     #[inline]
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    /// Return the inner [`ManifestSpec`] of this manifest.
+    #[inline]
+    pub fn inner(&self) -> &ManifestSpec {
+        &self.inner
     }
 
     /// Return the `version` of this manifest.
@@ -1236,6 +1251,16 @@ pub struct InstallInfo {
 }
 
 impl InstallInfo {
+    /// Create a new [`InstallInfo`] with the given fields.
+    pub fn new(architecture: String, bucket: Option<String>, url: Option<String>) -> InstallInfo {
+        InstallInfo {
+            architecture,
+            bucket,
+            hold: None,
+            url,
+        }
+    }
+
     pub fn parse<P: AsRef<Path>>(path: P) -> Fallible<InstallInfo> {
         let path = path.as_ref();
         let mut bytes = Vec::new();

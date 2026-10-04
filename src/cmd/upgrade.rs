@@ -197,6 +197,5 @@ pub fn execute(args: Args, session: &Session) -> Result<()> {
 
     let _ = stdout.execute(cursor::Show);
 
-    eprintln!("Not implemented yet.");
     Ok(())
 }
