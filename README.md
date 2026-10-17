@@ -148,8 +148,8 @@ For licenses of sub crates, see [COPYING](COPYING).
 
 > [Blog](https://chawyehsu.com) · GitHub [@chawyehsu](https://github.com/chawyehsu) · Twitter [@chawyehsu](https://twitter.com/chawyehsu)
 
-[cicd-badge]: https://github.com/chawyehsu/hok/workflows/CICD/badge.svg
-[cicd]: https://github.com/chawyehsu/hok/actions/workflows/cicd.yml
+[cicd-badge]: https://github.com/chawyehsu/hok/workflows/Test/badge.svg
+[cicd]: https://github.com/chawyehsu/hok/actions/workflows/test.yml
 [release-badge]: https://img.shields.io/github/v/release/chawyehsu/hok
 [releases]: https://github.com/chawyehsu/hok/releases/latest
 [crates-svg]: https://img.shields.io/crates/v/libscoop.svg
