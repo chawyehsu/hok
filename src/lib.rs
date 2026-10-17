@@ -1,6 +1,6 @@
 use crossterm::{
-    style::{Color, Print, SetForegroundColor},
     ExecutableCommand,
+    style::{Color, Print, SetForegroundColor},
 };
 use std::{fmt::Display, io};
 

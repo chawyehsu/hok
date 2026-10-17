@@ -1,13 +1,12 @@
 use clap::{ArgAction, Parser};
 use crossterm::{
-    cursor,
+    ExecutableCommand, cursor,
     style::Stylize,
     terminal::{Clear, ClearType},
-    ExecutableCommand,
 };
-use libscoop::{operation, Event, Session, SyncOption};
+use libscoop::{Event, Session, SyncOption, operation};
 
-use crate::{cui, util, Result};
+use crate::{Result, cui, util};
 
 /// Upgrade installed package(s)
 #[derive(Debug, Parser)]

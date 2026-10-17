@@ -1,8 +1,8 @@
 use clap::{ArgAction, Parser};
 use crossterm::style::Stylize;
-use libscoop::{operation, Event, Session, SyncOption};
+use libscoop::{Event, Session, SyncOption, operation};
 
-use crate::{cui, Result};
+use crate::{Result, cui};
 
 /// Uninstall package(s)
 #[derive(Debug, Parser)]

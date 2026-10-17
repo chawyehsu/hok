@@ -1,7 +1,7 @@
 use clap::{ArgAction, Parser, Subcommand};
-use libscoop::{operation, Session};
+use libscoop::{Session, operation};
 
-use crate::{util, Result};
+use crate::{Result, util};
 
 /// Package cache management
 #[derive(Debug, Parser)]

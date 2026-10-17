@@ -1,5 +1,5 @@
 use clap::Parser;
-use libscoop::{operation, QueryOption, Session};
+use libscoop::{QueryOption, Session, operation};
 use std::{io::Write, process::Command};
 
 use crate::Result;
@@ -49,16 +49,17 @@ pub fn execute(args: Args, session: &Session) -> Result<()> {
             std::io::stdin().read_line(&mut input).unwrap();
             let parsed = input.trim().parse::<usize>();
             if let Ok(num) = parsed
-                && num < result.len() {
-                    let package = &result[num];
-                    let url = std::ffi::OsStr::new(package.homepage());
-                    Command::new("cmd")
-                        .arg("/C")
-                        .arg("start")
-                        .arg(url)
-                        .spawn()?;
-                    return Ok(());
-                }
+                && num < result.len()
+            {
+                let package = &result[num];
+                let url = std::ffi::OsStr::new(package.homepage());
+                Command::new("cmd")
+                    .arg("/C")
+                    .arg("start")
+                    .arg(url)
+                    .spawn()?;
+                return Ok(());
+            }
             eprintln!("Invalid input.");
         }
     }

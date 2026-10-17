@@ -1,7 +1,7 @@
 use clap::{ArgAction, Parser, Subcommand};
 use crossterm::style::Stylize;
-use libscoop::{operation, Session};
-use std::io::{stdout, Write};
+use libscoop::{Session, operation};
+use std::io::{Write, stdout};
 
 use crate::Result;
 

@@ -1,7 +1,7 @@
-use clap::{crate_name, CommandFactory, Parser};
+use clap::{CommandFactory, Parser, crate_name};
 use clap_complete::Shell;
 
-use crate::{cmd::Cli, Result};
+use crate::{Result, cmd::Cli};
 
 /// Generate shell completions
 #[derive(Parser, Debug)]

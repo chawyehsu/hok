@@ -1,8 +1,8 @@
-use clap::{crate_description, crate_name, crate_version, Parser, Subcommand};
+use clap::{Parser, Subcommand, crate_description, crate_name, crate_version};
 use clap_verbosity_flag::Verbosity;
 use libscoop::Session;
 use tracing_subscriber::{
-    filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter,
+    EnvFilter, filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt,
 };
 
 mod bucket;

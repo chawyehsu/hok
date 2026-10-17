@@ -1,5 +1,5 @@
 use clap::Parser;
-use libscoop::{operation, Session};
+use libscoop::{Session, operation};
 
 use crate::Result;
 
