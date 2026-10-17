@@ -8,7 +8,7 @@ repository = "https://github.com/chawyehsu/hok"
 license = "Apache-2.0"
 
 [workspace]
-members = ["crates/libscoop", "crates/scoop_hash"]
+members = ["crates/libscoop"]
 
 [lib]
 path = "src/lib.rs"
