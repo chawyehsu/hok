@@ -1,0 +1,22 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - v*
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/build.yml
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - name: Draft Release
+        uses: chawyehsu/actions/create-release@39efbf77de6aa263da59da5e12ee36e2c1bb174e # v1.3.0

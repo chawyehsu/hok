@@ -1,0 +1,65 @@
+name: Test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths-ignore:
+      - ".vscode"
+      - "*.md"
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+jobs:
+  # format and lint check
+  ci_style_check:
+    name: Code Style Check
+    # skip if it's a release commit to the main branch
+    if: "!(github.event_name == 'push' && contains(github.event.head_commit.message, 'chore(main): release'))"
+    runs-on: ubuntu-latest
+    env:
+      SCCACHE_GHA_ENABLED: true
+      RUSTC_WRAPPER: sccache
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Cache Setup
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+
+      - name: Format Check
+        run: cargo fmt -- --check
+
+      - name: Clippy Check
+        run: cargo clippy
+
+  # tests and build
+  ci_test_build:
+    name: Test Build
+    needs: ci_style_check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: i686-pc-windows-msvc, os: windows-latest }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest }
+          - { target: aarch64-pc-windows-msvc, os: windows-11-arm }
+
+    runs-on: ${{ matrix.os }}
+    env:
+      SCCACHE_GHA_ENABLED: true
+      RUSTC_WRAPPER: sccache
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Cache Setup
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+
+      - name: Run Tests
+        run: cargo test
+
+      - name: Dev Build
+        run: cargo build --locked --target ${{ matrix.target }}
