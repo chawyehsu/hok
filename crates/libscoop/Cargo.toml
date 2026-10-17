@@ -35,6 +35,9 @@ tracing = "0.1.41"
 path = "../scoop_hash"
 version = "0.1.0-beta.7"
 
+[dev-dependencies]
+tempfile = "3.13.0"
+
 [target."cfg(unix)".dependencies]
 openssl = { version = "0.10.66", features = ["vendored"] }
 

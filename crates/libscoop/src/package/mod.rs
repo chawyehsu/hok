@@ -1,5 +1,6 @@
 pub(crate) mod download;
 pub(crate) mod manifest;
+pub(crate) mod metadata;
 pub(crate) mod query;
 pub(crate) mod resolve;
 pub(crate) mod sync;
