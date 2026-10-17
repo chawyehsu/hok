@@ -92,7 +92,7 @@ impl Session {
     ///
     /// [1]: crate::operation::config_list
     /// [2]: crate::operation
-    pub fn config(&self) -> Ref<Config> {
+    pub fn config(&self) -> Ref<'_, Config> {
         self.config.borrow()
     }
 
@@ -101,7 +101,7 @@ impl Session {
     /// This method is only directly accessible from within the crate itself.
     /// It maybe indirectly used by other public available APIs to (indirectly)
     /// mutate the config. See [`Session::config`] for more details.
-    pub(crate) fn config_mut(&self) -> Fallible<RefMut<Config>> {
+    pub(crate) fn config_mut(&self) -> Fallible<RefMut<'_, Config>> {
         self.config.try_borrow_mut().map_err(|_| Error::ConfigInUse)
     }
 

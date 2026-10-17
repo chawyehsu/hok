@@ -3,6 +3,6 @@
     "editorconfig.editorconfig",
     "rust-lang.rust-analyzer",
     "github.vscode-github-actions",
-    "tamasfe.even-better-toml"
+    "tombi-toml.tombi"
   ]
 }

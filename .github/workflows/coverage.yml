@@ -1,0 +1,52 @@
+name: Coverage
+
+on:
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - ".vscode"
+      - "*.md"
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "docs/**"
+      - ".vscode"
+      - "*.md"
+
+permissions: {}
+
+jobs:
+  coverage:
+    name: Code Coverage
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    if: github.actor != 'dependabot[bot]'
+    env:
+      SCCACHE_GHA_ENABLED: true
+      RUSTC_WRAPPER: sccache
+    permissions:
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup SCCache
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@e67fa11c4b9316fa714ddf0abed07a0c3143b95b # v2.87.4
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Generate Coverage
+        run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.out
+
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          files: lcov.out
+          fail_ci_if_error: true
+          use_oidc: true

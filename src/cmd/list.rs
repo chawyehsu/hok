@@ -1,6 +1,6 @@
 use clap::{ArgAction, Parser};
 use crossterm::style::Stylize;
-use libscoop::{operation, QueryOption, Session};
+use libscoop::{QueryOption, Session, operation};
 
 use crate::Result;
 
@@ -48,8 +48,10 @@ pub fn execute(args: Args, session: &Session) -> Result<()> {
                 }
 
                 let upgradable = pkg.upgradable_version();
-                if args.upgradable && upgradable.is_some() {
-                    output.push_str(format!(" -> {}", upgradable.unwrap().blue()).as_str());
+                if args.upgradable
+                    && let Some(upgradable) = upgradable
+                {
+                    output.push_str(format!(" -> {}", upgradable.blue()).as_str());
                 }
 
                 if held {

@@ -51,7 +51,7 @@ pub enum ShimType {
 }
 
 impl Shim<'_> {
-    pub fn new(def: Vec<&str>) -> Shim {
+    pub fn new(def: Vec<&str>) -> Shim<'_> {
         let length = def.len();
         assert_ne!(length, 0);
 

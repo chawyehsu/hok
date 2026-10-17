@@ -144,7 +144,7 @@ where
         let node = self
             .nodes
             .iter()
-            .filter(|(_, deps)| deps.len() == 0)
+            .filter(|(_, deps)| deps.is_empty())
             .map(|(node, _)| node)
             .next()
             .cloned();
@@ -204,7 +204,7 @@ where
     fn __step(nodes: &mut Nodes<T>) -> Vec<T> {
         let step = nodes
             .iter()
-            .filter(|(_, deps)| deps.len() == 0)
+            .filter(|(_, deps)| deps.is_empty())
             .map(|(node, _)| node.clone())
             .collect::<Vec<_>>();
         step.iter().for_each(|node| {

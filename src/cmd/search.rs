@@ -1,6 +1,6 @@
 use clap::{ArgAction, Parser};
 use crossterm::style::Stylize;
-use libscoop::{operation, QueryOption, Session};
+use libscoop::{QueryOption, Session, operation};
 
 use crate::Result;
 

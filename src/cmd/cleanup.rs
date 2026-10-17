@@ -1,9 +1,9 @@
 #![allow(unused)]
 use clap::{ArgAction, ArgMatches, Parser};
 use crossterm::style::Stylize;
-use libscoop::{operation, Session};
+use libscoop::{Session, operation};
 use std::{
-    io::{stdout, Write},
+    io::{Write, stdout},
     path::Path,
     result,
 };

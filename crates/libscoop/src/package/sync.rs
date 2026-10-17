@@ -501,7 +501,7 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
             let hashes = pkg.download_hashes();
             let files_cnt = files.len();
 
-            for (idx, (filename, hash)) in files.into_iter().zip(hashes.into_iter()).enumerate() {
+            for (idx, (filename, hash)) in files.into_iter().zip(hashes).enumerate() {
                 let path = cache_root.join(filename);
 
                 let mut hasher = ChecksumBuilder::new().algo(hash.algorithm())?.build();

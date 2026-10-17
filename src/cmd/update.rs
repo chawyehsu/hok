@@ -1,8 +1,8 @@
 use clap::Parser;
-use crossterm::{cursor, ExecutableCommand};
-use libscoop::{operation, Event, Session};
+use crossterm::{ExecutableCommand, cursor};
+use libscoop::{Event, Session, operation};
 
-use crate::{cui, Result};
+use crate::{Result, cui};
 
 /// Fetch and update subscribed buckets
 #[derive(Debug, Parser)]

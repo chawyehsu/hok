@@ -1,35 +1,34 @@
 [package]
 name = "scoop-hash"
-description = "Hashing library for libscoop"
-repository = "https://github.com/chawyehsu/hok"
 version = "0.1.0-beta.7"
-authors = ["Chawye Hsu <su+cratesio@chawyehsu.com>"]
-categories = ["cryptography"]
-keywords = ["hash", "scoop"]
-license = "MIT OR Apache-2.0"
 edition = "2021"
 rust-version = "1.60.0"
+description = "Hashing library for libscoop"
 readme = "README.md"
+repository = "https://github.com/chawyehsu/hok"
+license = "MIT OR Apache-2.0"
+keywords = ["hash", "scoop"]
+categories = ["cryptography"]
 
 [[bench]]
+harness = false
 name = "md5"
 path = "benches/md5.rs"
-harness = false
 
 [[bench]]
+harness = false
 name = "sha1"
 path = "benches/sha1.rs"
-harness = false
 
 [[bench]]
+harness = false
 name = "sha256"
 path = "benches/sha256.rs"
-harness = false
 
 [[bench]]
+harness = false
 name = "sha512"
 path = "benches/sha512.rs"
-harness = false
 
 [dependencies]
 md-5 = { version = "0.10", optional = true }

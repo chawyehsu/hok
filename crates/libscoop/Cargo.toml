@@ -1,15 +1,14 @@
 [package]
 name = "libscoop"
-description = "Rust library implementation of Scoop"
-repository = "https://github.com/chawyehsu/hok"
-documentation = "https://docs.rs/libscoop"
 version = "0.1.0-beta.7"
-authors = ["Chawye Hsu <su+cratesio@chawyehsu.com>"]
-categories = ["command-line-utilities"]
-keywords = ["package-manager", "windows", "scoop"]
-license = "MIT OR Apache-2.0"
 edition = "2021"
+description = "Rust library implementation of Scoop"
+documentation = "https://docs.rs/libscoop"
 readme = "README.md"
+repository = "https://github.com/chawyehsu/hok"
+license = "MIT OR Apache-2.0"
+keywords = ["package-manager", "scoop", "windows"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 chrono = "0.4"
@@ -33,18 +32,18 @@ tracing = "0.1.41"
 # zip = "0.6.2"
 
 [dependencies.scoop-hash]
-version = "0.1.0-beta.7"
 path = "../scoop_hash"
-
-[target.'cfg(windows)'.dependencies]
-junction = "1.2.0"
-winreg = "0.52"
-
-[target.'cfg(unix)'.dependencies]
-openssl = { version = "0.10.66", features = ["vendored"] }
+version = "0.1.0-beta.7"
 
 [dev-dependencies]
 tempfile = "3.13.0"
+
+[target."cfg(unix)".dependencies]
+openssl = { version = "0.10.66", features = ["vendored"] }
+
+[target."cfg(windows)".dependencies]
+junction = "1.2.0"
+winreg = "0.52"
 
 [features]
 default = []
