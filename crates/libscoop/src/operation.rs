@@ -30,8 +30,8 @@ use crate::{
     cache::CacheFile,
     error::{Error, Fallible},
     event::Event,
-    internal, package,
-    package::{InstallInfo, Package, QueryOption},
+    internal,
+    package::{self, metadata, InstallInfo, Package, QueryOption},
     Session, SyncOption,
 };
 
@@ -311,9 +311,10 @@ pub fn config_set(session: &Session, key: &str, value: &str) -> Fallible<()> {
 /// This method will return an error if the package is not installed.
 ///
 /// A [`PackageHoldBrokenInstall`][1] error will be returned if the install is
-/// broken (`install.json` is missing or broken).
+/// broken (`scoop-install.json` or the legacy `install.json` is missing or
+/// broken).
 ///
-/// I/O errors will be returned if failed to write the `install.json` file.
+/// I/O errors will be returned if failed to write the install info file.
 /// Serde errors will be returned if the install info cannot be serialized.
 ///
 /// [1]: crate::Error::PackageHoldBrokenInstall
@@ -327,11 +328,11 @@ pub fn package_hold(session: &Session, name: &str, flag: bool) -> Fallible<()> {
     }
 
     path.push("current");
-    path.push("install.json");
+    let install_info_path = metadata::resolve_install_json_path(&path);
 
-    if let Ok(mut install_info) = InstallInfo::parse(&path) {
+    if let Ok(mut install_info) = InstallInfo::parse(&install_info_path) {
         install_info.set_held(flag);
-        internal::fs::write_json(path, install_info)
+        internal::fs::write_json(install_info_path, install_info)
     } else {
         Err(Error::PackageHoldBrokenInstall(name.to_owned()))
     }

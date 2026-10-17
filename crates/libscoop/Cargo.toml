@@ -43,6 +43,9 @@ winreg = "0.52"
 [target.'cfg(unix)'.dependencies]
 openssl = { version = "0.10.66", features = ["vendored"] }
 
+[dev-dependencies]
+tempfile = "3.13.0"
+
 [features]
 default = []
 rustcrypto-hash = ["scoop-hash/rustcrypto"]

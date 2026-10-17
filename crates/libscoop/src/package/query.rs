@@ -11,6 +11,7 @@ use crate::{
     Session,
 };
 
+use super::metadata::{resolve_install_json_path, resolve_manifest_json_path};
 use super::{InstallState, InstallStateInstalled, Package};
 
 /// Options that may be used to query Scoop packages.
@@ -109,8 +110,9 @@ pub(crate) fn query_installed(
                         let name = filename.to_str().unwrap();
                         // The name `scoop` is reserved for Scoop, ignore it
                         let is_scoop = name == "scoop";
-                        let manifest_path = e.path().join("current/manifest.json");
-                        let install_info_path = e.path().join("current/install.json");
+                        let current_dir = e.path().join("current");
+                        let manifest_path = resolve_manifest_json_path(&current_dir);
+                        let install_info_path = resolve_install_json_path(&current_dir);
                         let is_not_broken = manifest_path.exists() && install_info_path.exists();
 
                         if !is_dir || is_scoop || !is_not_broken {
@@ -389,14 +391,16 @@ pub(crate) fn query_synced(
 
                             // The query has finished, the package has been found,
                             // the last step is to check if the package is installed.
-                            let mut path = apps_dir.join(name);
-                            path.push("current");
-                            path.push("install.json");
+                            let mut current_dir = apps_dir.join(name);
+                            current_dir.push("current");
 
-                            if let Ok(install_info) = InstallInfo::parse(&path) {
-                                path.pop();
-                                path.push("manifest.json");
-                                if let Ok(install_manifest) = Manifest::parse(path) {
+                            let install_info_path = resolve_install_json_path(&current_dir);
+
+                            if let Ok(install_info) = InstallInfo::parse(&install_info_path) {
+                                let install_manifest_path =
+                                    resolve_manifest_json_path(&current_dir);
+                                if let Ok(install_manifest) = Manifest::parse(install_manifest_path)
+                                {
                                     let state = InstallState::Installed(InstallStateInstalled {
                                         version: install_manifest.version().to_owned(),
                                         bucket: install_info.bucket().map(|s| s.to_owned()),
