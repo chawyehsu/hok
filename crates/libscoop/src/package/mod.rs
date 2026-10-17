@@ -8,7 +8,7 @@ pub(crate) mod sync;
 use once_cell::unsync::OnceCell;
 use std::{fmt, path::PathBuf};
 
-pub use manifest::{HashString, InstallInfo, License, Manifest};
+pub use manifest::{Algorithm, HashString, InstallInfo, License, Manifest};
 pub use query::QueryOption;
 pub use sync::SyncOption;
 
@@ -202,7 +202,9 @@ impl Package {
             .url()
             .into_iter()
             .map(|u| {
-                let mut hasher = scoop_hash::ChecksumBuilder::new().sha256().build();
+                let mut hasher = crate::internal::hash::ChecksumBuilder::new()
+                    .sha256()
+                    .build();
                 hasher.consume(u.as_bytes());
                 let mut hash = hasher.finalize();
                 hash.truncate(7);

@@ -91,10 +91,6 @@ pub enum Error {
     #[error(transparent)]
     CyclicDependency(#[from] CyclicError),
 
-    /// Scoop hash error
-    #[error(transparent)]
-    Hash(#[from] scoop_hash::Error),
-
     /// Curl error
     #[error(transparent)]
     Curl(#[from] curl::Error),

@@ -1,11 +1,10 @@
 use once_cell::unsync::OnceCell;
-use scoop_hash::ChecksumBuilder;
 use std::io::Read;
 use tracing::{debug, info};
 
 use crate::{
-    constant::REGEX_HASH, env, error::Fallible, internal, persist, psmodule, shim, shortcut, Error,
-    Event, QueryOption, Session,
+    constant::REGEX_HASH, env, error::Fallible, internal, internal::hash::ChecksumBuilder, persist,
+    psmodule, shim, shortcut, Error, Event, QueryOption, Session,
 };
 
 use super::{
@@ -504,7 +503,7 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
             for (idx, (filename, hash)) in files.into_iter().zip(hashes).enumerate() {
                 let path = cache_root.join(filename);
 
-                let mut hasher = ChecksumBuilder::new().algo(hash.algorithm())?.build();
+                let mut hasher = ChecksumBuilder::new().algo(hash.algorithm()).build();
 
                 if let Some(tx) = session.emitter() {
                     let progress = format!("{} ({}/{})", pkg.name(), idx + 1, files_cnt);

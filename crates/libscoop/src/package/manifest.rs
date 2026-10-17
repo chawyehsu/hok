@@ -331,13 +331,16 @@ pub struct AutoupdateArchitecture {
     pub aarch64: Option<AutoupdateArchSpec>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug)]
+#[non_exhaustive]
 pub enum HashString {
     Md5(String),
     Sha1(String),
     Sha256(String),
     Sha512(String),
 }
+
+pub use crate::internal::hash::Algorithm;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HashExtraction {
@@ -1094,32 +1097,30 @@ impl HashString {
 
         let (algo, hash) = raw.split_once(':').unwrap_or(("sha256", raw));
         let hash = hash.to_lowercase();
+        let algo = algo
+            .parse::<internal::hash::Algorithm>()
+            .map_err(|e| crate::Error::Custom(e.to_string()))?;
+        Ok(HashString::with_parts(algo, hash))
+    }
+
+    fn with_parts(algo: internal::hash::Algorithm, value: String) -> HashString {
+        use internal::hash::Algorithm;
         match algo {
-            "md5" => Ok(HashString::Md5(hash)),
-            "sha1" => Ok(HashString::Sha1(hash)),
-            "sha256" => Ok(HashString::Sha256(hash)),
-            "sha512" => Ok(HashString::Sha512(hash)),
-            _ => Err(crate::Error::Custom(format!(
-                "unsupported hash algorithm: {}",
-                algo
-            ))),
+            Algorithm::Md5 => HashString::Md5(value),
+            Algorithm::Sha1 => HashString::Sha1(value),
+            Algorithm::Sha256 => HashString::Sha256(value),
+            Algorithm::Sha512 => HashString::Sha512(value),
         }
     }
 
     /// Return the hash algorithm.
-    ///
-    /// # Returns
-    ///
-    /// - `md5`
-    /// - `sha1`
-    /// - `sha256`
-    /// - `sha512`
-    pub fn algorithm(&self) -> &str {
+    pub fn algorithm(&self) -> internal::hash::Algorithm {
+        use internal::hash::Algorithm;
         match self {
-            HashString::Md5(_) => "md5",
-            HashString::Sha1(_) => "sha1",
-            HashString::Sha256(_) => "sha256",
-            HashString::Sha512(_) => "sha512",
+            HashString::Md5(_) => Algorithm::Md5,
+            HashString::Sha1(_) => Algorithm::Sha1,
+            HashString::Sha256(_) => Algorithm::Sha256,
+            HashString::Sha512(_) => Algorithm::Sha512,
         }
     }
 
@@ -1136,14 +1137,16 @@ impl HashString {
 
 impl fmt::Display for HashString {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let s = match self {
-            HashString::Md5(s) => format!("md5:{}", s),
-            HashString::Sha1(s) => format!("sha1:{}", s),
-            HashString::Sha256(s) => format!("sha256:{}", s),
-            HashString::Sha512(s) => format!("sha512:{}", s),
-        };
+        write!(f, "{}:{}", self.algorithm(), self.value())
+    }
+}
 
-        write!(f, "{}", s)
+impl Serialize for HashString {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.collect_str(self)
     }
 }
 
