@@ -1,4 +1,4 @@
-use crate::{error::Fallible, internal, package::Package, Session};
+use crate::{Session, error::Fallible, internal, package::Package};
 
 /// Remove PowerShell module imported by a given package.
 pub fn unlink(session: &Session, package: &Package) -> Fallible<()> {

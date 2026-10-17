@@ -1,4 +1,4 @@
-use crate::{config, error::Fallible, internal, package::Package, Error, Event, Session};
+use crate::{Error, Event, Session, config, error::Fallible, internal, package::Package};
 
 /// Unset all environment variables defined by a given package.
 pub fn remove(session: &Session, package: &Package) -> Fallible<()> {

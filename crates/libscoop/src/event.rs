@@ -1,4 +1,4 @@
-use flume::{bounded, Receiver, Sender};
+use flume::{Receiver, Sender, bounded};
 
 use crate::{
     bucket::BucketUpdateProgressContext,

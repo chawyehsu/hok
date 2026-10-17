@@ -5,7 +5,7 @@ use std::path::Path;
 use tracing::{debug, info, trace};
 
 use crate::{
-    config::{possible_config_paths, Config, ConfigBuilder},
+    config::{Config, ConfigBuilder, possible_config_paths},
     error::{Error, Fallible},
     event::{Event, EventBus},
 };

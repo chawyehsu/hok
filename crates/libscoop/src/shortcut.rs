@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 use std::path::PathBuf;
 
-use crate::{error::Fallible, internal, package::Package, Event, Session};
+use crate::{Event, Session, error::Fallible, internal, package::Package};
 
 static SCOOP_SHORTCUT_DIR: Lazy<PathBuf> = Lazy::new(shortcut_dir);
 

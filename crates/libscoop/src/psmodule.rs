@@ -1,4 +1,4 @@
-use crate::{error::Fallible, package::Package, Event, Session};
+use crate::{Event, Session, error::Fallible, package::Package};
 
 /// Remove PowerShell module imported by a given package.
 pub fn remove(session: &Session, package: &Package) -> Fallible<()> {

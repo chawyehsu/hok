@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use std::path::Path;
 
-use crate::{error::Fallible, internal, package::Package, Event, Session};
+use crate::{Event, Session, error::Fallible, internal, package::Package};
 
 #[derive(Debug)]
 pub struct Shim<'a> {

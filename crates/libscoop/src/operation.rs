@@ -26,13 +26,13 @@ use std::{
 use tracing::{debug, info};
 
 use crate::{
+    Session, SyncOption,
     bucket::{Bucket, BucketUpdateProgressContext},
     cache::CacheFile,
     error::{Error, Fallible},
     event::Event,
     internal,
-    package::{self, metadata, InstallInfo, Package, QueryOption},
-    Session, SyncOption,
+    package::{self, InstallInfo, Package, QueryOption, metadata},
 };
 
 /// Add a bucket to Scoop.

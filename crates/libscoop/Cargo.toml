@@ -1,7 +1,7 @@
 [package]
 name = "libscoop"
 version = "0.1.0-beta.7"
-edition = "2021"
+edition = "2024"
 description = "Rust library implementation of Scoop"
 documentation = "https://docs.rs/libscoop"
 readme = "README.md"

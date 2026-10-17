@@ -1,9 +1,9 @@
 use crate::{
+    Error, Session,
     error::Fallible,
     event,
     internal::dag::DepGraph,
-    package::{query, Package},
-    Error, Session,
+    package::{Package, query},
 };
 
 /// Resolve dependencies of the given packages.
