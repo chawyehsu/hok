@@ -35,19 +35,10 @@ jobs:
       - name: Clippy Check
         run: cargo clippy
 
-  # tests and build
-  ci_test_build:
-    name: Test Build
+  ci_test:
+    name: Run Tests
     needs: ci_style_check
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { target: i686-pc-windows-msvc, os: windows-latest }
-          - { target: x86_64-pc-windows-msvc, os: windows-latest }
-          - { target: aarch64-pc-windows-msvc, os: windows-11-arm }
-
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     env:
       SCCACHE_GHA_ENABLED: true
       RUSTC_WRAPPER: sccache
@@ -59,7 +50,11 @@ jobs:
         uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
 
       - name: Run Tests
-        run: cargo test
+        run: cargo test --locked
 
-      - name: Dev Build
-        run: cargo build --locked --target ${{ matrix.target }}
+  ci_nightly_build:
+    name: Build Nightly Artifacts
+    needs: ci_test
+    uses: ./.github/workflows/build.yml
+    with:
+      build_type: nightly
