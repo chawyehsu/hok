@@ -8,7 +8,7 @@ repository = "https://github.com/chawyehsu/hok"
 license = "Apache-2.0"
 
 [workspace]
-members = ["crates/libscoop", "crates/scoop_hash"]
+members = ["crates/libscoop"]
 
 [lib]
 path = "src/lib.rs"
@@ -27,7 +27,6 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 [dependencies.libscoop]
 path = "./crates/libscoop"
 version = "0.1.0-beta.7"
-features = ["rustcrypto-hash"]
 
 [profile.release]
 opt-level = 3

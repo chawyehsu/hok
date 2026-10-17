@@ -1,16 +1,16 @@
 use once_cell::unsync::OnceCell;
-use scoop_hash::ChecksumBuilder;
 use std::io::Read;
 use tracing::{debug, info};
 
 use crate::{
-    constant::REGEX_HASH, env, error::Fallible, internal, persist, psmodule, shim, shortcut, Error,
-    Event, QueryOption, Session,
+    Error, Event, QueryOption, Session, constant::REGEX_HASH, env, error::Fallible, internal,
+    internal::hash::ChecksumBuilder, persist, psmodule, shim, shortcut,
 };
 
 use super::{
+    Package,
     download::{self, DownloadSize},
-    query, resolve, Package,
+    query, resolve,
 };
 
 /// Options that may be used to tweak behavior of package sync operation.
@@ -504,7 +504,7 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
             for (idx, (filename, hash)) in files.into_iter().zip(hashes).enumerate() {
                 let path = cache_root.join(filename);
 
-                let mut hasher = ChecksumBuilder::new().algo(hash.algorithm())?.build();
+                let mut hasher = ChecksumBuilder::new().algo(hash.algorithm()).build();
 
                 if let Some(tx) = session.emitter() {
                     let progress = format!("{} ({}/{})", pkg.name(), idx + 1, files_cnt);
@@ -663,8 +663,14 @@ pub fn remove(session: &Session, queries: &[&str], options: &[SyncOption]) -> Fa
 
     // TODO: support removal of packages with PowerShell script
     if !packages_with_script.is_empty() {
-        let msg = format!("Found package(s) using PowerShell script:\n  {}\nRemoval of package with PowerShell script is not yet supported.",
-        packages_with_script.iter().map(|p| p.name()).collect::<Vec<_>>().join("  "));
+        let msg = format!(
+            "Found package(s) using PowerShell script:\n  {}\nRemoval of package with PowerShell script is not yet supported.",
+            packages_with_script
+                .iter()
+                .map(|p| p.name())
+                .collect::<Vec<_>>()
+                .join("  ")
+        );
         return Err(Error::Custom(msg));
     }
 

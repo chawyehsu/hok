@@ -11,7 +11,7 @@ use std::{
 use tracing::debug;
 
 use crate::constant::DEFAULT_USER_AGENT;
-use crate::{error::Fallible, internal, Event, Session};
+use crate::{Event, Session, error::Fallible, internal};
 
 use super::Package;
 

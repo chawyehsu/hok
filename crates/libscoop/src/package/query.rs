@@ -3,12 +3,12 @@ use regex::{Regex, RegexBuilder};
 use tracing::{debug, info};
 
 use crate::{
+    Session,
     bucket::Bucket,
     constant::ISOLATED_PACKAGE_BUCKET,
     error::Fallible,
     internal::compare_versions,
     package::manifest::{InstallInfo, Manifest},
-    Session,
 };
 
 use super::metadata::{resolve_install_json_path, resolve_manifest_json_path};

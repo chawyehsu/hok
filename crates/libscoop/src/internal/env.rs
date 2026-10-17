@@ -18,8 +18,8 @@ mod windows {
     use once_cell::sync::Lazy;
     use std::ffi::OsString;
     use std::path::Path;
-    use winreg::enums::HKEY_CURRENT_USER;
     use winreg::RegKey;
+    use winreg::enums::HKEY_CURRENT_USER;
 
     use crate::error::Fallible;
 

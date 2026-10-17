@@ -4,9 +4,9 @@ use std::fs::DirEntry;
 use std::path::{Path, PathBuf};
 use tracing::{debug, warn};
 
+use crate::Session;
 use crate::error::{Error, Fallible};
 use crate::internal;
-use crate::Session;
 
 /// Scoop bucket representation.
 ///
@@ -176,7 +176,10 @@ impl Bucket {
                 files.into_par_iter()
             } else {
                 dirs.into_par_iter()
-                    .filter_map(|de| par_read_dir(&de.path()).ok())
+                    .filter_map(|de| {
+                        let p = de.path();
+                        par_read_dir(&p).ok().map(|it| it.collect::<Vec<_>>())
+                    })
                     .flatten()
                     .collect::<Vec<_>>()
                     .into_par_iter()
