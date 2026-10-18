@@ -93,10 +93,10 @@ impl Hasher {
     #[inline]
     fn finalize(self) -> String {
         match self {
-            Hasher::Md5(h) => format!("{:x}", md5::Digest::finalize(h)),
-            Hasher::Sha1(h) => format!("{:x}", sha1::Digest::finalize(h)),
-            Hasher::Sha256(h) => format!("{:x}", sha2::Digest::finalize(h)),
-            Hasher::Sha512(h) => format!("{:x}", sha2::Digest::finalize(h)),
+            Hasher::Md5(h) => hex::encode(md5::Digest::finalize(h).as_slice()),
+            Hasher::Sha1(h) => hex::encode(sha1::Digest::finalize(h).as_slice()),
+            Hasher::Sha256(h) => hex::encode(sha2::Digest::finalize(h).as_slice()),
+            Hasher::Sha512(h) => hex::encode(sha2::Digest::finalize(h).as_slice()),
         }
     }
 }
