@@ -349,7 +349,7 @@ impl<'a> PackageSet<'a> {
                 easy.get(true)?;
                 easy.url(url)?;
                 easy.follow_location(true)?;
-                easy.nobody(true)?;
+                easy.write_function(|data| Ok(data.len()))?;
                 easy.useragent(user_agent)?;
                 if let Some(proxy) = proxy {
                     easy.proxy(proxy)?;
@@ -392,8 +392,8 @@ impl<'a> PackageSet<'a> {
                             if let Ok(code) = handle.response_code() {
                                 let mut content_length = 0u64;
                                 if code == 200 {
-                                    content_length =
-                                        handle.content_length_download().unwrap_or(0f64) as u64;
+                                    let raw = handle.content_length_download().unwrap_or(-1f64);
+                                    content_length = if raw < 0.0 { 0 } else { raw as u64 };
                                     info.remote_size = content_length;
                                     if content_length != info.local_size {
                                         total += content_length;
