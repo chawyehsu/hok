@@ -1,16 +1,18 @@
 use once_cell::unsync::OnceCell;
 use std::io::Read;
+use std::path::{Path, PathBuf};
 use tracing::{debug, info};
 
 use crate::{
     Error, Event, QueryOption, Session, constant::REGEX_HASH, env, error::Fallible, internal,
-    internal::hash::ChecksumBuilder, persist, psmodule, shim, shortcut,
+    internal::archive, internal::atomic, internal::hash::ChecksumBuilder, persist, psmodule, shim,
+    shortcut,
 };
 
 use super::{
     Package,
     download::{self, DownloadSize},
-    query, resolve,
+    metadata, query, resolve,
 };
 
 /// Options that may be used to tweak behavior of package sync operation.
@@ -541,39 +543,236 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
 
     let download_only = options.contains(&SyncOption::DownloadOnly);
     if !download_only {
-        // TODO: PowerShell hosting with execution context is not supported yet.
-        // Perhaps at present we could call Scoop to do the removal for packages
-        // using PS scripts...
-        let (_packages_with_script, _packages): (Vec<&Package>, Vec<&Package>) =
-            packages.iter().partition(|p| p.has_install_script());
+        let config = session.config();
+        let apps_dir = config.root_path().join("apps");
+        let cache_dir = config.cache_path().to_owned();
 
-        // TODO: commit transcation
-        // let config = session.config();
-        // let apps_dir = config.root_path().join("apps");
+        // The packages are already ordered dependency-first, so committing them
+        // one by one keeps every dependency installed before its dependent. A
+        // committed package is never rolled back when a later one fails.
+        let ignore_failure = options.contains(&SyncOption::IgnoreFailure);
 
-        // for &pkg in packages.iter() {
-        //     if let Some(tx) = session.emitter() {
-        //         let _ = tx.send(Event::PackageCommitStart(pkg.name().to_owned()));
-        //     }
+        for &pkg in packages.iter() {
+            if pkg.has_install_script() {
+                // PowerShell hosting with execution context is not supported
+                // yet, and installing such a package without running its hooks
+                // would produce a broken install. Fail loudly instead.
+                let msg = format!(
+                    "package '{}' uses PowerShell install scripts, which are not supported yet",
+                    pkg.name()
+                );
+                tracing::warn!("{}", msg);
+                return Err(Error::Custom(msg));
+            }
 
-        //     let working_dir = apps_dir.join(pkg.name()).join(pkg.version());
-        //     internal::fs::ensure_dir(&working_dir)?;
-
-        //     let files = pkg.download_filenames();
-
-        //     for filename in files.iter() {
-        //         let src = config.cache_path().join(filename);
-        //         let dst = working_dir.join(filename);
-
-        //         // replace existing file
-        //         let _ = std::fs::remove_file(&dst);
-        //         std::fs::copy(src, dst)?;
-
-        //     }
-        // }
+            match commit_package(session, &apps_dir, &cache_dir, pkg) {
+                Ok(()) => {}
+                Err(err) if ignore_failure => {
+                    tracing::warn!("failed to commit package '{}' (err: {})", pkg.name(), err);
+                }
+                Err(err) => return Err(err),
+            }
+        }
     }
 
     Ok(())
+}
+
+/// Assemble a package version in a staging directory and commit it.
+///
+/// The staging directory receives every non-archive download verbatim, the
+/// extracted contents of every archive, and the Scoop metadata files. Only a
+/// fully assembled staging directory is swapped into the live version path.
+fn commit_package(
+    session: &Session,
+    apps_dir: &Path,
+    cache_dir: &Path,
+    pkg: &Package,
+) -> Fallible<()> {
+    if let Some(tx) = session.emitter() {
+        let _ = tx.send(Event::PackageCommitStart(pkg.name().to_owned()));
+    }
+
+    atomic::sweep(apps_dir, pkg.name());
+    let staging = atomic::staging_dir(apps_dir, pkg.name(), pkg.version())?;
+    let dest = staging.path();
+
+    let urls = pkg.download_urls();
+    let filenames = pkg.download_filenames();
+    let extract_dirs = pkg.manifest().extract_dir().unwrap_or_default();
+    let extract_tos = pkg.manifest().extract_to().unwrap_or_default();
+
+    // `extracted` counts only downloads that are actually extracted, which is
+    // what indexes the `extract_dir`/`extract_to` arrays (Scoop semantics).
+    let mut extracted = 0usize;
+
+    for (url, filename) in urls.iter().zip(filenames.iter()) {
+        let src = cache_dir.join(filename);
+        let leaf = url_leaf(url);
+
+        if !path_exists(&src) {
+            return Err(Error::Custom(format!(
+                "downloaded file for '{}' is missing from the cache: {}",
+                pkg.name(),
+                src.display()
+            )));
+        }
+
+        if !archive::is_archive_name(&leaf) && archive::probe(&src).is_err() {
+            // Neither named as an archive nor archive-looking: copy verbatim.
+            // The file keeps its URL leaf name, not the hashed cache name.
+            let dst = unique_dest(dest, &leaf);
+            std::fs::copy(&src, &dst)?;
+            continue;
+        }
+
+        let label = leaf.clone();
+        let extract_dir = extract_dirs.get(extracted).copied();
+        let extract_to = extract_tos.get(extracted).copied();
+        extracted += 1;
+
+        if let Some(tx) = session.emitter() {
+            let _ = tx.send(Event::PackageExtractingStart(
+                crate::event::PackageExtractContext::new(pkg.name(), &label),
+            ));
+        }
+
+        let observer = EventObserver::new(session.emitter());
+        let options = crate::event::extract_options(&observer, extract_dir, extract_to);
+        let report = archive::extract(&src, dest, &options)?;
+
+        for warning in report.warnings.iter() {
+            tracing::warn!(
+                "warning while extracting '{}' for '{}': {}",
+                label,
+                pkg.name(),
+                warning
+            );
+        }
+
+        if let Some(tx) = session.emitter() {
+            let _ = tx.send(Event::PackageExtractingDone {
+                package: pkg.name().to_owned(),
+                archive: label,
+                format: format!("{:?}", report.probe.detected).to_lowercase(),
+                entries: report.entries,
+                bytes: report.bytes,
+                extractor: report.extractor.to_owned(),
+                warnings: report.warnings,
+            });
+        }
+    }
+
+    // Copy the manifest and write the install info into the staging directory.
+    std::fs::copy(pkg.manifest().path(), dest.join(metadata::MANIFEST))?;
+    let mut install = serde_json::json!({ "architecture": architecture() });
+    if let Some(object) = install.as_object_mut() {
+        object.insert(
+            "bucket".to_owned(),
+            serde_json::Value::String(pkg.bucket().to_owned()),
+        );
+        if let Some(url) = urls.first() {
+            object.insert(
+                "url".to_owned(),
+                serde_json::Value::String((*url).to_owned()),
+            );
+        }
+    }
+    internal::fs::write_json(dest.join(metadata::INSTALL), install)?;
+
+    staging.complete()?;
+
+    let live = apps_dir.join(pkg.name()).join(pkg.version());
+    atomic::commit_swap(&live, &staging)?;
+    internal::fs::symlink_dir(&live, apps_dir.join(pkg.name()).join("current"))?;
+
+    if let Some(tx) = session.emitter() {
+        let _ = tx.send(Event::PackageCommitDone(pkg.name().to_owned()));
+    }
+
+    Ok(())
+}
+
+/// The architecture label written into the install info file.
+fn architecture() -> &'static str {
+    if cfg!(target_arch = "x86_64") {
+        "64bit"
+    } else if cfg!(target_arch = "aarch64") {
+        "arm64"
+    } else {
+        "32bit"
+    }
+}
+
+/// The last path segment of a URL, used as the on-disk name of a download.
+fn url_leaf(url: &str) -> String {
+    let trimmed = url
+        .split_once('#')
+        .map(|(head, _)| head)
+        .unwrap_or(url)
+        .trim_end_matches('/');
+    trimmed
+        .rsplit(['/', '\\'])
+        .next()
+        .filter(|segment| !segment.is_empty())
+        .unwrap_or("download")
+        .to_owned()
+}
+
+/// Whether `path` exists, treating a permissions error as "exists".
+fn path_exists(path: &Path) -> bool {
+    !matches!(path.try_exists(), Ok(false))
+}
+
+/// Join `name` onto `dir`, keeping an existing file untouched by suffixing it.
+fn unique_dest(dir: &Path, name: &str) -> PathBuf {
+    let candidate = dir.join(name);
+    if !path_exists(&candidate) {
+        return candidate;
+    }
+
+    let stem = Path::new(name)
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| name.to_owned());
+    let ext = Path::new(name)
+        .extension()
+        .map(|e| e.to_string_lossy().into_owned());
+
+    for n in 1..=u32::MAX {
+        let unique = match &ext {
+            Some(ext) => format!("{stem}.{n}.{ext}"),
+            None => format!("{stem}.{n}"),
+        };
+        let candidate = dir.join(unique);
+        if !path_exists(&candidate) {
+            return candidate;
+        }
+    }
+
+    dir.join(name)
+}
+
+/// An [`ExtractObserver`] that forwards written entries to the event bus.
+///
+/// Entries are dropped rather than blocking when the event bus is full or has
+/// no receiver, so extraction never stalls on progress reporting.
+struct EventObserver {
+    tx: Option<flume::Sender<Event>>,
+}
+
+impl EventObserver {
+    fn new(tx: Option<flume::Sender<Event>>) -> EventObserver {
+        EventObserver { tx }
+    }
+}
+
+impl archive::ExtractObserver for EventObserver {
+    fn entry_written(&self, entry: &str) {
+        if let Some(tx) = &self.tx {
+            let _ = tx.try_send(Event::PackageExtractingEntry(entry.to_owned()));
+        }
+    }
 }
 
 /// Sync operation: remove packages.

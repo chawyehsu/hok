@@ -99,6 +99,7 @@ pub fn execute(args: Args, session: &Session) -> Result<()> {
     let _ = stdout.execute(cursor::Hide);
 
     let mut dlprogress = cui::MultiProgressUI::new();
+    let mut extract = cui::ExtractUI::new();
 
     let handle = std::thread::spawn(move || {
         while let Ok(event) = rx.recv() {
@@ -134,6 +135,22 @@ pub fn execute(args: Args, session: &Session) -> Result<()> {
                         .execute(Clear(ClearType::CurrentLine))
                         .unwrap();
                     println!("Checking package integrity...{}", "Ok".green());
+                }
+                Event::PackageExtractingStart(_ctx) => {
+                    extract.start();
+                }
+                Event::PackageExtractingEntry(entry) => {
+                    extract.entry(&entry);
+                }
+                Event::PackageExtractingDone {
+                    package,
+                    archive,
+                    format,
+                    entries,
+                    extractor,
+                    ..
+                } => {
+                    extract.done(&package, &archive, &format, &extractor, entries);
                 }
                 Event::PromptPackageCandidate(pkgs) => {
                     let name = pkgs[0].split_once('/').unwrap().1;
@@ -260,6 +277,5 @@ pub fn execute(args: Args, session: &Session) -> Result<()> {
     let mut stdout = std::io::stdout();
     let _ = stdout.execute(cursor::Show);
 
-    eprintln!("Not implemented yet.");
     Ok(())
 }
