@@ -90,7 +90,15 @@ where
 #[cfg(windows)]
 pub fn remove_symlink<P: AsRef<Path>>(lnk: P) -> io::Result<()> {
     let lnk = lnk.as_ref();
-    let metadata = lnk.symlink_metadata()?;
+    let metadata = match lnk.symlink_metadata() {
+        Ok(metadata) => metadata,
+        Err(err) => {
+            if err.kind() == io::ErrorKind::NotFound {
+                return Ok(());
+            }
+            return Err(err);
+        }
+    };
     let mut permissions = metadata.permissions();
 
     // Remove possible readonly flag on the symlink added by `attrib +R` command
