@@ -117,12 +117,19 @@ not a TTY only per-archive completion lines are printed.
 | rar | `rars` | `7z.exe` |
 | msi | `msi` + `cab` tables | `msiexec /a`, then `7z.exe` |
 | inno | `innospect` (Windows) | `innounp.exe` |
-| nsis | `nsis` (Windows) | `7z.exe` |
+| nsis | `nsis` (Windows) | `7z.exe` (drops `$PLUGINSDIR` and `Uninstall.exe`) |
 | iso / img | `iso9660` | `7z.exe` |
 | cab, lzh | — | `7z.exe` |
 
 Declared but unsupported: header-encrypted 7z, base64-wrapped 7z. Both fail with
 an explicit error instead of being skipped.
+
+NSIS has no header of its own at the start of the file; its signature is the
+28-byte FirstHeader in the PE overlay. The prober reads `section_end` and one
+512-byte step past it, validates `0xDEADBEEF` + `NullsoftInst` at offset 4 with
+plausible length fields, and reports `Format::Nsis` at `offset: 0` with
+`ProbeKind::StubHeader`. A 7z payload found before that header still wins, and
+an installer whose header is missed falls back to the declared name.
 
 ## Tests
 

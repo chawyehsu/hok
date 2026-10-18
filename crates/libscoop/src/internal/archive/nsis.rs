@@ -17,6 +17,14 @@ use crate::error::Fallible;
 /// The `$INSTDIR` prefix NSIS uses for files that land in the install root.
 const INSTDIR: &str = "$INSTDIR";
 
+/// Name of the helper extractor, as reported in an extraction summary.
+const HELPER_EXTRACTOR: &str = "nsis (helper: 7z.exe)";
+
+/// Entries a 7z extraction of an NSIS installer produces that are not part of
+/// the installed package: the installer's own temporary directory and its
+/// uninstaller.
+const INSTALLER_ARTIFACTS: &[&str] = &["$PLUGINSDIR", "Uninstall.exe"];
+
 /// Extract an NSIS installer into `dest`.
 pub fn extract(
     src: &Path,
@@ -32,7 +40,41 @@ pub fn extract(
                 err
             );
             let _ = probe;
-            helper::extract_archive(helper::SEVEN_ZIP, SEVEN_ZIP_ARGS, src, dest, observer)
+            extract_helper(src, dest, observer)
+        }
+    }
+}
+
+/// Extract through `7z.exe`, then drop the entries the installer would have
+/// created only at install time.
+fn extract_helper(
+    src: &Path,
+    dest: &Path,
+    observer: &dyn ExtractObserver,
+) -> Fallible<ExtractSummary> {
+    helper::require(helper::SEVEN_ZIP)?;
+    let mut args = SEVEN_ZIP_ARGS
+        .iter()
+        .map(|flag| (*flag).to_owned())
+        .collect::<Vec<_>>();
+    args.push(format!("-o{}", dest.display()));
+    args.push(src.display().to_string());
+    helper::run(helper::SEVEN_ZIP, args, None)?;
+    remove_installer_artifacts(dest);
+    helper::report_tree(src, dest, observer, Vec::new(), HELPER_EXTRACTOR)
+}
+
+/// Remove the installer artifacts from an extracted tree.
+///
+/// Failures are ignored: the entries are not part of the package, so a tree
+/// that keeps them is still usable.
+fn remove_installer_artifacts(dest: &Path) {
+    for name in INSTALLER_ARTIFACTS {
+        let path = dest.join(name);
+        if path.is_dir() {
+            let _ = std::fs::remove_dir_all(&path);
+        } else {
+            let _ = std::fs::remove_file(&path);
         }
     }
 }
@@ -146,6 +188,28 @@ mod tests {
         );
         assert_eq!(instdir_relative("$PLUGINSDIR/x.dll"), None);
         assert_eq!(instdir_relative("$INSTDIR"), None);
+    }
+
+    #[test]
+    fn installer_artifacts_are_removed() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path();
+        std::fs::create_dir_all(dest.join("$PLUGINSDIR")).unwrap();
+        std::fs::write(dest.join("$PLUGINSDIR/Plugin.dll"), b"p").unwrap();
+        std::fs::write(dest.join("Uninstall.exe"), b"u").unwrap();
+        std::fs::write(dest.join("app.exe"), b"a").unwrap();
+        remove_installer_artifacts(dest);
+        assert!(!dest.join("$PLUGINSDIR").exists());
+        assert!(!dest.join("Uninstall.exe").exists());
+        assert!(dest.join("app.exe").is_file());
+    }
+
+    #[test]
+    fn missing_artifacts_are_ignored() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("app.exe"), b"a").unwrap();
+        remove_installer_artifacts(dir.path());
+        assert!(dir.path().join("app.exe").is_file());
     }
 
     #[test]

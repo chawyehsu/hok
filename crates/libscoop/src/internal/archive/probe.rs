@@ -19,6 +19,21 @@ use super::{FORMATS, Format, ISO_PVD_OFFSET, Probe, ProbeKind, lookup_name};
 /// Number of bytes read from the front of the file.
 const PREFIX_LEN: usize = 1024;
 
+/// Bytes read past the last PE section when looking for an NSIS first header.
+///
+/// The header is 28 bytes and normally starts at the first overlay byte, but a
+/// packed stub can place up to 512 bytes of padding in front of it, so the
+/// window covers that one step plus the header itself.
+const NSIS_STUB_WINDOW: usize = 512 + 28;
+
+/// Distance between the overlay-relative positions an NSIS first header is
+/// found at.
+const NSIS_STUB_STEP: u64 = 512;
+
+/// The NSIS stub-header signature, matched at the first header's `siginfo`
+/// field so a hit is the start of a header the detector can validate.
+const NSIS_PAYLOAD: &[u8] = b"\xEF\xBE\xAD\xDE\0\0\0\0NullsoftInst";
+
 /// Magic bytes that announce an archive payload inside a self-extracting stub.
 const PAYLOAD_MAGICS: &[&[u8]] = &[
     b"PK\x03\x04",
@@ -30,6 +45,7 @@ const PAYLOAD_MAGICS: &[&[u8]] = &[
     b"BZh",
     b"\xFD7zXZ\x00",
     b"\x28\xB5\x2F\xFD",
+    NSIS_PAYLOAD,
 ];
 
 /// A bounded window read from a file.
@@ -205,6 +221,11 @@ fn detect_pe(
         if let Some(detected) = probe_payload_window(&tail.bytes, suffix_start, declared) {
             return Ok(Some(detected));
         }
+        // A stub header is only evidence of the format, so it is checked after
+        // the payload: a real 7z payload is extracted at its own offset.
+        if let Some(detected) = probe_nsis_stub(file, suffix_start, suffix_end)? {
+            return Ok(Some(detected));
+        }
     }
 
     if let Some(declared) = declared
@@ -220,6 +241,35 @@ fn detect_pe(
         }));
     }
 
+    Ok(None)
+}
+
+/// Locate an NSIS first header in the overlay that starts at `overlay`.
+///
+/// The header is normally the first overlay byte, but a packed stub can pad up
+/// to 512 bytes in front of it, so both of those positions are tried. The
+/// result reports offset 0: the header says what the file is, not where
+/// extraction starts.
+fn probe_nsis_stub(file: &mut File, overlay: u64, file_len: u64) -> Fallible<Option<Detected>> {
+    let window = read_window_len_at(file, overlay, NSIS_STUB_WINDOW)?;
+    for step in [0, NSIS_STUB_STEP] {
+        if overlay.saturating_add(step) >= file_len {
+            break;
+        }
+        let Some(at) = usize::try_from(step).ok() else {
+            continue;
+        };
+        let Some(candidate) = window.bytes.get(at..) else {
+            continue;
+        };
+        if super::detect_nsis(candidate, overlay + step).is_some() {
+            return Ok(Some(Detected {
+                format: Format::Nsis,
+                offset: 0,
+                kind: ProbeKind::StubHeader,
+            }));
+        }
+    }
     Ok(None)
 }
 
@@ -286,11 +336,14 @@ fn pe_section_end(prefix: &[u8], lfanew: u64) -> Option<u64> {
 
 /// Read up to [`PREFIX_LEN`] bytes starting at `start`.
 pub(crate) fn read_window_at(file: &mut File, start: u64) -> Fallible<Prefix> {
+    read_window_len_at(file, start, PREFIX_LEN)
+}
+
+/// Read up to `len` bytes starting at `start`.
+fn read_window_len_at(file: &mut File, start: u64, len: usize) -> Fallible<Prefix> {
     file.seek(SeekFrom::Start(start))?;
-    let mut bytes = Vec::with_capacity(PREFIX_LEN);
-    file.by_ref()
-        .take(PREFIX_LEN as u64)
-        .read_to_end(&mut bytes)?;
+    let mut bytes = Vec::with_capacity(len);
+    file.by_ref().take(len as u64).read_to_end(&mut bytes)?;
     Ok(Prefix { bytes, start })
 }
 
@@ -434,6 +487,108 @@ mod tests {
         let probe = detect_bytes("a.unknown", &bytes).unwrap();
         assert_eq!(probe.detected, Format::SevenZip);
         assert_eq!(probe.offset, lfanew as u64 + 24);
+        assert_eq!(probe.kind, ProbeKind::PeStub);
+    }
+
+    /// Build a PE image whose single section ends at `section_end`.
+    fn pe_image(section_end: usize) -> Vec<u8> {
+        let lfanew = 0x80usize;
+        let raw_offset = 0x100usize;
+        let mut bytes = vec![0u8; section_end];
+        bytes[0..2].copy_from_slice(b"MZ");
+        bytes[0x3C..0x40].copy_from_slice(&(lfanew as u32).to_le_bytes());
+        bytes[lfanew..lfanew + 4].copy_from_slice(b"PE\0\0");
+        bytes[lfanew + 4..lfanew + 6].copy_from_slice(&0x14Cu16.to_le_bytes());
+        bytes[lfanew + 6..lfanew + 8].copy_from_slice(&1u16.to_le_bytes());
+        bytes[lfanew + 20..lfanew + 22].copy_from_slice(&0u16.to_le_bytes());
+        let section = lfanew + 24;
+        bytes[section + 8..section + 12].copy_from_slice(&0u32.to_le_bytes());
+        let raw_size = (section_end - raw_offset) as u32;
+        bytes[section + 16..section + 20].copy_from_slice(&raw_size.to_le_bytes());
+        bytes[section + 20..section + 24].copy_from_slice(&(raw_offset as u32).to_le_bytes());
+        bytes
+    }
+
+    /// Write an NSIS first header at `at`.
+    fn nsis_header_at(bytes: &mut [u8], at: usize) {
+        bytes[at..at + 4].copy_from_slice(&0u32.to_le_bytes());
+        bytes[at + 4..at + 8].copy_from_slice(b"\xEF\xBE\xAD\xDE");
+        bytes[at + 8..at + 20].copy_from_slice(b"NullsoftInst");
+        bytes[at + 20..at + 24].copy_from_slice(&1024i32.to_le_bytes());
+        bytes[at + 24..at + 28].copy_from_slice(&2048i32.to_le_bytes());
+    }
+
+    #[test]
+    fn nsis_detector_accepts_first_header() {
+        let mut bytes = vec![0u8; 64];
+        nsis_header_at(&mut bytes, 0);
+        let probe = detect_bytes("a.bin", &bytes).unwrap();
+        assert_eq!(probe.detected, Format::Nsis);
+        assert_eq!(probe.declared, None);
+        assert_eq!(probe.kind, ProbeKind::Prefix);
+    }
+
+    #[test]
+    fn nsis_detector_rejects_unusable_lengths() {
+        let mut bytes = vec![0u8; 64];
+        nsis_header_at(&mut bytes, 0);
+        bytes[0..4].copy_from_slice(&0u32.to_le_bytes());
+        bytes[20..24].copy_from_slice(&0i32.to_le_bytes());
+        assert_eq!(super::super::detect_nsis(&bytes, 0), None);
+        bytes[24..28].copy_from_slice(&8i32.to_le_bytes());
+        assert_eq!(super::super::detect_nsis(&bytes, 0), None);
+    }
+
+    #[test]
+    fn nsis_detector_rejects_foreign_vendor() {
+        let mut bytes = vec![0u8; 64];
+        nsis_header_at(&mut bytes, 0);
+        bytes[8..20].copy_from_slice(b"NullsoftInxx");
+        assert_eq!(super::super::detect_nsis(&bytes, 0), None);
+    }
+
+    /// Wrap `payload` after a PE image ending at `0x300`.
+    fn pe_with(payload: &[u8]) -> Vec<u8> {
+        let mut bytes = pe_image(0x300);
+        bytes.extend_from_slice(payload);
+        bytes
+    }
+
+    #[test]
+    fn nsis_stub_header_is_detected() {
+        let mut payload = vec![0u8; 512];
+        nsis_header_at(&mut payload, 0);
+        let probe = detect_bytes("a.unknown", &pe_with(&payload)).unwrap();
+        assert_eq!(probe.detected, Format::Nsis);
+        assert_eq!(probe.offset, 0);
+        assert_eq!(probe.kind, ProbeKind::StubHeader);
+    }
+
+    #[test]
+    fn nsis_stub_header_past_one_step_is_detected() {
+        let mut payload = vec![0u8; 1024];
+        nsis_header_at(&mut payload, 512);
+        let probe = detect_bytes("a.unknown", &pe_with(&payload)).unwrap();
+        assert_eq!(probe.detected, Format::Nsis);
+        assert_eq!(probe.kind, ProbeKind::StubHeader);
+    }
+
+    #[test]
+    fn nsis_stub_header_beyond_the_window_is_not_detected() {
+        let mut payload = vec![0u8; 1536];
+        nsis_header_at(&mut payload, 1024);
+        let probe = detect_bytes("a.unknown", &pe_with(&payload)).unwrap();
+        assert_eq!(probe.detected, Format::Exe);
+    }
+
+    #[test]
+    fn payload_before_stub_header_wins() {
+        let mut payload = vec![0u8; 512];
+        payload[..6].copy_from_slice(b"7z\xBC\xAF\x27\x1C");
+        nsis_header_at(&mut payload, 256);
+        let probe = detect_bytes("a.unknown", &pe_with(&payload)).unwrap();
+        assert_eq!(probe.detected, Format::SevenZip);
+        assert_eq!(probe.offset, 0x300);
         assert_eq!(probe.kind, ProbeKind::PeStub);
     }
 

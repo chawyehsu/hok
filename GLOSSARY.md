@@ -31,6 +31,13 @@ The component that decides an archive's format from its name and a bounded
 prefix of its bytes, without extracting it.
 _Avoid_: Detector, sniffer, classifier
 
+**Stub header**:
+A format-specific signature appended after an executable stub, whose presence
+identifies a format that has no header of its own at the start of the file. Its
+position is evidence of the format, not a start offset: a stub-header format
+probes as the whole file.
+_Avoid_: Magic number, payload header, overlay signature
+
 **Extractor**:
 The component that writes one archive's entries into a destination directory.
 An extractor is selected by the registry for a format, and may be a pure Rust

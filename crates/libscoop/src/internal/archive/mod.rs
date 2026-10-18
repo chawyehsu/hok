@@ -60,8 +60,13 @@ pub struct Probe {
 pub enum ProbeKind {
     /// Detected from the bounded prefix at offset 0.
     Prefix,
-    /// Detected from the payload appended to a PE image.
+    /// Declared by the name and confirmed to sit behind a PE image. The format
+    /// has no signature at the start of the file and `offset` is not
+    /// meaningful; the extractor reads the whole file.
     PeStub,
+    /// Confirmed from a stub header appended after a PE image. The stub header
+    /// is evidence of the format, not where it begins, so `offset` stays 0.
+    StubHeader,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -284,7 +289,7 @@ static FORMATS: &[FormatSpec] = &[
     FormatSpec {
         format: Format::Nsis,
         matches_name: matches_nsis_name,
-        detect: Some(no_detector),
+        detect: Some(detect_nsis),
         extractors: &[Ops {
             name: "nsis",
             extract: nsis::extract,
@@ -473,6 +478,40 @@ fn detect_cab(prefix: &[u8], _offset: u64) -> Option<Format> {
 
 fn detect_lzh(prefix: &[u8], _offset: u64) -> Option<Format> {
     (prefix.len() >= 5 && &prefix[2..5] == b"-lh").then_some(Format::Lzh)
+}
+
+/// Size of the NSIS first header.
+const NSIS_FIRST_HEADER_LEN: usize = 28;
+
+/// Byte offset of the first header's signature field.
+const NSIS_SIGNATURE_OFFSET: usize = 4;
+
+/// The `siginfo` signature of an NSIS first header, little-endian `0xDEADBEEF`.
+const NSIS_SIGNATURE: &[u8] = b"\xEF\xBE\xAD\xDE";
+
+/// The vendor identifier that follows `siginfo` in an NSIS first header.
+const NSIS_VENDOR: &[u8] = b"NullsoftInst";
+
+/// Detect an NSIS first header at the start of a bounded window.
+///
+/// The layout is `flags`, `siginfo`, `NullsoftInst`, then the header lengths.
+/// Both are compared as bytes so the result does not depend on the host. The
+/// length fields must look usable, so a stray signature is not mistaken for an
+/// installer.
+pub(crate) fn detect_nsis(prefix: &[u8], _offset: u64) -> Option<Format> {
+    if prefix.len() < NSIS_FIRST_HEADER_LEN {
+        return None;
+    }
+    let header = &prefix[..NSIS_FIRST_HEADER_LEN];
+    if &header[NSIS_SIGNATURE_OFFSET..NSIS_SIGNATURE_OFFSET + 4] != NSIS_SIGNATURE {
+        return None;
+    }
+    if &header[NSIS_SIGNATURE_OFFSET + 4..NSIS_SIGNATURE_OFFSET + 16] != NSIS_VENDOR {
+        return None;
+    }
+    let length_of_header = i32::from_le_bytes(header[20..24].try_into().ok()?);
+    let length_of_all = i32::from_le_bytes(header[24..28].try_into().ok()?);
+    (length_of_header > 0 && length_of_all >= NSIS_FIRST_HEADER_LEN as i32).then_some(Format::Nsis)
 }
 
 fn detect_iso(prefix: &[u8], offset: u64) -> Option<Format> {
