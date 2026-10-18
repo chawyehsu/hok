@@ -445,26 +445,24 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
         transaction.set_download_size(download_size);
     }
 
-    if !assume_yes {
-        if let Some(tx) = session.emitter() {
-            if tx
-                .send(Event::PromptTransactionNeedConfirm(transaction.clone()))
-                .is_ok()
-            {
-                let rx = session.receiver().unwrap();
-                let mut confirmed = false;
+    if !assume_yes
+        && let Some(tx) = session.emitter()
+        && tx
+            .send(Event::PromptTransactionNeedConfirm(transaction.clone()))
+            .is_ok()
+    {
+        let rx = session.receiver().unwrap();
+        let mut confirmed = false;
 
-                while let Ok(event) = rx.recv() {
-                    if let Event::PromptTransactionNeedConfirmResult(ret) = event {
-                        confirmed = ret;
-                        break;
-                    }
-                }
-
-                if !confirmed {
-                    return Ok(());
-                }
+        while let Ok(event) = rx.recv() {
+            if let Event::PromptTransactionNeedConfirmResult(ret) = event {
+                confirmed = ret;
+                break;
             }
+        }
+
+        if !confirmed {
+            return Ok(());
         }
     }
 
@@ -677,26 +675,24 @@ pub fn remove(session: &Session, queries: &[&str], options: &[SyncOption]) -> Fa
     transaction.set_remove(packages);
 
     let assume_yes = options.contains(&SyncOption::AssumeYes);
-    if !assume_yes {
-        if let Some(tx) = session.emitter() {
-            if tx
-                .send(Event::PromptTransactionNeedConfirm(transaction.clone()))
-                .is_ok()
-            {
-                let rx = session.receiver().unwrap();
-                let mut confirmed = false;
+    if !assume_yes
+        && let Some(tx) = session.emitter()
+        && tx
+            .send(Event::PromptTransactionNeedConfirm(transaction.clone()))
+            .is_ok()
+    {
+        let rx = session.receiver().unwrap();
+        let mut confirmed = false;
 
-                while let Ok(event) = rx.recv() {
-                    if let Event::PromptTransactionNeedConfirmResult(ret) = event {
-                        confirmed = ret;
-                        break;
-                    }
-                }
-
-                if !confirmed {
-                    return Ok(());
-                }
+        while let Ok(event) = rx.recv() {
+            if let Event::PromptTransactionNeedConfirmResult(ret) = event {
+                confirmed = ret;
+                break;
             }
+        }
+
+        if !confirmed {
+            return Ok(());
         }
     }
 

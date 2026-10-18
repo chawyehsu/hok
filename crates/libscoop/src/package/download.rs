@@ -154,13 +154,12 @@ impl<'a> PackageSet<'a> {
                 let remote_size = 0u64;
                 let mut local_size = 0u64;
 
-                if self.reuse_cache {
-                    if let Ok(file) = File::open(cache_root.join(filename)) {
-                        if let Ok(metadata) = file.metadata() {
-                            local_size = metadata.len();
-                            file_cached_count += 1;
-                        }
-                    }
+                if self.reuse_cache
+                    && let Ok(file) = File::open(cache_root.join(filename))
+                    && let Ok(metadata) = file.metadata()
+                {
+                    local_size = metadata.len();
+                    file_cached_count += 1;
                 }
 
                 let dlinfo = FileDownloadInfo {

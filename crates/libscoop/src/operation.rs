@@ -223,22 +223,20 @@ pub fn cache_list(session: &Session, query: &str) -> Fallible<Vec<CacheFile>> {
                 .filter_map(|de| {
                     if let Ok(entry) = de {
                         let is_file = entry.file_type().unwrap().is_file();
-                        if is_file {
-                            if let Ok(item) = CacheFile::from(entry.path()) {
-                                if !is_wildcard_query {
-                                    let matched = item
-                                        .package_name()
-                                        .to_lowercase()
-                                        .contains(&query.to_lowercase());
-                                    if matched {
-                                        return Some(item);
-                                    } else {
-                                        return None;
-                                    }
+                        if is_file && let Ok(item) = CacheFile::from(entry.path()) {
+                            if !is_wildcard_query {
+                                let matched = item
+                                    .package_name()
+                                    .to_lowercase()
+                                    .contains(&query.to_lowercase());
+                                if matched {
+                                    return Some(item);
+                                } else {
+                                    return None;
                                 }
-
-                                return Some(item);
                             }
+
+                            return Some(item);
                         }
                     }
                     None

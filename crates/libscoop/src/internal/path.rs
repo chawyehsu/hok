@@ -31,10 +31,10 @@ pub fn extract_name_and_bucket(path: &Path) -> Fallible<(String, String)> {
         Some(caps) => {
             let name = caps.name("name").map(|m| m.as_str().to_string());
             let bucket = caps.name("bucket").map(|m| m.as_str().to_string());
-            if let Some(name) = name {
-                if let Some(bucket) = bucket {
-                    return Ok((name, bucket));
-                }
+            if let Some(name) = name
+                && let Some(bucket) = bucket
+            {
+                return Ok((name, bucket));
             }
         }
     }

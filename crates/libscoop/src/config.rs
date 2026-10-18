@@ -428,47 +428,47 @@ impl Deref for Config {
 pub(crate) fn possible_config_paths() -> Vec<PathBuf> {
     let mut ret = vec![];
 
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Ok(metadata) = std::fs::symlink_metadata(&exe_path) {
-            let is_symlink = metadata.is_symlink();
-            let mut path = exe_path.clone();
+    if let Ok(exe_path) = std::env::current_exe()
+        && let Ok(metadata) = std::fs::symlink_metadata(&exe_path)
+    {
+        let is_symlink = metadata.is_symlink();
+        let mut path = exe_path.clone();
 
-            if is_symlink {
-                // since the executable is a symlink, we can use `read_link`
-                // to get the real path of the executable
-                if let Ok(real_path) = std::fs::read_link(&exe_path) {
-                    path = real_path;
-                }
+        if is_symlink {
+            // since the executable is a symlink, we can use `read_link`
+            // to get the real path of the executable
+            if let Ok(real_path) = std::fs::read_link(&exe_path) {
+                path = real_path;
             }
+        }
 
-            path.pop();
-            path.push("config.json");
+        path.pop();
+        path.push("config.json");
 
-            // 1) config.json side-by-side with the real executable
-            ret.push(path.clone());
+        // 1) config.json side-by-side with the real executable
+        ret.push(path.clone());
 
-            // this pop is ok, it removes `config.json` we just pushed
+        // this pop is ok, it removes `config.json` we just pushed
+        // <app>\<current>\<app_name>\apps\<root> (in theory)
+        //       ^^^^^^^^^
+        path.pop();
+        // <app>\<current>\<app_name>\apps\<root> (in theory)
+        //                 ^^^^^^^^^^
+        if path.pop() {
             // <app>\<current>\<app_name>\apps\<root> (in theory)
-            //       ^^^^^^^^^
-            path.pop();
-            // <app>\<current>\<app_name>\apps\<root> (in theory)
-            //                 ^^^^^^^^^^
+            //                            ^^^^
             if path.pop() {
+                let check = internal::path::leaf(&path)
+                    .map(|n| n == "apps")
+                    .unwrap_or_default();
                 // <app>\<current>\<app_name>\apps\<root> (in theory)
-                //                            ^^^^
-                if path.pop() {
-                    let check = internal::path::leaf(&path)
-                        .map(|n| n == "apps")
-                        .unwrap_or_default();
-                    // <app>\<current>\<app_name>\apps\<root> (in theory)
-                    //                                 ^^^^^
-                    if check && path.pop() {
-                        path.push("config.json");
+                //                                 ^^^^^
+                if check && path.pop() {
+                    path.push("config.json");
 
-                        // 2) config.json located in the `root` directory of
-                        // Scoop, i.e., the portable config.json
-                        ret.push(path);
-                    }
+                    // 2) config.json located in the `root` directory of
+                    // Scoop, i.e., the portable config.json
+                    ret.push(path);
                 }
             }
         }
