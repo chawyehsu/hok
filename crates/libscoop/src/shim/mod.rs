@@ -201,6 +201,10 @@ fn install(
     )
     .map_err(crate::Error::Custom)?;
 
+    // A shim should look like the program it launches. A target that carries
+    // no icon leaves the template's icon in place.
+    resource::copy_icon(&exe_path, target).map_err(crate::Error::Custom)?;
+
     internal::fs::write_atomic(&sidecar_path, to_text(config).as_bytes())?;
 
     Ok(())

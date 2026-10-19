@@ -47,7 +47,7 @@ fn config_round_trips_through_the_embedded_resource() {
     let payload = encode(&config).unwrap();
     resource::write(&path, &wides(CONFIG_RESOURCE_NAME), &payload, Some(0x0409)).unwrap();
 
-    let read = resource::read(&path, &wides(CONFIG_RESOURCE_NAME)).unwrap();
+    let read = resource::read(&path, &wides(CONFIG_RESOURCE_NAME), resource::RT_RCDATA).unwrap();
     assert_eq!(decode(&read).unwrap(), config);
 }
 
@@ -77,7 +77,7 @@ fn resource_replacement_round_trips_the_latest_value() {
     )
     .unwrap();
 
-    let read = resource::read(&path, &wides(CONFIG_RESOURCE_NAME)).unwrap();
+    let read = resource::read(&path, &wides(CONFIG_RESOURCE_NAME), resource::RT_RCDATA).unwrap();
     assert_eq!(decode(&read).unwrap(), second);
 }
 
@@ -138,7 +138,7 @@ fn gui_target_patches_the_subsystem_field() {
         Some(0x0409),
     )
     .unwrap();
-    let read = resource::read(&path, &wides(CONFIG_RESOURCE_NAME)).unwrap();
+    let read = resource::read(&path, &wides(CONFIG_RESOURCE_NAME), resource::RT_RCDATA).unwrap();
     assert_eq!(decode(&read).unwrap(), config);
 }
 
@@ -272,4 +272,82 @@ fn created_shim_launches_its_target() {
         .status()
         .unwrap();
     assert_eq!(status.code(), Some(42));
+}
+
+/// The template ships one icon group; replacing it must leave exactly one,
+/// and it must be the target's.
+#[test]
+fn icon_is_copied_from_the_target() {
+    let dir = tempfile::tempdir().unwrap();
+    let shim = write_template(dir.path(), &templated_image());
+
+    // The template's own icon is the placeholder from `assets/hok.ico`.
+    let before = resource::read_icon(&shim).unwrap().unwrap();
+    assert!(before.image_count() > 0);
+
+    // notepad.exe ships an icon group on every supported Windows version;
+    // cmd.exe is compiled without one, so it is not a useful positive case.
+    let target = Path::new(r"C:\Windows\System32\notepad.exe");
+    if !target.is_file() {
+        return;
+    }
+    let expected = resource::read_icon(target).unwrap().unwrap();
+
+    resource::copy_icon(&shim, target).unwrap();
+
+    let after = resource::read_icon(&shim).unwrap().unwrap();
+    assert_eq!(after.group_id, expected.group_id);
+    assert_eq!(after.group, expected.group);
+    assert_eq!(after.image_count(), expected.image_count());
+}
+
+#[test]
+fn a_target_without_an_icon_leaves_the_template_icon() {
+    let dir = tempfile::tempdir().unwrap();
+    let shim = write_template(dir.path(), &templated_image());
+
+    let empty = dir.path().join("iconless.exe");
+    // A valid PE with no resource section: neither the template's resources
+    // nor any icon exist here, so the source is simply unreadable as one.
+    std::fs::write(&empty, b"not a PE image").unwrap();
+
+    let before = resource::read_icon(&shim).unwrap().unwrap();
+    resource::copy_icon(&shim, &empty).unwrap();
+    let after = resource::read_icon(&shim).unwrap().unwrap();
+
+    assert_eq!(before.group_id, after.group_id);
+    assert_eq!(before.group, after.group);
+}
+
+#[test]
+fn icon_group_ids_are_read_from_the_directory() {
+    // GRPICONDIR: reserved(2) type(2) count(2), then 14-byte entries whose
+    // last u16 is the image id.
+    let mut group = vec![0u8; 6 + 14 * 2];
+    group[4..6].copy_from_slice(&2u16.to_le_bytes());
+    group[6 + 12..6 + 14].copy_from_slice(&7u16.to_le_bytes());
+    group[20 + 12..20 + 14].copy_from_slice(&42u16.to_le_bytes());
+
+    assert_eq!(resource::referenced_image_ids(&group), vec![7, 42]);
+}
+
+/// Create a shim for a real installed package and compare icons, when one is
+/// present. Skipped on machines without that package.
+#[test]
+fn real_package_icon_matches_its_target() {
+    let target = Path::new(r"C:\Windows\explorer.exe");
+    if !target.is_file() {
+        return;
+    }
+
+    let dir = tempfile::tempdir().unwrap();
+    let shim = write_template(dir.path(), &templated_image());
+
+    let expected = resource::read_icon(target).unwrap().unwrap();
+    resource::copy_icon(&shim, target).unwrap();
+    let actual = resource::read_icon(&shim).unwrap().unwrap();
+
+    assert_eq!(actual.group_id, expected.group_id);
+    assert_eq!(actual.group, expected.group);
+    assert_eq!(actual.image_count(), expected.image_count());
 }
