@@ -740,6 +740,7 @@ dependencies = [
  "futures",
  "git2",
  "hex",
+ "hok-shim-spec",
  "junction",
  "md-5",
  "once_cell",
@@ -755,6 +756,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tracing",
+ "windows-sys 0.61.2",
  "winreg",
 ]
 

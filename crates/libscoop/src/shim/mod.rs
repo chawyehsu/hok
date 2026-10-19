@@ -1,7 +1,23 @@
 #![allow(dead_code)]
+mod pe;
+mod resource;
+
 use std::path::Path;
+use tracing::warn;
+
+use hok_shim_spec::{Config, Utf16String, encode, to_text};
 
 use crate::{Event, Session, error::Fallible, internal, package::Package};
+
+/// Resource name carrying the shim configuration, as `hok-shim` reads it.
+const CONFIG_RESOURCE_NAME: &str = "HOK_SHIM_CONFIG";
+
+/// Language id attached to the injected configuration resource.
+const CONFIG_RESOURCE_LANGUAGE: u16 = 0x0409;
+
+/// The `hok-shim` launcher template, embedded by `build.rs`.
+#[cfg(windows)]
+include!(concat!(env!("OUT_DIR"), "/embedded_shim.rs"));
 
 #[derive(Debug)]
 pub struct Shim<'a> {
@@ -90,16 +106,171 @@ impl Shim<'_> {
     }
 }
 
-// pub fn add(session: &Session, package: &Package) -> Fallible<()> {
-//     let config = session.config();
-//     let shims_dir = config.root_path().join("shims");
+/// Create shims for a package.
+///
+/// The package must already be committed under `apps`, since shim targets are
+/// resolved there rather than in the cache.
+pub fn add(session: &Session, package: &Package) -> Fallible<()> {
+    let config = session.config();
+    let shims_dir = config.root_path().join("shims");
 
-//     if let Some(bins) = package.manifest().bin() {
-//         // TODO
-//     }
+    let Some(bins) = package.manifest().bin() else {
+        return Ok(());
+    };
 
-//     Ok(())
-// }
+    // TODO: script shims (bash, batch, java, powershell, python) still need a
+    // generated wrapper on `PATH`; only native targets are shimmed today.
+    let shims = bins
+        .into_iter()
+        .map(Shim::new)
+        .filter(|shim| shim.ty == ShimType::Exe)
+        .collect::<Vec<_>>();
+
+    if shims.is_empty() {
+        return Ok(());
+    }
+
+    internal::fs::ensure_dir(&shims_dir)?;
+
+    if let Some(tx) = session.emitter() {
+        let _ = tx.send(Event::PackageShimAddStart);
+    }
+
+    let app_path = config.root_path().join("apps").join(package.name());
+    let version = if config.no_junction() {
+        package.installed_version().unwrap_or("current")
+    } else {
+        "current"
+    };
+
+    for shim in shims {
+        let target = internal::path::normalize_path(app_path.join(version).join(shim.real_name));
+        let shim_config = Config {
+            target: Utf16String::from(target.to_string_lossy().as_ref()),
+            args: shim
+                .args
+                .unwrap_or_default()
+                .into_iter()
+                .map(Utf16String::from)
+                .collect(),
+            ..Config::default()
+        };
+
+        let shim_path = shims_dir.join(shim.name);
+
+        install(package, &shims_dir, &shim_path, &shim_config, &target)?;
+
+        if let Some(tx) = session.emitter() {
+            let name = shim_path.with_extension("exe");
+            let _ = tx.send(Event::PackageShimAddProgress(
+                name.file_name().unwrap().to_string_lossy().to_string(),
+            ));
+        }
+    }
+
+    if let Some(tx) = session.emitter() {
+        let _ = tx.send(Event::PackageShimAddDone);
+    }
+
+    Ok(())
+}
+
+fn install(
+    package: &Package,
+    shims_dir: &Path,
+    shim_path: &Path,
+    config: &Config,
+    target: &Path,
+) -> Fallible<()> {
+    let exe_path = shim_path.with_extension("exe");
+    let sidecar_path = shim_path.with_extension("shim");
+
+    back_up_conflict(package, shims_dir, &exe_path);
+    back_up_conflict(package, shims_dir, &sidecar_path);
+
+    let mut image = HOK_SHIM_BYTES.to_vec();
+    pe::set_subsystem(&mut image, subsystem_of(target)).map_err(crate::Error::Custom)?;
+    internal::fs::write_atomic(&exe_path, &image)?;
+
+    let payload = encode(config).map_err(|err| crate::Error::Custom(format!("{err:?}")))?;
+    resource::write(
+        &exe_path,
+        &wides(CONFIG_RESOURCE_NAME),
+        &payload,
+        Some(CONFIG_RESOURCE_LANGUAGE),
+    )
+    .map_err(crate::Error::Custom)?;
+
+    internal::fs::write_atomic(&sidecar_path, to_text(config).as_bytes())?;
+
+    Ok(())
+}
+
+/// The subsystem a shim for `target` should carry.
+///
+/// A shim takes the subsystem of the program it launches, so a GUI target gets
+/// a GUI shim and never flashes a console. Anything unreadable counts as
+/// console: a console image misread as GUI would detach the console the child
+/// needs.
+fn subsystem_of(target: &Path) -> u16 {
+    let image = std::fs::read(target).unwrap_or_default();
+    match pe::subsystem(&image) {
+        Some(pe::IMAGE_SUBSYSTEM_WINDOWS_GUI) => pe::IMAGE_SUBSYSTEM_WINDOWS_GUI,
+        _ => pe::IMAGE_SUBSYSTEM_WINDOWS_CUI,
+    }
+}
+
+/// Move an existing shim owned by another package aside, the way Scoop does:
+/// `<name>.<ext>.<oldpkg>`, so the other package can take it back on removal.
+fn back_up_conflict(package: &Package, shims_dir: &Path, path: &Path) {
+    if !path.exists() {
+        return;
+    }
+
+    let Some(owner) = shim_owner(shims_dir, path) else {
+        // Not a shim of ours; leave it alone rather than silently hiding it.
+        return;
+    };
+
+    let pkg_name = package.name();
+    if owner == pkg_name {
+        return;
+    }
+
+    let file_name = path.file_name().unwrap().to_string_lossy().to_string();
+    let backup = path.with_file_name(format!("{file_name}.{owner}"));
+
+    warn!(
+        "shim '{}' is owned by package '{}', backing it up to '{}'",
+        file_name,
+        owner,
+        backup.file_name().unwrap().to_string_lossy()
+    );
+
+    if let Err(err) = std::fs::rename(path, &backup) {
+        warn!("failed to back up shim '{}': {}", file_name, err);
+    }
+}
+
+/// Which package installed the shim at `path`, derived from its configuration
+/// target (`<root>\apps\<pkg>\...`).
+fn shim_owner(shims_dir: &Path, path: &Path) -> Option<String> {
+    let sidecar = path.with_extension("shim");
+    let text = std::fs::read_to_string(sidecar).ok()?;
+    let config = hok_shim_spec::from_text(&text).ok()?;
+
+    let target = config.target.as_utf16().to_display_string();
+    let apps_dir = shims_dir.parent()?.join("apps");
+    let relative = Path::new(&target).strip_prefix(&apps_dir).ok()?;
+    relative
+        .components()
+        .next()
+        .map(|component| component.as_os_str().to_string_lossy().to_string())
+}
+
+fn wides(text: &str) -> Vec<u16> {
+    text.encode_utf16().chain(std::iter::once(0)).collect()
+}
 
 /// Remove shims for a package.
 pub fn remove(session: &Session, package: &Package) -> Fallible<()> {
@@ -197,3 +368,6 @@ pub fn remove(session: &Session, package: &Package) -> Fallible<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;

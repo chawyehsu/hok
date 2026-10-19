@@ -135,6 +135,9 @@ pub fn execute(args: Args, session: &Session) -> Result<()> {
                         .unwrap();
                     println!("Checking package integrity...{}", "Ok".green());
                 }
+                Event::PackageShimAddProgress(ctx) => {
+                    println!("Creating shim {}", ctx);
+                }
                 Event::PromptPackageCandidate(pkgs) => {
                     let name = pkgs[0].split_once('/').unwrap().1;
                     println!("Found multiple candidates for package '{}':\n", name);
