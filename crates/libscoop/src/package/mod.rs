@@ -182,44 +182,12 @@ impl Package {
         self.manifest.dependencies()
     }
 
-    /// Get download urls of this package.
-    ///
-    /// # Note
-    ///
-    /// This method will return the actual download urls without the `#/dl.7z`
-    /// fragment which is used to fake the file extension of the download urls.
-    pub(crate) fn download_urls(&self) -> Vec<&str> {
+    /// Get the downloads of this package, in manifest order.
+    pub(crate) fn downloads(&self) -> Vec<Download<'_>> {
         self.manifest
             .url()
             .into_iter()
-            .map(|u| u.split_once('#').map(|s| s.0).unwrap_or(u))
-            .collect::<Vec<_>>()
-    }
-
-    /// Get download urls of this package.
-    pub(crate) fn download_filenames(&self) -> Vec<String> {
-        self.manifest
-            .url()
-            .into_iter()
-            .map(|u| {
-                let mut hasher = crate::internal::hash::ChecksumBuilder::new()
-                    .sha256()
-                    .build();
-                hasher.consume(u.as_bytes());
-                let mut hash = hasher.finalize();
-                hash.truncate(7);
-                let path = PathBuf::from(u);
-                let mut ext = path
-                    .extension()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string();
-                if !ext.is_empty() {
-                    ext.insert(0, '.');
-                }
-
-                format!("{}#{}#{}{}", self.name(), self.version(), hash, ext)
-            })
+            .map(Download::new)
             .collect::<Vec<_>>()
     }
 
@@ -424,6 +392,181 @@ impl Package {
 impl PartialEq for Package {
     fn eq(&self, other: &Package) -> bool {
         self.name() == other.name()
+    }
+}
+
+/// One download of a package, as the manifest declares it.
+///
+/// A manifest URL may carry a `#/<name>` fragment that renames the download,
+/// for example `https://example.com/dl?id=7#/tool.exe`. The fragment is not sent
+/// to the server: it names the file that the download becomes on disk.
+pub(crate) struct Download<'a> {
+    /// The manifest URL as written, rename fragment included.
+    pub(crate) manifest_url: &'a str,
+    /// The URL to fetch, without the rename fragment.
+    pub(crate) url: &'a str,
+    /// The name the download takes once installed.
+    ///
+    /// The rename fragment when the URL has one, otherwise the last path
+    /// segment of the URL.
+    pub(crate) filename: String,
+}
+
+impl<'a> Download<'a> {
+    fn new(manifest_url: &'a str) -> Download<'a> {
+        let (url, rename) = match manifest_url.split_once('#') {
+            Some((url, rename)) => (url, Some(rename)),
+            None => (manifest_url, None),
+        };
+
+        let filename = rename
+            .filter(|rename| !rename.is_empty())
+            .and_then(|rename| {
+                rename
+                    .trim_start_matches(['/', '\\'])
+                    .rsplit(['/', '\\'])
+                    .next()
+            })
+            .filter(|rename| !rename.is_empty())
+            .map(str::to_owned)
+            .unwrap_or_else(|| url_leaf(url));
+
+        Download {
+            manifest_url,
+            url,
+            filename,
+        }
+    }
+}
+
+/// The last path segment of `url`, or `download` when it has none.
+fn url_leaf(url: &str) -> String {
+    url.split_once('#')
+        .map(|(head, _)| head)
+        .unwrap_or(url)
+        .trim_end_matches('/')
+        .rsplit(['/', '\\'])
+        .next()
+        .filter(|segment| !segment.is_empty())
+        .unwrap_or("download")
+        .to_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Download, Package, manifest::Manifest, url_leaf};
+    use std::path::PathBuf;
+
+    /// A package whose manifest declares `urls` for this host.
+    fn package_with(urls: &[&str]) -> Package {
+        let url = urls
+            .iter()
+            .map(|url| format!("\"{url}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let json = format!(
+            r#"{{"version":"1.0.0","description":"test","homepage":"https://example.com","license":"MIT","url":[{}],"hash":["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"]}}"#,
+            url
+        );
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "hok-download-test-{}-{}.json",
+            std::process::id(),
+            COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        std::fs::write(&path, json).unwrap();
+        let manifest = Manifest::parse(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        Package::from("tool", "bucket", manifest)
+    }
+
+    #[test]
+    fn rename_fragment_names_the_download() {
+        let package = package_with(&["https://example.com/get?id=7#/tool.exe"]);
+        let downloads = package.downloads();
+        assert_eq!(downloads.len(), 1);
+        assert_eq!(downloads[0].url, "https://example.com/get?id=7");
+        assert_eq!(downloads[0].filename, "tool.exe");
+    }
+
+    #[test]
+    fn rename_fragment_may_carry_a_path() {
+        let package = package_with(&["https://example.com/get#/dl.7z"]);
+        assert_eq!(package.downloads()[0].filename, "dl.7z");
+
+        let package = package_with(&["https://example.com/get#dir/../tool.zip"]);
+        assert_eq!(package.downloads()[0].filename, "tool.zip");
+    }
+
+    #[test]
+    fn a_rename_fragment_changes_the_extension_not_the_url() {
+        let package = package_with(&["https://example.com/api/v1/download#/tool.exe"]);
+        let download = &package.downloads()[0];
+        assert!(
+            !download.url.ends_with(".exe"),
+            "the fragment must not reach the server"
+        );
+    }
+
+    #[test]
+    fn without_a_fragment_the_url_leaf_names_the_download() {
+        let package = package_with(&["https://example.com/releases/tool.zip"]);
+        assert_eq!(package.downloads()[0].filename, "tool.zip");
+    }
+
+    #[test]
+    fn an_empty_fragment_is_ignored() {
+        let package = package_with(&["https://example.com/releases/tool.zip#"]);
+        assert_eq!(package.downloads()[0].filename, "tool.zip");
+    }
+
+    #[test]
+    fn cache_name_hashes_the_manifest_url_and_names_the_fragment_extension() {
+        let package = package_with(&["https://example.com/get?id=7#/tool.exe"]);
+        let download = &package.downloads()[0];
+        assert_eq!(
+            download.manifest_url,
+            "https://example.com/get?id=7#/tool.exe"
+        );
+        assert_eq!(download.url, "https://example.com/get?id=7");
+        assert_eq!(download.filename, "tool.exe");
+    }
+
+    #[test]
+    fn cache_name_hash_is_the_manifest_url_hash() {
+        use crate::internal::hash::ChecksumBuilder;
+
+        let manifest_url = "https://example.com/get?id=7#/tool.exe";
+        let package = package_with(&[manifest_url]);
+        let download = &package.downloads()[0];
+
+        let mut hasher = ChecksumBuilder::new().sha256().build();
+        hasher.consume(manifest_url.as_bytes());
+        let expected_hash = hasher.finalize();
+        let expected_hash = &expected_hash[..7];
+
+        let name = super::download::cache_filename(&package, download);
+        assert_eq!(
+            name,
+            format!("tool#1.0.0#{expected_hash}.exe"),
+            "the cache hash must stay the manifest URL hash"
+        );
+    }
+
+    #[test]
+    fn url_leaf_is_the_last_path_segment() {
+        assert_eq!(
+            url_leaf("https://example.com/releases/tool.zip"),
+            "tool.zip"
+        );
+        assert_eq!(url_leaf("https://example.com/releases/"), "releases");
+        assert_eq!(url_leaf("https://example.com"), "example.com");
+        assert_eq!(url_leaf("https://example.com/dl?id=7"), "dl?id=7");
+    }
+
+    #[test]
+    fn url_leaf_never_keeps_a_fragment() {
+        assert_eq!(url_leaf("https://example.com/get#/dl.7z"), "get");
     }
 }
 

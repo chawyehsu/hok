@@ -13,7 +13,29 @@ use tracing::debug;
 use crate::constant::DEFAULT_USER_AGENT;
 use crate::{Event, Session, error::Fallible, internal};
 
-use super::Package;
+use super::{Download, Package};
+
+/// The cache file name of `download`.
+///
+/// The hash is taken over the whole manifest URL, rename fragment included, so
+/// the name is stable across runs and two packages that share a URL never share
+/// a cache file. The extension comes from [`Download::filename`] because that is
+/// what the download is probed and installed as. It is not the name the download
+/// is installed under; that is [`Download::filename`].
+pub(crate) fn cache_filename(package: &Package, download: &Download<'_>) -> String {
+    let mut hasher = internal::hash::ChecksumBuilder::new().sha256().build();
+    hasher.consume(download.manifest_url.as_bytes());
+    let hash = hasher.finalize();
+    let hash = &hash[..7];
+
+    let ext = download
+        .filename
+        .rsplit_once('.')
+        .map(|(_, ext)| format!(".{ext}"))
+        .unwrap_or_default();
+
+    format!("{}#{}#{}{}", package.name(), package.version(), hash, ext)
+}
 
 /// Download size information.
 #[derive(Clone, Copy)]
@@ -140,8 +162,7 @@ impl<'a> PackageSet<'a> {
             // if the package is upgradable, use the upgradable reference instead
             let pkg = pkg.upgradable().unwrap_or(pkg);
 
-            let urls = pkg.download_urls();
-            let filenames = pkg.download_filenames();
+            let downloads = pkg.downloads();
 
             let mut pacakge_cache = PackageCache {
                 package: pkg,
@@ -150,12 +171,13 @@ impl<'a> PackageSet<'a> {
             };
 
             let mut file_cached_count = 0;
-            for (url, filename) in urls.iter().zip(filenames.iter()) {
+            for download in downloads.iter() {
+                let filename = cache_filename(pkg, download);
                 let remote_size = 0u64;
                 let mut local_size = 0u64;
 
                 if self.reuse_cache
-                    && let Ok(file) = File::open(cache_root.join(filename))
+                    && let Ok(file) = File::open(cache_root.join(&filename))
                     && let Ok(metadata) = file.metadata()
                 {
                     local_size = metadata.len();
@@ -163,17 +185,17 @@ impl<'a> PackageSet<'a> {
                 }
 
                 let dlinfo = FileDownloadInfo {
-                    url,
+                    url: download.url,
                     local_size,
                     remote_size,
                     estimated: false,
                 };
 
-                pacakge_cache.inner.insert(filename.to_owned(), dlinfo);
+                pacakge_cache.inner.insert(filename, dlinfo);
             }
 
             if self.reuse_cache {
-                if file_cached_count == urls.len() {
+                if file_cached_count == downloads.len() {
                     pacakge_cache.valid = CacheMaybeValid::Full;
                 } else if file_cached_count > 0 {
                     pacakge_cache.valid = CacheMaybeValid::Partial;
@@ -340,11 +362,12 @@ impl<'a> PackageSet<'a> {
             // if the package is upgradable, use the upgradable reference instead
             let pkg = pkg.upgradable().unwrap_or(pkg);
 
-            let urls = pkg.download_urls();
-            let filenames = pkg.download_filenames();
+            let downloads = pkg.downloads();
             let cookie = pkg.cookie().unwrap_or_default();
 
-            for (uidx, (url, filename)) in urls.iter().zip(filenames.iter()).enumerate() {
+            for (uidx, download) in downloads.iter().enumerate() {
+                let url = download.url;
+                let filename = cache_filename(pkg, download);
                 let mut easy = Easy::new();
                 easy.get(true)?;
                 easy.url(url)?;
@@ -361,7 +384,7 @@ impl<'a> PackageSet<'a> {
                 let _ = easyhandle.set_token(token);
                 handles.insert(token, easyhandle);
 
-                token_ctx.insert(token, (pkg.ident(), url.to_string(), filename.to_owned()));
+                token_ctx.insert(token, (pkg.ident(), url.to_string(), filename));
             }
         }
 
