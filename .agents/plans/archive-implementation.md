@@ -124,6 +124,13 @@ not a TTY only per-archive completion lines are printed.
 Declared but unsupported: header-encrypted 7z, base64-wrapped 7z. Both fail with
 an explicit error instead of being skipped.
 
+The `nsis` crate parses with a fixed 2 GiB decompression budget rather than
+its 64 MiB default. The budget is a constant, not derived from the installer
+size, so a prepared download cannot buy itself a larger allocation. An
+installer larger than the budget is not offered to the crate at all, and a
+stream that still overruns it falls back to `7z.exe` with a warning on the
+summary.
+
 NSIS has no header of its own at the start of the file; its signature is the
 28-byte FirstHeader in the PE overlay. The prober reads `section_end` and one
 512-byte step past it, validates `0xDEADBEEF` + `NullsoftInst` at offset 4 with
