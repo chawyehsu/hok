@@ -503,7 +503,7 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
                 let path = cache_root.join(download::cache_file_name(
                     pkg.name(),
                     pkg.version(),
-                    download.manifest_url,
+                    download,
                 ));
 
                 let mut hasher = ChecksumBuilder::new().algo(hash.algorithm()).build();

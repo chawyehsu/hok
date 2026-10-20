@@ -168,7 +168,7 @@ impl<'a> PackageSet<'a> {
 
             let mut file_cached_count = 0;
             for download in downloads.iter() {
-                let filename = cache_file_name(pkg.name(), pkg.version(), download.manifest_url);
+                let filename = cache_file_name(pkg.name(), pkg.version(), download);
                 let remote_size = 0u64;
                 let mut local_size = 0u64;
 
@@ -363,7 +363,7 @@ impl<'a> PackageSet<'a> {
 
             for (uidx, download) in downloads.iter().enumerate() {
                 let url = download.url;
-                let filename = cache_file_name(pkg.name(), pkg.version(), download.manifest_url);
+                let filename = cache_file_name(pkg.name(), pkg.version(), download);
                 let mut easy = Easy::new();
                 easy.get(true)?;
                 easy.url(url)?;

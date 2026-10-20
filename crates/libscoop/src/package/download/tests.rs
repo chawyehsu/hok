@@ -127,7 +127,7 @@ fn cache_name_uses_the_package_identity_and_the_manifest_url() {
     let package = package_with(&[url]);
     let download: &Download<'_> = &package.downloads()[0];
 
-    let name = cache_file_name("tool", "1.0.0", download.manifest_url);
+    let name = cache_file_name("tool", "1.0.0", download);
     assert!(name.starts_with("tool#1.0.0#"), "{name}");
     assert!(name.ends_with(".exe"), "{name}");
 }
