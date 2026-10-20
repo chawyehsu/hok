@@ -500,7 +500,11 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
             let files_cnt = downloads.len();
 
             for (idx, (download, hash)) in downloads.iter().zip(hashes).enumerate() {
-                let path = cache_root.join(download::cache_filename(pkg, download));
+                let path = cache_root.join(download::cache_file_name(
+                    pkg.name(),
+                    pkg.version(),
+                    download.manifest_url,
+                ));
 
                 let mut hasher = ChecksumBuilder::new().algo(hash.algorithm()).build();
 
