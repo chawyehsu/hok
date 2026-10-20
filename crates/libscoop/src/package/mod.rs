@@ -441,10 +441,10 @@ impl<'a> Download<'a> {
 
 /// The last path segment of `url`, or `download` when it has none.
 fn url_leaf(url: &str) -> String {
-    url.split_once('#')
-        .map(|(head, _)| head)
-        .unwrap_or(url)
-        .trim_end_matches('/')
+    let url = url.split_once('#').map(|(head, _)| head).unwrap_or(url);
+    let url = url.split_once('?').map(|(head, _)| head).unwrap_or(url);
+
+    url.trim_end_matches('/')
         .rsplit(['/', '\\'])
         .next()
         .filter(|segment| !segment.is_empty())
@@ -561,7 +561,8 @@ mod tests {
         );
         assert_eq!(url_leaf("https://example.com/releases/"), "releases");
         assert_eq!(url_leaf("https://example.com"), "example.com");
-        assert_eq!(url_leaf("https://example.com/dl?id=7"), "dl?id=7");
+        assert_eq!(url_leaf("https://example.com/dl?id=7"), "dl");
+        assert_eq!(url_leaf("https://example.com/tool.zip?raw=1"), "tool.zip");
     }
 
     #[test]
