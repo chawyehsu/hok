@@ -1,0 +1,13 @@
+---
+source: tests/e2e/mod.rs
+info:
+  program: hok
+  args:
+    - "--version"
+---
+success: true
+exit_code: 0
+----- stdout -----
+hok [VERSION]
+
+----- stderr -----
