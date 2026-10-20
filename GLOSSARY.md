@@ -6,6 +6,23 @@ diverges from Scoop's implementation while keeping its manifest semantics.
 
 ## Language
 
+**Download**:
+One URL entry of a package manifest, together with the name it takes on disk.
+A package may have several downloads, and a download is either extracted (when
+it is an archive) or copied as is.
+_Avoid_: File, asset, artifact
+
+**Download name**:
+The name a download takes once installed: the manifest URL's `#/<name>` rename
+fragment when it has one, otherwise the URL's last path segment. It is not the
+name the download is cached under.
+_Avoid_: File name, target name, output name
+
+**Rename fragment**:
+The `#/<name>` suffix of a manifest URL that names the download without reaching
+the server. It selects the extension a download is probed and installed under.
+_Avoid_: Fragment, hash, anchor
+
 **Archive**:
 A downloaded file that is opened to produce the contents of a package version
 directory. An archive is a property of a download, not of a package.

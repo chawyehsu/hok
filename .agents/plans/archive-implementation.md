@@ -96,8 +96,16 @@ directories best effort.
 1. `atomic::sweep`, then create the staging directory.
 2. For each download: extract archives (pairing `extract_dir`/`extract_to` with
    a counter that only advances for extracted archives), copy non-archives under
-   their URL leaf name. A download is extracted when it is archive-named or
+   their download name. A download is extracted when it is archive-named or
    `is_extractable`; a bare executable is copied, not offered to an extractor.
+
+   `Package::downloads()` yields one `Download` per manifest URL, holding the
+   URL to fetch and the name it installs under. The name is the URL's `#/<name>`
+   rename fragment when present, otherwise the URL leaf, and it drives both the
+   copy destination and the extraction label. The cache name is separate
+   (`download::cache_filename`) and stays keyed on the package identity plus the
+   whole manifest URL, so a rename fragment never changes what is cached and two
+   packages sharing a URL never share a cache file.
    A package that declares an `installer` is not special-cased here yet: that
    needs the PowerShell runner engine, so a bare installer executable is copied
    until then.
