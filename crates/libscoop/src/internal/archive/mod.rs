@@ -609,6 +609,26 @@ pub fn is_archive_name(name: &str) -> bool {
     lookup_name(name).is_some()
 }
 
+/// Whether a download is an archive that [`extract`] can unpack.
+///
+/// The download is probed rather than judged by name, so a payload behind an
+/// executable stub counts as an archive. Only a format the registry has an
+/// extractor for counts, and a plain executable never does: it has no payload
+/// to extract, so it is a download to copy, not an archive.
+///
+/// A probe that cannot identify a format is also not an archive. An error means
+/// the download is named as a format that cannot be extracted, and is returned
+/// so a bundle is never silently copied in place of being extracted.
+pub fn is_extractable(src: &Path) -> Fallible<bool> {
+    let probe = probe::probe(src)?;
+    Ok(is_supported(probe.detected))
+}
+
+/// Whether the registry can extract `format`.
+fn is_supported(format: Format) -> bool {
+    format != Format::Exe && spec_for(format).is_some_and(|spec| !spec.extractors.is_empty())
+}
+
 pub(crate) fn lookup_name(name: &str) -> Option<&'static FormatSpec> {
     FORMATS
         .iter()
@@ -923,6 +943,59 @@ mod tests {
         for name in ["a.txt", "A.ZIP", "a", "a.001.zip.txt"] {
             assert!(!is_archive_name(name), "{name} should not match");
         }
+    }
+
+    /// A minimal PE image with no payload after its single section.
+    fn bare_pe() -> Vec<u8> {
+        let lfanew = 0x80usize;
+        let section_end = 0x200usize;
+        let raw_offset = 0x100usize;
+        let mut bytes = vec![0u8; section_end];
+        bytes[0..2].copy_from_slice(b"MZ");
+        bytes[0x3C..0x40].copy_from_slice(&(lfanew as u32).to_le_bytes());
+        bytes[lfanew..lfanew + 4].copy_from_slice(b"PE\0\0");
+        bytes[lfanew + 4..lfanew + 6].copy_from_slice(&0x8664u16.to_le_bytes());
+        bytes[lfanew + 6..lfanew + 8].copy_from_slice(&1u16.to_le_bytes());
+        let section = lfanew + 24;
+        let raw_size = (section_end - raw_offset) as u32;
+        bytes[section + 16..section + 20].copy_from_slice(&raw_size.to_le_bytes());
+        bytes[section + 20..section + 24].copy_from_slice(&(raw_offset as u32).to_le_bytes());
+        bytes
+    }
+
+    fn writable(temp: &TempDir, name: &str, bytes: &[u8]) -> std::path::PathBuf {
+        let path = temp.path().join(name);
+        std::fs::write(&path, bytes).unwrap();
+        path
+    }
+
+    #[test]
+    fn bare_executable_is_not_extractable() {
+        let temp = TempDir::new().unwrap();
+        let src = writable(&temp, "tool.exe", &bare_pe());
+        assert!(!is_extractable(&src).unwrap());
+    }
+
+    #[test]
+    fn executable_with_an_extractable_payload_is_extractable() {
+        let temp = TempDir::new().unwrap();
+        let mut bytes = bare_pe();
+        bytes.extend_from_slice(b"7z\xBC\xAF\x27\x1C");
+        let src = writable(&temp, "setup.exe", &bytes);
+        assert!(is_extractable(&src).unwrap());
+    }
+
+    #[test]
+    fn executable_alone_is_never_a_supported_format() {
+        assert!(!is_supported(Format::Exe));
+        assert!(is_supported(Format::Zip));
+        assert!(is_supported(Format::Nsis));
+    }
+
+    #[test]
+    fn missing_file_is_an_error_not_a_copy() {
+        let temp = TempDir::new().unwrap();
+        assert!(is_extractable(&temp.path().join("missing.bin")).is_err());
     }
 
     #[test]

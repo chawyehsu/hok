@@ -54,6 +54,12 @@ the only path check; every extractor routes entries through it. A guard
 rejection is final for the whole registry chain and is never retried with a
 helper binary.
 
+`is_extractable(src)` is the predicate the install path uses to decide between
+extracting and copying a download. It probes the file and returns true only for
+a detected format with a non-empty extractor chain; `Format::Exe` is never one,
+so a bare executable is copied. A probe error (a name-declared format with no
+extractor, or an I/O failure) is returned rather than treated as a copy.
+
 ## Registry
 
 `FORMATS: &[FormatSpec]` in `archive/mod.rs`, one entry per `Format`, is the only
@@ -90,7 +96,11 @@ directories best effort.
 1. `atomic::sweep`, then create the staging directory.
 2. For each download: extract archives (pairing `extract_dir`/`extract_to` with
    a counter that only advances for extracted archives), copy non-archives under
-   their URL leaf name.
+   their URL leaf name. A download is extracted when it is archive-named or
+   `is_extractable`; a bare executable is copied, not offered to an extractor.
+   A package that declares an `installer` is not special-cased here yet: that
+   needs the PowerShell runner engine, so a bare installer executable is copied
+   until then.
 3. Write `scoop-manifest.json` and `scoop-install.json`.
 4. `complete()`, `commit_swap`, then point `current` at the version directory.
 

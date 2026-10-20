@@ -7,7 +7,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use libscoop::{
-    ExtractObserver, ExtractReport, Format, extract, extract_options, is_archive_name, probe,
+    ExtractObserver, ExtractReport, Format, extract, extract_options, is_archive_name,
+    is_extractable, probe,
 };
 
 /// A scratch directory that removes itself when dropped.
@@ -207,6 +208,45 @@ fn non_archive_detection() {
     assert!(is_archive_name("a.7z"));
 
     assert!(probe(&fixture("b.txt")).is_err());
+}
+
+/// A PE image with no payload after its single section.
+fn bare_executable() -> Vec<u8> {
+    let lfanew = 0x80usize;
+    let section_end = 0x200usize;
+    let raw_offset = 0x100usize;
+    let mut bytes = vec![0u8; section_end];
+    bytes[0..2].copy_from_slice(b"MZ");
+    bytes[0x3C..0x40].copy_from_slice(&(lfanew as u32).to_le_bytes());
+    bytes[lfanew..lfanew + 4].copy_from_slice(b"PE\0\0");
+    bytes[lfanew + 4..lfanew + 6].copy_from_slice(&0x8664u16.to_le_bytes());
+    bytes[lfanew + 6..lfanew + 8].copy_from_slice(&1u16.to_le_bytes());
+    let section = lfanew + 24;
+    let raw_size = (section_end - raw_offset) as u32;
+    bytes[section + 16..section + 20].copy_from_slice(&raw_size.to_le_bytes());
+    bytes[section + 20..section + 24].copy_from_slice(&(raw_offset as u32).to_le_bytes());
+    bytes
+}
+
+#[test]
+fn bare_executable_is_copied_not_extracted() {
+    let work = scratch();
+    let src = work.path().join("tool.exe");
+    std::fs::write(&src, bare_executable()).unwrap();
+
+    // A bare executable reports as `Format::Exe`: it is not an archive, so the
+    // install path copies it instead of extracting it.
+    assert_eq!(probe(&src).unwrap().detected, Format::Exe);
+    assert!(!is_extractable(&src).unwrap());
+
+    // Extraction still refuses it, which is what the copy path avoids.
+    let dest = sub(work.path(), "dest");
+    let observer = Recorder::default();
+    let options = extract_options(&observer, None, None);
+    match extract(&src, &dest, &options) {
+        Ok(_) => panic!("a bare executable must not be extracted"),
+        Err(err) => assert!(err.to_string().contains("not an archive"), "{err}"),
+    }
 }
 
 #[test]

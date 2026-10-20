@@ -52,7 +52,8 @@ pub mod operation;
 pub use error::Error;
 pub use event::{Event, extract_options};
 pub use internal::archive::{
-    ExtractObserver, ExtractOptions, ExtractReport, Format, Probe, extract, is_archive_name, probe,
+    ExtractObserver, ExtractOptions, ExtractReport, Format, Probe, extract, is_archive_name,
+    is_extractable, probe,
 };
 pub use package::{QueryOption, SyncOption};
 pub use session::Session;

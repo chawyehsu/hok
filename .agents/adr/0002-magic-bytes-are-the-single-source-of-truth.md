@@ -30,6 +30,12 @@ instead of being read into memory or split into a temporary file.
 - A file whose name claims a known archive format but whose bytes disagree is an
   error, not a copy. The error reports both the declared and the detected format.
 - Files that are neither archive-named nor archive-looking are copied verbatim;
-  that is what makes script-only and supplementary downloads work.
+  that is what makes script-only and supplementary downloads work. This includes
+  a probed executable: an executable is a payload container only when the probe
+  finds a format with an extractor behind its stub. A bare executable has no
+  format to extract, so it is a file to install as is, not an archive.
+- A download that extracts is one the registry can unpack. A download the probe
+  cannot identify is not an archive and is copied; one named as a format that
+  has no extractor is an error, never a copy.
 - Every extractor that can honour a start offset must accept one, so the probe
   result type must always carry it.

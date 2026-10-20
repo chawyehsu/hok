@@ -618,8 +618,10 @@ fn commit_package(
             )));
         }
 
-        if !archive::is_archive_name(&leaf) && archive::probe(&src).is_err() {
-            // Neither named as an archive nor archive-looking: copy verbatim.
+        // A download that is named as an archive, or that probes as one Hok can
+        // extract, is extracted. Anything else is a file to install as is: a
+        // probed executable is not an archive just because it is executable.
+        if !archive::is_archive_name(&leaf) && !archive::is_extractable(&src)? {
             // The file keeps its URL leaf name, not the hashed cache name.
             let dst = unique_dest(dest, &leaf);
             std::fs::copy(&src, &dst)?;
