@@ -597,8 +597,7 @@ fn commit_package(
     let staging = atomic::staging_dir(apps_dir, pkg.name(), pkg.version())?;
     let dest = staging.path();
 
-    let urls = pkg.download_urls();
-    let filenames = pkg.download_filenames();
+    let downloads = pkg.downloads();
     let extract_dirs = pkg.manifest().extract_dir().unwrap_or_default();
     let extract_tos = pkg.manifest().extract_to().unwrap_or_default();
 
@@ -606,9 +605,16 @@ fn commit_package(
     // what indexes the `extract_dir`/`extract_to` arrays (Scoop semantics).
     let mut extracted = 0usize;
 
-    for (url, filename) in urls.iter().zip(filenames.iter()) {
-        let src = cache_dir.join(filename);
-        let leaf = url_leaf(url);
+    for download in downloads.iter() {
+        let src = cache_dir.join(download::cache_file_name(
+            pkg.name(),
+            pkg.version(),
+            download,
+        ));
+        // The name the download takes on disk is the manifest's, not the URL's:
+        // a `#/<name>` fragment renames it, and a query string is never part of
+        // it.
+        let leaf = download.filename.as_str();
 
         if !path_exists(&src) {
             return Err(Error::Custom(format!(
@@ -621,14 +627,13 @@ fn commit_package(
         // A download that is named as an archive, or that probes as one Hok can
         // extract, is extracted. Anything else is a file to install as is: a
         // probed executable is not an archive just because it is executable.
-        if !archive::is_archive_name(&leaf) && !archive::is_extractable(&src)? {
-            // The file keeps its URL leaf name, not the hashed cache name.
-            let dst = unique_dest(dest, &leaf);
+        if !archive::is_archive_name(leaf) && !archive::is_extractable(&src)? {
+            let dst = unique_dest(dest, leaf);
             std::fs::copy(&src, &dst)?;
             continue;
         }
 
-        let label = leaf.clone();
+        let label = leaf.to_owned();
         let extract_dir = extract_dirs.get(extracted).copied();
         let extract_to = extract_tos.get(extracted).copied();
         extracted += 1;
@@ -673,10 +678,10 @@ fn commit_package(
             "bucket".to_owned(),
             serde_json::Value::String(pkg.bucket().to_owned()),
         );
-        if let Some(url) = urls.first() {
+        if let Some(download) = downloads.first() {
             object.insert(
                 "url".to_owned(),
-                serde_json::Value::String((*url).to_owned()),
+                serde_json::Value::String(download.url.to_owned()),
             );
         }
     }
@@ -704,21 +709,6 @@ fn architecture() -> &'static str {
     } else {
         "32bit"
     }
-}
-
-/// The last path segment of a URL, used as the on-disk name of a download.
-fn url_leaf(url: &str) -> String {
-    let trimmed = url
-        .split_once('#')
-        .map(|(head, _)| head)
-        .unwrap_or(url)
-        .trim_end_matches('/');
-    trimmed
-        .rsplit(['/', '\\'])
-        .next()
-        .filter(|segment| !segment.is_empty())
-        .unwrap_or("download")
-        .to_owned()
 }
 
 /// Whether `path` exists, treating a permissions error as "exists".
