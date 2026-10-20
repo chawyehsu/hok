@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use crate::constant::REGEX_CACHE_FILE;
 use crate::error::{Error, Fallible};
+use crate::package::download::CacheFileName;
 
 /// Scoop cache file representation
 #[derive(Clone, Debug)]
@@ -11,10 +11,9 @@ pub struct CacheFile {
 
 impl CacheFile {
     pub fn from(path: PathBuf) -> Fallible<CacheFile> {
-        let text = path.file_name().unwrap().to_str().unwrap();
-        match REGEX_CACHE_FILE.is_match(text) {
-            false => Err(Error::InvalidCacheFile { path }),
-            true => Ok(CacheFile { path }),
+        match self::file_name(&path).and_then(CacheFileName::parse) {
+            None => Err(Error::InvalidCacheFile { path }),
+            Some(_) => Ok(CacheFile { path }),
         }
     }
 
@@ -27,18 +26,27 @@ impl CacheFile {
     /// Get file name of this cache file
     #[inline]
     pub fn file_name(&self) -> &str {
-        self.path.file_name().unwrap().to_str().unwrap()
+        file_name(&self.path).unwrap_or_default()
     }
 
     /// Get package name of this cache file
     #[inline]
     pub fn package_name(&self) -> &str {
-        self.file_name().split_once('#').map(|s| s.0).unwrap()
+        CacheFileName::parse(self.file_name())
+            .map(|name| name.package)
+            .unwrap_or_default()
     }
 
     /// Get version of this cache file
     #[inline]
     pub fn version(&self) -> &str {
-        self.file_name().splitn(3, '#').collect::<Vec<_>>()[1]
+        CacheFileName::parse(self.file_name())
+            .map(|name| name.version)
+            .unwrap_or_default()
     }
+}
+
+/// The file name component of `path`, if it is valid UTF-8.
+fn file_name(path: &Path) -> Option<&str> {
+    path.file_name()?.to_str()
 }

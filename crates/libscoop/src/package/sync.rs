@@ -495,12 +495,16 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
                 continue;
             }
 
-            let files = pkg.download_filenames();
+            let downloads = pkg.downloads();
             let hashes = pkg.download_hashes();
-            let files_cnt = files.len();
+            let files_cnt = downloads.len();
 
-            for (idx, (filename, hash)) in files.into_iter().zip(hashes).enumerate() {
-                let path = cache_root.join(filename);
+            for (idx, (download, hash)) in downloads.iter().zip(hashes).enumerate() {
+                let path = cache_root.join(download::cache_file_name(
+                    pkg.name(),
+                    pkg.version(),
+                    download,
+                ));
 
                 let mut hasher = ChecksumBuilder::new().algo(hash.algorithm()).build();
 
@@ -522,7 +526,7 @@ pub fn install(session: &Session, queries: &[&str], options: &[SyncOption]) -> F
                 let expected = hash.value();
                 if actual != expected {
                     let name = pkg.name().to_owned();
-                    let url = pkg.download_urls()[idx].to_owned();
+                    let url = download.url.to_owned();
                     let ctx =
                         super::HashMismatchContext::new(name, url, expected.to_owned(), actual);
                     return Err(Error::HashMismatch(ctx));

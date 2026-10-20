@@ -182,44 +182,12 @@ impl Package {
         self.manifest.dependencies()
     }
 
-    /// Get download urls of this package.
-    ///
-    /// # Note
-    ///
-    /// This method will return the actual download urls without the `#/dl.7z`
-    /// fragment which is used to fake the file extension of the download urls.
-    pub(crate) fn download_urls(&self) -> Vec<&str> {
+    /// Get the downloads of this package, in manifest order.
+    pub(crate) fn downloads(&self) -> Vec<download::Download<'_>> {
         self.manifest
             .url()
             .into_iter()
-            .map(|u| u.split_once('#').map(|s| s.0).unwrap_or(u))
-            .collect::<Vec<_>>()
-    }
-
-    /// Get download urls of this package.
-    pub(crate) fn download_filenames(&self) -> Vec<String> {
-        self.manifest
-            .url()
-            .into_iter()
-            .map(|u| {
-                let mut hasher = crate::internal::hash::ChecksumBuilder::new()
-                    .sha256()
-                    .build();
-                hasher.consume(u.as_bytes());
-                let mut hash = hasher.finalize();
-                hash.truncate(7);
-                let path = PathBuf::from(u);
-                let mut ext = path
-                    .extension()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string();
-                if !ext.is_empty() {
-                    ext.insert(0, '.');
-                }
-
-                format!("{}#{}#{}{}", self.name(), self.version(), hash, ext)
-            })
+            .map(download::Download::new)
             .collect::<Vec<_>>()
     }
 

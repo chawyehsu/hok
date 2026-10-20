@@ -44,13 +44,6 @@ pub static BUCKET_PRIORITY: Lazy<Vec<&'static str>> = Lazy::new(|| {
     ]
 });
 
-/// regex to match valid Scoop cache filename:
-/// "app#version#filenamified_url"
-pub static REGEX_CACHE_FILE: Lazy<Regex> = Lazy::new(|| {
-    let pattern = r"(?P<name>[0-9a-zA-Z-_.]+)#(?P<version>[0-9a-zA-Z-.]+)#(?P<url>.*)";
-    RegexBuilder::new(pattern).build().unwrap()
-});
-
 /// Hash string validator regex. It's used to validate a deserialized string to
 /// be a valid hash string in the custom deserializing function for the hash
 /// field.
