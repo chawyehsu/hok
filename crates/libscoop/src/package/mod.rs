@@ -515,6 +515,15 @@ mod tests {
     }
 
     #[test]
+    fn a_query_string_never_reaches_the_download_name() {
+        let package = package_with(&["https://example.com/dl?file=tool.zip&raw=1"]);
+        assert_eq!(package.downloads()[0].filename, "dl");
+
+        let package = package_with(&["https://example.com/tool.zip?raw=1#/other.7z"]);
+        assert_eq!(package.downloads()[0].filename, "other.7z");
+    }
+
+    #[test]
     fn an_empty_fragment_is_ignored() {
         let package = package_with(&["https://example.com/releases/tool.zip#"]);
         assert_eq!(package.downloads()[0].filename, "tool.zip");
@@ -551,6 +560,27 @@ mod tests {
             format!("tool#1.0.0#{expected_hash}.exe"),
             "the cache hash must stay the manifest URL hash"
         );
+    }
+
+    /// Scoop's `cache_path` appends `Path::GetExtension` of the whole url, which
+    /// is the last dot segment. A `.tar.gz` download is cached as `.gz` there,
+    /// and the cache is shared with Scoop, so this must match.
+    #[test]
+    fn cache_name_extension_matches_scoop() {
+        for (manifest_url, expected) in [
+            ("https://example.com/releases/tool.tar.gz", ".gz"),
+            ("https://example.com/releases/tool.zip", ".zip"),
+            ("https://example.com/get#/dl.7z", ".7z"),
+            ("https://example.com/get?id=7#/tool.exe", ".exe"),
+            ("https://example.com/download#/tool", ""),
+        ] {
+            let package = package_with(&[manifest_url]);
+            let name = super::download::cache_filename(&package, &package.downloads()[0]);
+            assert!(
+                name.ends_with(expected),
+                "{manifest_url} should cache with extension '{expected}', got '{name}'"
+            );
+        }
     }
 
     #[test]

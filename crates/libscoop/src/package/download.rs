@@ -17,21 +17,26 @@ use super::{Download, Package};
 
 /// The cache file name of `download`.
 ///
-/// The hash is taken over the whole manifest URL, rename fragment included, so
-/// the name is stable across runs and two packages that share a URL never share
-/// a cache file. The extension comes from [`Download::filename`] because that is
-/// what the download is probed and installed as. It is not the name the download
-/// is installed under; that is [`Download::filename`].
+/// This mirrors Scoop's `cache_path`: `<name>#<version>#<7-char sha256 of the
+/// url><extension>`, where the extension is `Path::GetExtension` of the whole
+/// url. The hash therefore covers the manifest url verbatim, rename fragment
+/// included, and the extension is the one `GetExtension` reports, which is the
+/// last dot segment: a `.tar.gz` download is cached as `.gz`. That is deliberate,
+/// because it is what Scoop writes and the cache is shared.
+///
+/// It is not the name the download is installed under; that is
+/// [`Download::filename`].
 pub(crate) fn cache_filename(package: &Package, download: &Download<'_>) -> String {
     let mut hasher = internal::hash::ChecksumBuilder::new().sha256().build();
     hasher.consume(download.manifest_url.as_bytes());
     let hash = hasher.finalize();
     let hash = &hash[..7];
 
-    let ext = download
-        .filename
-        .rsplit_once('.')
-        .map(|(_, ext)| format!(".{ext}"))
+    let ext = std::path::Path::new(download.manifest_url)
+        .extension()
+        .map(|ext| ext.to_string_lossy().into_owned())
+        .filter(|ext| !ext.is_empty())
+        .map(|ext| format!(".{ext}"))
         .unwrap_or_default();
 
     format!("{}#{}#{}{}", package.name(), package.version(), hash, ext)
