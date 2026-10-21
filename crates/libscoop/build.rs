@@ -17,10 +17,18 @@ fn main() {
         .expect("workspace root")
         .to_path_buf();
 
-    // The profile of the current build, not a preference: a debug build that
-    // silently embedded a stale release template would ship a launcher
-    // unrelated to the sources under test.
-    let profile = env::var("PROFILE").expect("PROFILE");
+    // The profile of the current build, inferred from the OUT_DIR structure
+    // or falling back to the PROFILE environment variable. PROFILE is not
+    // guaranteed as Cargo exposes PROFILE=release for custom profiles that
+    // inherit release.
+    let profile = out_dir
+        .ancestors()
+        .filter(|p| p.is_dir())
+        .nth(3)
+        .and_then(Path::file_name)
+        .and_then(|name| name.to_str())
+        .map(str::to_owned)
+        .unwrap_or_else(|| env::var("PROFILE").expect("PROFILE"));
     let triple = env::var("TARGET").ok();
 
     let mut target_dirs = Vec::new();
