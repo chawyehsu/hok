@@ -37,7 +37,35 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
     let shim_name = "hok-shim.exe";
-    let candidates = shim_candidates(&target_dirs, &profile, triple.as_deref(), shim_name);
+    let mut candidates = shim_candidates(&target_dirs, &profile, triple.as_deref(), shim_name);
+
+    if !candidates.iter().any(|path| path.is_file()) {
+        // Custom target dir to prevent deadlocks calling cargo from within the build script.
+        // See:
+        // - https://github.com/rust-lang/cargo/issues/8938
+        // - https://github.com/rust-lang/cargo/issues/9096
+        let custom_target_dir = out_dir.join("custom_target");
+        std::fs::create_dir_all(&custom_target_dir).expect("create custom target dir");
+        target_dirs.insert(0, custom_target_dir);
+
+        let cargo_path = env::var("CARGO").expect("CARGO env var not set");
+        let mut cmd = std::process::Command::new(cargo_path);
+        cmd.arg("build").arg("-p").arg("hok-shim");
+        if let Some(triple) = &triple {
+            cmd.arg("--target").arg(triple);
+        }
+        cmd.arg("--target-dir").arg(&target_dirs[0]);
+
+        let status = cmd
+            .status()
+            .expect("failed to run cargo build for hok-shim");
+        if !status.success() {
+            panic!("cargo build for hok-shim failed");
+        }
+
+        // Recompute the shim candidates after building with the custom target dir.
+        candidates = shim_candidates(&target_dirs, &profile, triple.as_deref(), shim_name);
+    }
 
     let Some(shim_src) = candidates.iter().find(|path| path.is_file()) else {
         panic!(
