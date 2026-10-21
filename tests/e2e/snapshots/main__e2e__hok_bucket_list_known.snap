@@ -1,0 +1,21 @@
+---
+source: tests/e2e/mod.rs
+info:
+  program: hok
+  args:
+    - bucket
+    - list
+    - "--known"
+---
+success: true
+exit_code: 0
+----- stdout -----
+main https://github.com/ScoopInstaller/Main
+extras https://github.com/ScoopInstaller/Extras
+games https://github.com/calinou/scoop-games
+java https://github.com/ScoopInstaller/Java
+php https://github.com/ScoopInstaller/PHP
+versions https://github.com/ScoopInstaller/Versions
+nonportable https://github.com/ScoopInstaller/Nonportable
+
+----- stderr -----
