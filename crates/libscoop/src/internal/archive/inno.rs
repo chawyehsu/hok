@@ -48,7 +48,9 @@ pub fn extract_with_fallback(
     probe: &Probe,
     observer: &dyn ExtractObserver,
 ) -> Fallible<ExtractSummary> {
-    helper::require(Helper::Innounp)?;
+    if !Helper::Innounp.available() {
+        return Err(helper::missing_helper(Helper::Innounp));
+    }
     extract(src, dest, probe, observer)
 }
 
@@ -68,7 +70,6 @@ fn extract_helper(
     dest: &Path,
     observer: &dyn ExtractObserver,
 ) -> Fallible<ExtractSummary> {
-    helper::require(Helper::Innounp)?;
     helper::run(Helper::Innounp, helper_args(src, dest), None)?;
     helper::report_tree(src, dest, observer, Vec::new(), Helper::Innounp.extractor())
 }

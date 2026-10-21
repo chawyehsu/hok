@@ -98,7 +98,6 @@ pub fn extract_lzh(
     _probe: &Probe,
     observer: &dyn ExtractObserver,
 ) -> Fallible<ExtractSummary> {
-    helper::require(Helper::SevenZip)?;
     helper::extract_archive(
         Helper::SevenZip,
         helper::SEVEN_ZIP_ARGS,

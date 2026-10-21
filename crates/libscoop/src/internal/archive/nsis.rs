@@ -93,7 +93,6 @@ fn extract_helper(
     dest: &Path,
     observer: &dyn ExtractObserver,
 ) -> Fallible<ExtractSummary> {
-    helper::require(Helper::SevenZip)?;
     let mut args = SEVEN_ZIP_ARGS
         .iter()
         .map(|flag| (*flag).to_owned())
@@ -127,7 +126,9 @@ pub fn extract_with_fallback(
     probe: &Probe,
     observer: &dyn ExtractObserver,
 ) -> Fallible<ExtractSummary> {
-    helper::require(Helper::SevenZip)?;
+    if !Helper::SevenZip.available() {
+        return Err(helper::missing_helper(Helper::SevenZip));
+    }
     extract(src, dest, probe, observer)
 }
 

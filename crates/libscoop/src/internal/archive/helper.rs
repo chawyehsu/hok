@@ -130,19 +130,14 @@ pub fn missing_helper(helper: Helper) -> Error {
     }
 }
 
-/// Locate a helper binary or produce the "not found" error for it.
-///
-/// Callers use this when they need the resolved path for display or for
-/// `Command`, and want a single consistent error when the helper is absent.
-pub fn require(helper: Helper) -> Fallible<PathBuf> {
-    find(helper.exe()).ok_or_else(|| missing_helper(helper))
-}
-
 /// Run a helper that extracts `src` into `dest`, and report what it wrote.
 ///
 /// `flags` are the helper's own switches (for example `x -y`); `src` and
 /// `-o<dest>` are appended so the helper unpacks into `dest` and nowhere else.
 /// Every file found under `dest` afterwards is reported through `observer`.
+///
+/// The helper is not pre-resolved: launching it is the only reliable check, so
+/// a missing binary surfaces through [`run`] as [`Error::HelperNotFound`].
 pub fn extract_archive(
     helper: Helper,
     flags: &[&str],
@@ -150,7 +145,6 @@ pub fn extract_archive(
     dest: &Path,
     observer: &dyn ExtractObserver,
 ) -> Fallible<ExtractSummary> {
-    require(helper)?;
     let mut args = flags
         .iter()
         .map(|flag| (*flag).to_owned())
@@ -357,17 +351,22 @@ mod tests {
     }
 
     #[test]
-    fn require_reports_missing_helper() {
+    fn extract_archive_reports_missing_helper_without_extracting() {
         let dir = temp_dir();
+        let dest = temp_dir();
         with_path(&[dir.path()], || {
-            assert!(matches!(
-                require(Helper::SevenZip),
-                Err(Error::HelperNotFound { .. })
-            ));
-            assert!(matches!(
-                require(Helper::Msiexec),
-                Err(Error::Extract { .. })
-            ));
+            let result = extract_archive(
+                Helper::SevenZip,
+                SEVEN_ZIP_ARGS,
+                Path::new("a.cab"),
+                dest.path(),
+                &super::super::NoopObserver,
+            );
+            assert!(matches!(result, Err(Error::HelperNotFound { .. })));
+            assert_eq!(
+                std::fs::read_dir(dest.path()).expect("read dest").count(),
+                0
+            );
         });
     }
 
