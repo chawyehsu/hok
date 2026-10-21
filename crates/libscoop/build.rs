@@ -51,6 +51,7 @@ fn main() {
         let cargo_path = env::var("CARGO").expect("CARGO env var not set");
         let mut cmd = std::process::Command::new(cargo_path);
         cmd.arg("build").arg("-p").arg("hok-shim");
+        cmd.arg("--profile").arg(&profile);
         if let Some(triple) = &triple {
             cmd.arg("--target").arg(triple);
         }
