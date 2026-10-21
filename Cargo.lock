@@ -696,6 +696,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "hok-shim"
+version = "0.1.0"
+dependencies = [
+ "hok-shim-spec",
+ "windows-sys 0.61.2",
+ "winres",
+]
+
+[[package]]
+name = "hok-shim-spec"
+version = "0.1.0"
+
+[[package]]
 name = "iana-time-zone"
 version = "0.1.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -861,6 +874,7 @@ dependencies = [
  "futures",
  "git2",
  "hex",
+ "hok-shim-spec",
  "junction",
  "md-5",
  "once_cell",
@@ -876,6 +890,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tracing",
+ "windows-sys 0.61.2",
  "winreg",
 ]
 
@@ -1661,6 +1676,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
+name = "toml"
+version = "0.5.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4f7f0dd8d50a853a531c426359045b1998f04219d88799810762cd4ad314234"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "tracing"
 version = "0.1.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2161,4 +2185,13 @@ checksum = "a277a57398d4bfa075df44f501a17cfdf8542d224f0d36095a2adc7aee4ef0a5"
 dependencies = [
  "cfg-if",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "winres"
+version = "0.1.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b68db261ef59e9e52806f688020631e987592bd83619edccda9c47d42cde4f6c"
+dependencies = [
+ "toml",
 ]

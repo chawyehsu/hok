@@ -12,6 +12,7 @@ categories = ["command-line-utilities"]
 
 [dependencies]
 chrono = "0.4"
+hok-shim-spec = { path = "../hok-shim-spec", version = "0.1.0" }
 curl = { version = "0.4", features = ["static-curl"] }
 dirs = "5.0.1"
 flume = "0.10"
@@ -43,4 +44,8 @@ openssl = { version = "0.10.66", features = ["vendored"] }
 
 [target."cfg(windows)".dependencies]
 junction = "1.2.0"
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_LibraryLoader",
+] }
 winreg = "0.52"
