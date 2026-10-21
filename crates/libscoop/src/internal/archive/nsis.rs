@@ -10,6 +10,7 @@ use super::ExtractObserver;
 use super::ExtractSummary;
 use super::Probe;
 use super::helper;
+use super::helper::Helper;
 use super::helper::SEVEN_ZIP_ARGS;
 use crate::error::Error;
 use crate::error::Fallible;
@@ -92,14 +93,14 @@ fn extract_helper(
     dest: &Path,
     observer: &dyn ExtractObserver,
 ) -> Fallible<ExtractSummary> {
-    helper::require(helper::SEVEN_ZIP)?;
+    helper::require(Helper::SevenZip)?;
     let mut args = SEVEN_ZIP_ARGS
         .iter()
         .map(|flag| (*flag).to_owned())
         .collect::<Vec<_>>();
     args.push(format!("-o{}", dest.display()));
     args.push(src.display().to_string());
-    helper::run(helper::SEVEN_ZIP, args, None)?;
+    helper::run(Helper::SevenZip, args, None)?;
     remove_installer_artifacts(dest);
     helper::report_tree(src, dest, observer, Vec::new(), HELPER_EXTRACTOR)
 }
@@ -126,7 +127,7 @@ pub fn extract_with_fallback(
     probe: &Probe,
     observer: &dyn ExtractObserver,
 ) -> Fallible<ExtractSummary> {
-    helper::require(helper::SEVEN_ZIP)?;
+    helper::require(Helper::SevenZip)?;
     extract(src, dest, probe, observer)
 }
 

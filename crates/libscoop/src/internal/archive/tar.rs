@@ -19,6 +19,7 @@ use super::ExtractSummary;
 use super::Format;
 use super::Probe;
 use super::helper;
+use super::helper::Helper;
 use super::helper::SEVEN_ZIP_ARGS;
 use super::zip::skip_to;
 use crate::error::Error;
@@ -72,8 +73,14 @@ pub fn extract_with_fallback(
 ) -> Fallible<ExtractSummary> {
     match extract(src, dest, probe, observer) {
         Ok(summary) => Ok(summary),
-        Err(err) if helper::find(helper::SEVEN_ZIP).is_none() => Err(err),
-        Err(_) => helper::extract_archive(helper::SEVEN_ZIP, SEVEN_ZIP_ARGS, src, dest, observer),
+        Err(err) if !Helper::SevenZip.available() => Err(err),
+        Err(_) => helper::extract_archive(
+            Helper::SevenZip,
+            helper::SEVEN_ZIP_ARGS,
+            src,
+            dest,
+            observer,
+        ),
     }
 }
 

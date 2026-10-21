@@ -10,6 +10,7 @@ use super::ExtractObserver;
 use super::ExtractSummary;
 use super::Probe;
 use super::helper;
+use super::helper::Helper;
 use super::helper::SEVEN_ZIP_ARGS;
 use crate::error::Error;
 use crate::error::Fallible;
@@ -79,8 +80,14 @@ pub fn extract_cab_with_fallback(
 ) -> Fallible<ExtractSummary> {
     match extract_cab(src, dest, probe, observer) {
         Ok(summary) => Ok(summary),
-        Err(err) if helper::find(helper::SEVEN_ZIP).is_none() => Err(err),
-        Err(_) => helper::extract_archive(helper::SEVEN_ZIP, SEVEN_ZIP_ARGS, src, dest, observer),
+        Err(err) if !Helper::SevenZip.available() => Err(err),
+        Err(_) => helper::extract_archive(
+            Helper::SevenZip,
+            helper::SEVEN_ZIP_ARGS,
+            src,
+            dest,
+            observer,
+        ),
     }
 }
 
@@ -91,8 +98,14 @@ pub fn extract_lzh(
     _probe: &Probe,
     observer: &dyn ExtractObserver,
 ) -> Fallible<ExtractSummary> {
-    helper::require(helper::SEVEN_ZIP)?;
-    helper::extract_archive(helper::SEVEN_ZIP, SEVEN_ZIP_ARGS, src, dest, observer)
+    helper::require(Helper::SevenZip)?;
+    helper::extract_archive(
+        Helper::SevenZip,
+        helper::SEVEN_ZIP_ARGS,
+        src,
+        dest,
+        observer,
+    )
 }
 
 fn error(archive: &Path, err: impl std::fmt::Display) -> Error {
@@ -108,7 +121,7 @@ mod tests {
 
     #[test]
     fn missing_helper_reports_the_package() {
-        match helper::missing_helper(helper::SEVEN_ZIP) {
+        match helper::missing_helper(Helper::SevenZip) {
             Error::HelperNotFound { binary, package } => {
                 assert_eq!(binary, "7z.exe");
                 assert_eq!(package, "7zip");

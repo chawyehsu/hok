@@ -20,6 +20,7 @@ use super::ExtractObserver;
 use super::ExtractSummary;
 use super::Probe;
 use super::helper;
+use super::helper::Helper;
 use super::helper::SEVEN_ZIP_ARGS;
 use crate::error::Error;
 use crate::error::Fallible;
@@ -89,7 +90,13 @@ fn finish_with_hidden_fallback(
         return Ok((entries, bytes, warnings));
     }
     warnings.push("msiexec administrative install failed".to_owned());
-    let mut more = helper::extract_archive(helper::SEVEN_ZIP, SEVEN_ZIP_ARGS, src, dest, observer)?;
+    let mut more = helper::extract_archive(
+        Helper::SevenZip,
+        helper::SEVEN_ZIP_ARGS,
+        src,
+        dest,
+        observer,
+    )?;
     flatten(dest);
     warnings.append(&mut more.warnings);
     Ok((more.entries, more.bytes, warnings))
@@ -109,7 +116,7 @@ pub fn administrative_install(
     let target_dir = format!("TARGETDIR={}", source_dir.display());
     let log_arg = format!("/lwe {}", log.display());
     helper::run(
-        "msiexec.exe",
+        Helper::Msiexec,
         [
             "/a".to_owned(),
             src.display().to_string(),

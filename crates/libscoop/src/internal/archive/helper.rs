@@ -1,8 +1,8 @@
 //! Locating and invoking helper binaries.
 //!
-//! Some formats have no complete pure-Rust implementation. Their extractors
-//! delegate to an externally installed executable that is found only on `PATH`
-//! and never installed automatically (ADR 0003).
+//! Some formats have no complete and robust pure-Rust implementation, or by
+//! request, the extraction is delegated to an external helper. These external
+//! executable will be found on the `PATH` and never installed automatically.
 
 use std::fs;
 use std::path::Path;
@@ -17,30 +17,54 @@ use super::ExtractSummary;
 use crate::error::Error;
 use crate::error::Fallible;
 
-/// The `7z.exe` helper, provided by the `7zip` package.
-pub const SEVEN_ZIP: &str = "7z.exe";
+/// An external helper executable and the Scoop package that provides it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Helper {
+    /// `7z.exe`, provided by the `7zip` package.
+    SevenZip,
+    /// `innounp.exe`, provided by the `innounp` package.
+    Innounp,
+    /// `msiexec.exe`, shipped with Windows and never installed as a package.
+    Msiexec,
+}
 
-/// The `innounp.exe` helper, provided by the `innounp` package.
-pub const INNOUNP: &str = "innounp.exe";
+impl Helper {
+    /// The helper's executable name, as it appears on `PATH`.
+    pub const fn exe(self) -> &'static str {
+        match self {
+            Helper::SevenZip => "7z.exe",
+            Helper::Innounp => "innounp.exe",
+            Helper::Msiexec => "msiexec.exe",
+        }
+    }
+
+    /// The Scoop package that provides the helper, if any.
+    ///
+    /// Returns `None` for binaries Hok only reaches through `run`.
+    pub const fn package(self) -> Option<&'static str> {
+        match self {
+            Helper::SevenZip => Some("7zip"),
+            Helper::Innounp => Some("innounp"),
+            Helper::Msiexec => None,
+        }
+    }
+
+    /// The label reported in an extraction summary.
+    pub const fn extractor(self) -> &'static str {
+        self.exe()
+    }
+
+    /// Whether the helper is present on `PATH`.
+    pub fn available(self) -> bool {
+        find(self.exe()).is_some()
+    }
+}
 
 /// Arguments for extracting every entry of `src` into `dest` with `7z.exe`.
 ///
 /// `-aoa` overwrites without prompting, `-bd` disables the progress bar, and
 /// `-y` answers yes to every prompt so the helper never waits on a console.
 pub const SEVEN_ZIP_ARGS: &[&str] = &["x", "-aoa", "-bd", "-y"];
-
-/// The Scoop package that provides a helper binary, if one is known.
-///
-/// Returns `None` for binaries Hok only reaches through `run`.
-pub fn package_for(binary: &str) -> Option<&'static str> {
-    if binary.eq_ignore_ascii_case(SEVEN_ZIP) || binary.eq_ignore_ascii_case("7z") {
-        Some("7zip")
-    } else if binary.eq_ignore_ascii_case(INNOUNP) {
-        Some("innounp")
-    } else {
-        None
-    }
-}
 
 /// Search `PATH` for `program` and return its full path.
 ///
@@ -60,13 +84,12 @@ pub fn find(program: &str) -> Option<PathBuf> {
 /// helper maps to [`Error::HelperNotFound`] when the binary is a known one, and
 /// a non-zero exit status maps to [`Error::Extract`] carrying the helper's
 /// standard error text.
-pub fn run<P, I, S>(program: P, args: I, cwd: Option<&Path>) -> Fallible<Output>
+pub fn run<I, S>(helper: Helper, args: I, cwd: Option<&Path>) -> Fallible<Output>
 where
-    P: AsRef<str>,
     I: IntoIterator<Item = S>,
     S: AsRef<std::ffi::OsStr>,
 {
-    let program = program.as_ref();
+    let program = helper.exe();
     let mut command = Command::new(program);
     command.args(args);
     if let Some(cwd) = cwd {
@@ -75,7 +98,7 @@ where
     let output = match command.output() {
         Ok(output) => output,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            return Err(missing_helper(program));
+            return Err(missing_helper(helper));
         }
         Err(err) => {
             return Err(Error::Extract {
@@ -93,15 +116,15 @@ where
     Ok(output)
 }
 
-/// Build the error reported when `program` cannot be launched.
-pub fn missing_helper(program: &str) -> Error {
-    match package_for(program) {
+/// Build the error reported when `helper` cannot be launched.
+pub fn missing_helper(helper: Helper) -> Error {
+    match helper.package() {
         Some(package) => Error::HelperNotFound {
-            binary: program.to_owned(),
+            binary: helper.exe().to_owned(),
             package: package.to_owned(),
         },
         None => Error::Extract {
-            archive: PathBuf::from(program),
+            archive: PathBuf::from(helper.exe()),
             reason: "helper binary not found on PATH".to_owned(),
         },
     }
@@ -111,8 +134,8 @@ pub fn missing_helper(program: &str) -> Error {
 ///
 /// Callers use this when they need the resolved path for display or for
 /// `Command`, and want a single consistent error when the helper is absent.
-pub fn require(program: &str) -> Fallible<PathBuf> {
-    find(program).ok_or_else(|| missing_helper(program))
+pub fn require(helper: Helper) -> Fallible<PathBuf> {
+    find(helper.exe()).ok_or_else(|| missing_helper(helper))
 }
 
 /// Run a helper that extracts `src` into `dest`, and report what it wrote.
@@ -121,28 +144,21 @@ pub fn require(program: &str) -> Fallible<PathBuf> {
 /// `-o<dest>` are appended so the helper unpacks into `dest` and nowhere else.
 /// Every file found under `dest` afterwards is reported through `observer`.
 pub fn extract_archive(
-    program: &str,
+    helper: Helper,
     flags: &[&str],
     src: &Path,
     dest: &Path,
     observer: &dyn ExtractObserver,
 ) -> Fallible<ExtractSummary> {
-    require(program)?;
+    require(helper)?;
     let mut args = flags
         .iter()
         .map(|flag| (*flag).to_owned())
         .collect::<Vec<_>>();
     args.push(format!("-o{}", dest.display()));
     args.push(src.display().to_string());
-    run(program, args, None)?;
-    let extractor = if program.eq_ignore_ascii_case(SEVEN_ZIP) {
-        "7z.exe"
-    } else if program.eq_ignore_ascii_case(INNOUNP) {
-        "innounp.exe"
-    } else {
-        "helper"
-    };
-    report_tree(src, dest, observer, Vec::new(), extractor)
+    run(helper, args, None)?;
+    report_tree(src, dest, observer, Vec::new(), helper.extractor())
 }
 
 /// Report every file under `dest` through `observer`.
@@ -236,32 +252,38 @@ mod tests {
     }
 
     #[test]
-    fn package_mapping_is_case_insensitive() {
-        assert_eq!(package_for("7z.exe"), Some("7zip"));
-        assert_eq!(package_for("7Z.EXE"), Some("7zip"));
-        assert_eq!(package_for("7z"), Some("7zip"));
-        assert_eq!(package_for("innounp.exe"), Some("innounp"));
-        assert_eq!(package_for("INNOUNP.EXE"), Some("innounp"));
-        assert_eq!(package_for("msiexec.exe"), None);
+    fn helpers_expose_their_binary_and_package() {
+        assert_eq!(Helper::SevenZip.exe(), "7z.exe");
+        assert_eq!(Helper::SevenZip.package(), Some("7zip"));
+        assert_eq!(Helper::SevenZip.extractor(), "7z.exe");
+        assert_eq!(Helper::Innounp.exe(), "innounp.exe");
+        assert_eq!(Helper::Innounp.package(), Some("innounp"));
+        assert_eq!(Helper::Innounp.extractor(), "innounp.exe");
+        assert_eq!(Helper::Msiexec.exe(), "msiexec.exe");
+        assert_eq!(Helper::Msiexec.package(), None);
+        assert_eq!(Helper::Msiexec.extractor(), "msiexec.exe");
     }
 
     #[test]
     fn missing_helper_reports_package() {
-        match missing_helper("7z.exe") {
+        match missing_helper(Helper::SevenZip) {
             Error::HelperNotFound { binary, package } => {
                 assert_eq!(binary, "7z.exe");
                 assert_eq!(package, "7zip");
             }
             other => panic!("unexpected error: {other:?}"),
         }
-        match missing_helper("innounp.exe") {
+        match missing_helper(Helper::Innounp) {
             Error::HelperNotFound { binary, package } => {
                 assert_eq!(binary, "innounp.exe");
                 assert_eq!(package, "innounp");
             }
             other => panic!("unexpected error: {other:?}"),
         }
-        assert!(matches!(missing_helper("other.exe"), Error::Extract { .. }));
+        assert!(matches!(
+            missing_helper(Helper::Msiexec),
+            Error::Extract { .. }
+        ));
     }
 
     #[test]
@@ -278,6 +300,8 @@ mod tests {
         std::fs::write(&exe, b"").expect("write fake helper");
         with_path(&[dir.path()], || {
             assert_eq!(find("7z.exe"), Some(exe.clone()));
+            assert!(Helper::SevenZip.available());
+            assert!(!Helper::Innounp.available());
             assert_eq!(find("nope.exe"), None);
         });
     }
@@ -322,7 +346,7 @@ mod tests {
     #[test]
     fn run_reports_missing_helper_for_known_binary() {
         let dir = temp_dir();
-        let result = with_path(&[dir.path()], || run("7z.exe", ["x"], None));
+        let result = with_path(&[dir.path()], || run(Helper::SevenZip, ["x"], None));
         match result {
             Err(Error::HelperNotFound { binary, package }) => {
                 assert_eq!(binary, "7z.exe");
@@ -334,10 +358,17 @@ mod tests {
 
     #[test]
     fn require_reports_missing_helper() {
-        assert!(matches!(
-            require("definitely-not-on-path.exe"),
-            Err(Error::Extract { .. })
-        ));
+        let dir = temp_dir();
+        with_path(&[dir.path()], || {
+            assert!(matches!(
+                require(Helper::SevenZip),
+                Err(Error::HelperNotFound { .. })
+            ));
+            assert!(matches!(
+                require(Helper::Msiexec),
+                Err(Error::Extract { .. })
+            ));
+        });
     }
 
     fn failure_status() -> std::process::ExitStatus {

@@ -20,6 +20,7 @@ use super::ExtractSummary;
 use super::ExtractSummary as Summary;
 use super::Probe;
 use super::helper;
+use super::helper::Helper;
 use super::helper::SEVEN_ZIP_ARGS;
 use crate::error::Error;
 use crate::error::Fallible;
@@ -120,13 +121,17 @@ pub fn extract_with_fallback(
 ) -> Fallible<ExtractSummary> {
     match extract(src, dest, probe, observer) {
         Ok(summary) => Ok(summary),
-        Err(err) if helper::find(helper::SEVEN_ZIP).is_none() => Err(err),
+        Err(err) if !Helper::SevenZip.available() => Err(err),
         // An entry that escapes the destination is a property of the archive,
         // not a decoder limitation: handing it to a helper would extract it.
         Err(err) if err.is_unsafe_archive() => Err(err),
-        Err(_) => {
-            super::helper::extract_archive(helper::SEVEN_ZIP, SEVEN_ZIP_ARGS, src, dest, observer)
-        }
+        Err(_) => super::helper::extract_archive(
+            Helper::SevenZip,
+            helper::SEVEN_ZIP_ARGS,
+            src,
+            dest,
+            observer,
+        ),
     }
 }
 

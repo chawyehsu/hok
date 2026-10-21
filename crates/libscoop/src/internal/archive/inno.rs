@@ -14,6 +14,7 @@ use super::ExtractObserver;
 use super::ExtractSummary;
 use super::Probe;
 use super::helper;
+use super::helper::Helper;
 use crate::error::Error;
 use crate::error::Fallible;
 
@@ -47,7 +48,7 @@ pub fn extract_with_fallback(
     probe: &Probe,
     observer: &dyn ExtractObserver,
 ) -> Fallible<ExtractSummary> {
-    helper::require(helper::INNOUNP)?;
+    helper::require(Helper::Innounp)?;
     extract(src, dest, probe, observer)
 }
 
@@ -67,9 +68,9 @@ fn extract_helper(
     dest: &Path,
     observer: &dyn ExtractObserver,
 ) -> Fallible<ExtractSummary> {
-    helper::require(helper::INNOUNP)?;
-    helper::run(helper::INNOUNP, helper_args(src, dest), None)?;
-    helper::report_tree(src, dest, observer, Vec::new(), "innounp.exe")
+    helper::require(Helper::Innounp)?;
+    helper::run(Helper::Innounp, helper_args(src, dest), None)?;
+    helper::report_tree(src, dest, observer, Vec::new(), Helper::Innounp.extractor())
 }
 
 /// The `innospect` extraction path. Only meaningful on Windows; other targets
