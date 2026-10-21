@@ -231,10 +231,8 @@ pub fn stream_name(src: &Path) -> Fallible<String> {
 
 fn apply_times(times: &[(PathBuf, u64)]) {
     for (path, mtime) in times {
-        if let Ok(file) = fs::File::open(path) {
-            let time = UNIX_EPOCH + std::time::Duration::from_secs(*mtime);
-            let _ = file.set_times(FileTimes::new().set_modified(time));
-        }
+        let time = UNIX_EPOCH + std::time::Duration::from_secs(*mtime);
+        super::mtime::set_mtime(path, time);
     }
 }
 

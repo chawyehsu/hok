@@ -285,11 +285,7 @@ impl Outcome {
     }
 
     fn apply_times(&self) {
-        for (path, time) in &self.times {
-            if let Ok(file) = fs::File::open(path) {
-                let _ = file.set_times(FileTimes::new().set_modified(*time));
-            }
-        }
+        super::mtime::apply_times(&self.times);
     }
 }
 
@@ -315,18 +311,7 @@ impl<W: Write> Write for CountingWriter<W> {
 /// Convert a DOS date/time packed as `date << 16 | time` into a
 /// [`SystemTime`], interpreting the local timestamp as UTC.
 pub fn dos_to_system_time(file_time: u32) -> Option<SystemTime> {
-    if file_time == 0 {
-        return None;
-    }
-    let time = file_time & 0xffff;
-    let date = (file_time >> 16) & 0xffff;
-    let year = ((date >> 9) & 0x7f) as u16 + 1980;
-    let month = ((date >> 5) & 0x0f) as u8;
-    let day = (date & 0x1f) as u8;
-    let hour = ((time >> 11) & 0x1f) as u8;
-    let minute = ((time >> 5) & 0x3f) as u8;
-    let second = ((time & 0x1f) * 2) as u8;
-    super::zip::dos_to_system_time(year, month, day, hour, minute, second)
+    super::mtime::packed_dos_to_system_time(file_time)
 }
 
 #[cfg(test)]

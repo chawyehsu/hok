@@ -133,11 +133,7 @@ impl Outcome {
     }
 
     fn apply_times(&self) {
-        for (path, time) in &self.times {
-            if let Ok(file) = File::open(path) {
-                let _ = file.set_times(FileTimes::new().set_modified(*time));
-            }
-        }
+        super::mtime::apply_times(&self.times);
     }
 }
 

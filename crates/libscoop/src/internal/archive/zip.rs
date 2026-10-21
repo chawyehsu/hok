@@ -5,13 +5,10 @@
 
 use std::fs;
 use std::fs::File;
-use std::fs::FileTimes;
 use std::io;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
-use std::path::PathBuf;
-use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
@@ -103,7 +100,7 @@ pub fn extract(
     }
 
     drop(archive);
-    apply_times(&times);
+    super::mtime::apply_times(&times);
     Ok(Summary {
         extractor: "zip",
         entries,
@@ -176,7 +173,7 @@ fn write_entry<R: Read>(entry: &mut zip::read::ZipFile<'_, R>, target: &Path) ->
 }
 
 fn dos_time(date: zip::DateTime) -> Option<SystemTime> {
-    dos_to_system_time(
+    super::mtime::dos_to_system_time(
         date.year(),
         date.month(),
         date.day(),
@@ -184,51 +181,6 @@ fn dos_time(date: zip::DateTime) -> Option<SystemTime> {
         date.minute(),
         date.second(),
     )
-}
-
-/// Convert an MS-DOS date and time into a [`SystemTime`].
-///
-/// A year below 1980 is not representable in the MS-DOS range and yields
-/// `None`, as does any out-of-range field. DOS timestamps are local time; they
-/// are interpreted as UTC because the archive carries no zone information.
-pub(crate) fn dos_to_system_time(
-    year: u16,
-    month: u8,
-    day: u8,
-    hour: u8,
-    minute: u8,
-    second: u8,
-) -> Option<SystemTime> {
-    if !(1980..=2107).contains(&year) || !(1..=12).contains(&month) || !(1..=31).contains(&day) {
-        return None;
-    }
-    if hour > 23 || minute > 59 || second > 59 {
-        return None;
-    }
-    let days = days_from_civil(year as i64, month as u32, day as u32);
-    let seconds = days * 86_400 + hour as i64 * 3_600 + minute as i64 * 60 + second as i64;
-    let seconds = u64::try_from(seconds).ok()?;
-    Some(UNIX_EPOCH + Duration::from_secs(seconds))
-}
-
-/// Days since 1970-01-01 for a proleptic Gregorian date.
-pub(crate) fn days_from_civil(year: i64, month: u32, day: u32) -> i64 {
-    let year = if month <= 2 { year - 1 } else { year };
-    let era = if year >= 0 { year } else { year - 399 } / 400;
-    let year_of_era = year - era * 400;
-    let month = month as i64;
-    let day = day as i64;
-    let day_of_year = (153 * (if month > 2 { month - 3 } else { month + 9 }) + 2) / 5 + day - 1;
-    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
-    era * 146_097 + day_of_era - 719_468
-}
-
-fn apply_times(times: &[(PathBuf, SystemTime)]) {
-    for (path, time) in times {
-        if let Ok(file) = File::open(path) {
-            let _ = file.set_times(FileTimes::new().set_modified(*time));
-        }
-    }
 }
 
 #[cfg(test)]
@@ -253,33 +205,13 @@ mod tests {
     }
 
     #[test]
-    fn dos_time_converts_known_dates() {
-        let epoch = dos_to_system_time(1980, 1, 1, 0, 0, 0).unwrap();
+    fn dos_time_uses_zip_fields() {
+        // ZIP stores seconds in steps of two, so `zip` rounds 15 down to 14.
+        let date = zip::DateTime::from_date_and_time(2024, 2, 29, 13, 14, 15).unwrap();
         assert_eq!(
-            epoch.duration_since(UNIX_EPOCH).unwrap().as_secs(),
-            315_532_800
+            dos_time(date),
+            super::super::mtime::dos_to_system_time(2024, 2, 29, 13, 14, 14)
         );
-
-        let time = dos_to_system_time(2024, 2, 29, 13, 14, 15).unwrap();
-        let secs = time.duration_since(UNIX_EPOCH).unwrap().as_secs();
-        assert_eq!(secs, 1_709_212_455);
-    }
-
-    #[test]
-    fn dos_time_rejects_out_of_range_fields() {
-        assert!(dos_to_system_time(1979, 1, 1, 0, 0, 0).is_none());
-        assert!(dos_to_system_time(2000, 13, 1, 0, 0, 0).is_none());
-        assert!(dos_to_system_time(2000, 1, 32, 0, 0, 0).is_none());
-        assert!(dos_to_system_time(2000, 1, 1, 24, 0, 0).is_none());
-        assert!(dos_to_system_time(2000, 1, 1, 0, 60, 0).is_none());
-        assert!(dos_to_system_time(2000, 1, 1, 0, 0, 60).is_none());
-    }
-
-    #[test]
-    fn days_from_civil_matches_epoch() {
-        assert_eq!(days_from_civil(1970, 1, 1), 0);
-        assert_eq!(days_from_civil(1970, 3, 1), 59);
-        assert_eq!(days_from_civil(2000, 3, 1), 11_017);
     }
 
     #[test]
@@ -339,10 +271,6 @@ mod tests {
             std::fs::read(dest.join("tree/hello.txt")).unwrap(),
             b"hello world"
         );
-        // Whether the host filesystem keeps a stored ZIP timestamp is platform
-        // dependent, so assert the value the crate restores on extraction
-        // instead of comparing against a locally computed epoch.
-        assert!(dos_to_system_time(2021, 6, 15, 10, 30, 0).is_some());
     }
 
     #[test]

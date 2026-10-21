@@ -20,6 +20,7 @@ pub mod helper;
 pub mod inno;
 pub mod iso;
 pub mod msi;
+pub mod mtime;
 pub mod nsis;
 pub mod probe;
 pub mod rar;
