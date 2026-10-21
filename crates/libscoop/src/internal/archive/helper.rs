@@ -4,13 +4,13 @@
 //! delegate to an externally installed executable that is found only on `PATH`
 //! and never installed automatically (ADR 0003).
 
-use std::env;
-use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Output;
+
+use which::which;
 
 use super::ExtractObserver;
 use super::ExtractSummary;
@@ -51,15 +51,7 @@ pub fn find(program: &str) -> Option<PathBuf> {
     if program.is_empty() || program.contains('/') || program.contains('\\') {
         return None;
     }
-    let path = env::var_os("PATH")?;
-    find_in(&path, program)
-}
-
-fn find_in(path: &OsString, program: &str) -> Option<PathBuf> {
-    env::split_paths(path)
-        .filter(|dir| !dir.as_os_str().is_empty())
-        .map(|dir| dir.join(program))
-        .find(|candidate| candidate.is_file())
+    which(program).ok()
 }
 
 /// Run a helper binary, capturing its output.
@@ -218,6 +210,26 @@ fn failure_reason(output: &Output) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::env;
+    use std::sync::Mutex;
+
+    /// Serializes tests that mutate the process `PATH`.
+    static PATH_LOCK: Mutex<()> = Mutex::new(());
+
+    fn with_path<R>(dirs: &[&Path], body: impl FnOnce() -> R) -> R {
+        let _guard = PATH_LOCK.lock().unwrap_or_else(|err| err.into_inner());
+        let previous = env::var_os("PATH");
+        let path = env::join_paths(dirs.iter().copied()).expect("join paths");
+        // SAFETY: `PATH_LOCK` serializes access to the process environment.
+        unsafe { env::set_var("PATH", path) };
+        let result = body();
+        // SAFETY: `PATH_LOCK` serializes access to the process environment.
+        match previous {
+            Some(previous) => unsafe { env::set_var("PATH", previous) },
+            None => unsafe { env::remove_var("PATH") },
+        }
+        result
+    }
 
     fn temp_dir() -> tempfile::TempDir {
         tempfile::tempdir().expect("create temp dir")
@@ -260,23 +272,23 @@ mod tests {
     }
 
     #[test]
-    fn find_in_returns_first_matching_file() {
+    fn find_locates_a_binary_on_path() {
         let dir = temp_dir();
         let exe = dir.path().join("7z.exe");
         std::fs::write(&exe, b"").expect("write fake helper");
-        let path = env::join_paths([dir.path()]).expect("join paths");
-        assert_eq!(find_in(&path, "7z.exe"), Some(exe.clone()));
-        assert_eq!(find_in(&path, "nope.exe"), None);
+        with_path(&[dir.path()], || {
+            assert_eq!(find("7z.exe"), Some(exe.clone()));
+            assert_eq!(find("nope.exe"), None);
+        });
     }
 
     #[test]
-    fn find_in_skips_empty_and_missing_directories() {
+    fn find_ignores_empty_and_missing_directories() {
         let dir = temp_dir();
         let missing = dir.path().join("missing");
-        let empty = "";
-        let path =
-            env::join_paths([std::path::Path::new(empty), missing.as_path()]).expect("join paths");
-        assert_eq!(find_in(&path, "7z.exe"), None);
+        with_path(&[std::path::Path::new(""), missing.as_path()], || {
+            assert_eq!(find("7z.exe"), None);
+        });
     }
 
     #[test]
@@ -310,14 +322,7 @@ mod tests {
     #[test]
     fn run_reports_missing_helper_for_known_binary() {
         let dir = temp_dir();
-        let previous = env::var_os("PATH");
-        // SAFETY: the test serializes access to the process environment.
-        unsafe { env::set_var("PATH", dir.path()) };
-        let result = run("7z.exe", ["x"], None);
-        if let Some(previous) = previous {
-            // SAFETY: the test serializes access to the process environment.
-            unsafe { env::set_var("PATH", previous) };
-        }
+        let result = with_path(&[dir.path()], || run("7z.exe", ["x"], None));
         match result {
             Err(Error::HelperNotFound { binary, package }) => {
                 assert_eq!(binary, "7z.exe");

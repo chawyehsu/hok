@@ -39,6 +39,7 @@ sysinfo = "0.29"
 tar = "0.4.46"
 thiserror = "1.0"
 tracing = "0.1.41"
+which = "8.0.6"
 zip = { version = "9.0.4", default-features = false, features = ["deflate", "bzip2", "zstd", "deflate64"] }
 zstd = "0.14.3"
 
