@@ -6,12 +6,12 @@ directory that runs another program on the user's behalf.
 This crate builds exactly one binary, `hok-shim`, as a console-subsystem
 image. That single artifact is embedded into `hok.exe`, and each shim is a
 copy of it with two things changed: the per-shim configuration written into
-its own string table resource, and, for a GUI target, the two-byte PE
+its own `RT_RCDATA` resource (`HOK_SHIM_CONFIG`), and, for a GUI target, the two-byte PE
 subsystem field. There is no separate GUI binary; see ADR 0007.
 
 ## Behavior
 
-At startup the launcher reads its configuration from its own `RT_STRING`
+At startup the launcher reads its configuration from its own `RT_RCDATA`
 resource, not from a sidecar `.shim` file (`hok-shim-spec` defines that
 layout). It then:
 
