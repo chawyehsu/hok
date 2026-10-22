@@ -87,6 +87,28 @@ pub enum Error {
     #[error("{0}")]
     Custom(String),
 
+    /// Failed to extract an archive.
+    #[error("failed to extract '{archive}': {reason}")]
+    Extract { archive: PathBuf, reason: String },
+
+    /// A required helper binary was not found on PATH.
+    #[error(
+        "'{binary}' is required to extract this archive but was not found on PATH; install the '{package}' package or add it to PATH"
+    )]
+    HelperNotFound { binary: String, package: String },
+
+    /// An archive's name claims a format its bytes do not match.
+    #[error("'{path}' was named as {declared:?} but is actually {detected:?}")]
+    FormatMismatch {
+        path: PathBuf,
+        declared: String,
+        detected: String,
+    },
+
+    /// The `extract_dir` of an archive does not exist in it.
+    #[error("extract_dir '{dir}' not found in archive; top-level entries: {available}")]
+    ExtractDirNotFound { dir: String, available: String },
+
     /// Cycle dependency error
     #[error(transparent)]
     CyclicDependency(#[from] CyclicError),

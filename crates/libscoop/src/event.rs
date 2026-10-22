@@ -6,6 +6,26 @@ use crate::{
     package::{download::PackageDownloadProgressContext, sync::Transaction},
 };
 
+pub use crate::internal::archive::ExtractObserver;
+
+/// Build [`ExtractOptions`][1] for one extraction.
+///
+/// [`ExtractOptions`][1] is `#[non_exhaustive]`, so callers outside this crate
+/// cannot use a struct literal; this is the supported constructor.
+///
+/// [1]: crate::internal::archive::ExtractOptions
+pub fn extract_options<'a>(
+    observer: &'a dyn ExtractObserver,
+    extract_dir: Option<&'a str>,
+    extract_to: Option<&'a str>,
+) -> crate::internal::archive::ExtractOptions<'a> {
+    crate::internal::archive::ExtractOptions {
+        extract_dir,
+        extract_to,
+        observer,
+    }
+}
+
 /// Event bus for event transmission.
 #[derive(Debug)]
 pub struct EventBus {
@@ -62,6 +82,39 @@ impl Default for EventBus {
     }
 }
 
+/// Context of an archive being extracted into a package version.
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub struct PackageExtractContext {
+    /// Package name.
+    pub package: String,
+
+    /// Archive label, i.e. the file name of the download.
+    pub archive: String,
+}
+
+impl PackageExtractContext {
+    /// Create a new extraction context.
+    pub fn new(package: &str, archive: &str) -> PackageExtractContext {
+        PackageExtractContext {
+            package: package.to_owned(),
+            archive: archive.to_owned(),
+        }
+    }
+
+    /// Name of the package.
+    #[inline]
+    pub fn package(&self) -> &str {
+        self.package.as_str()
+    }
+
+    /// Label of the archive.
+    #[inline]
+    pub fn archive(&self) -> &str {
+        self.archive.as_str()
+    }
+}
+
 /// Event that may be emitted during the execution of operations.
 #[derive(Clone)]
 #[non_exhaustive]
@@ -77,6 +130,33 @@ pub enum Event {
 
     /// Package has been committed.
     PackageCommitDone(String),
+
+    /// Extraction of one archive of a package has started.
+    PackageExtractingStart(PackageExtractContext),
+
+    /// One archive entry has been written.
+    PackageExtractingEntry(String),
+
+    /// Extraction of one archive of a package has finished.
+    ///
+    /// `entries` and `bytes` describe what the extractor actually wrote,
+    /// `extractor` is the human-readable extractor name that succeeded.
+    PackageExtractingDone {
+        /// Package name.
+        package: String,
+        /// Archive label, i.e. the file name of the download.
+        archive: String,
+        /// Format of the extracted archive.
+        format: String,
+        /// Number of archive entries written.
+        entries: u64,
+        /// Number of bytes written.
+        bytes: u64,
+        /// Extractor that performed the extraction.
+        extractor: String,
+        /// Non-fatal problems worth surfacing (skipped entries, etc.).
+        warnings: Vec<String>,
+    },
 
     /// Calculating download size has started.
     PackageDownloadSizingStart,

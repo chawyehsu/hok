@@ -1,12 +1,12 @@
 use crossterm::{
     ExecutableCommand, cursor,
     style::{Print, Stylize},
-    terminal::{Clear, ClearType},
+    terminal::{Clear, ClearType, size},
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::{
     collections::HashMap,
-    io::{Write, stdout},
+    io::{IsTerminal, Write, stderr, stdout},
 };
 
 static BAR_FMT: &str = " {wide_msg} {total_bytes:>12} [{bar:>20}] {percent:>3}%";
@@ -148,6 +148,111 @@ impl BucketUpdateUI {
             .execute(cursor::MoveToPreviousLine(sorted.len() as u16))
             .unwrap();
     }
+}
+
+/// Incremental renderer for archive extraction progress.
+///
+/// On a terminal the current archive entry is drawn as a single live line on
+/// stderr. When stderr is redirected, only the per-archive completion lines are
+/// printed, so logs stay readable.
+pub struct ExtractUI {
+    tty: bool,
+    /// Usable entry width for the live line, including the `x ` prefix.
+    width: usize,
+}
+
+impl ExtractUI {
+    pub fn new() -> ExtractUI {
+        let width = size()
+            .map(|(cols, _)| usize::from(cols).saturating_sub(4))
+            .unwrap_or(76);
+        ExtractUI {
+            tty: stderr().is_terminal(),
+            width,
+        }
+    }
+
+    /// Note that extraction of an archive has started.
+    ///
+    /// Only meaningful for the live line; kept so a caller can clear any
+    /// leftover entry from a previous archive.
+    pub fn start(&mut self) {
+        self.clear_if_tty();
+    }
+
+    /// Report a written archive entry.
+    pub fn entry(&mut self, entry: &str) {
+        if !self.tty {
+            return;
+        }
+
+        let shown = fit_entry(entry, self.width);
+
+        let mut stderr = stderr();
+        let _ = write!(stderr, "\r\x1b[2K{} {}", "x".yellow(), shown);
+        let _ = stderr.flush();
+    }
+
+    /// Erase the live line when drawing to a terminal.
+    fn clear_if_tty(&mut self) {
+        if self.tty {
+            let mut stderr = stderr();
+            let _ = write!(stderr, "\r\x1b[2K");
+            let _ = stderr.flush();
+        }
+    }
+
+    /// Report that extraction of the current archive has finished.
+    pub fn done(
+        &mut self,
+        package: &str,
+        archive: &str,
+        format: &str,
+        extractor: &str,
+        entries: u64,
+    ) {
+        self.clear_if_tty();
+
+        // `Extracting <pkg>: <archive> (<format>, <extractor>, <n> entries)`
+        println!(
+            "Extracting {}: {} ({}, {}, {} {})",
+            package,
+            archive,
+            format,
+            extractor,
+            entries,
+            if entries == 1 { "entry" } else { "entries" },
+        );
+    }
+}
+
+impl Default for ExtractUI {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shorten an entry path to `...\<basename>` when it does not fit `width`.
+fn fit_entry(entry: &str, width: usize) -> String {
+    if entry.chars().count() <= width {
+        return entry.to_owned();
+    }
+
+    let basename = entry
+        .rsplit(['/', '\\'])
+        .find(|segment| !segment.is_empty())
+        .unwrap_or(entry);
+    let indented = format!(r"...\{basename}");
+
+    if indented.chars().count() <= width {
+        return indented;
+    }
+
+    // Keep the tail of the basename, which carries the most signal.
+    let keep = width.saturating_sub(4);
+    let chars = basename.chars().collect::<Vec<_>>();
+    let start = chars.len().saturating_sub(keep);
+    format!(r"...\{}", chars[start..].iter().collect::<String>())
 }
 
 /// Prompt user to continue or not.

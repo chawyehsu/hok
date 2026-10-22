@@ -13,10 +13,10 @@
 use std::path::{Path, PathBuf};
 
 /// The app manifest file name used by Scoop 0.6.0 and later.
-const MANIFEST: &str = "scoop-manifest.json";
+pub const MANIFEST: &str = "scoop-manifest.json";
 
 /// The install manifest file name used by Scoop 0.6.0 and later.
-const INSTALL: &str = "scoop-install.json";
+pub const INSTALL: &str = "scoop-install.json";
 
 /// The app manifest file name used before Scoop 0.6.0.
 const LEGACY_MANIFEST: &str = "manifest.json";
