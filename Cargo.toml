@@ -1,6 +1,6 @@
 [package]
 name = "hok"
-version = "0.1.0-beta.7"
+version = "0.1.0"
 edition = "2024"
 description = "Hok is a CLI implementation of Scoop in Rust"
 readme = "README.md"
@@ -26,7 +26,7 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 [dependencies.libscoop]
 path = "./crates/libscoop"
-version = "0.1.0-beta.7"
+version = "0.1.0"
 
 [dev-dependencies]
 assert_fs = "1.1.3"

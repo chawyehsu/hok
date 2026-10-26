@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.0](https://github.com/chawyehsu/hok/compare/v0.1.0-beta.7...v0.1.0) (2026-10-26)
+
+
+### Features
+
+* **libscoop:** support parsing `github` hash extraction mode ([152aff1](https://github.com/chawyehsu/hok/commit/152aff1bbfe29faf9541116b700ebfabf19ff193))
+* **libscoop:** support prefixed metadata file names ([#39](https://github.com/chawyehsu/hok/issues/39)) ([3f9a02d](https://github.com/chawyehsu/hok/commit/3f9a02d6e8bdcc3522b6c3f1b6e8e6f75f008869))
+
+
+### Bug Fixes
+
+* **fs:** treat missing symlink as success in remove_symlink ([0b49150](https://github.com/chawyehsu/hok/commit/0b491509b6cb32b0cf6f6008e1c6b9544bb3bdd7))
+
 ## [0.1.0-beta.7](https://github.com/chawyehsu/hok/compare/v0.1.0-beta.6...v0.1.0-beta.7) (2024-12-10)
 
 
