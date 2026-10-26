@@ -378,22 +378,41 @@ pub struct AutoupdateArchSpec {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum HashExtractionMode {
+    /// Downloads the file and computes its hash locally
     #[serde(rename = "download")]
     Download,
+
+    /// Extract from a plain text file or webpage by RegEx
     #[serde(rename = "extract")]
     Extract,
+
+    /// Extract from a JSON document using JSONPath
     #[serde(rename = "json")]
     Json,
+
+    /// Extract from an XML document using XPath
     #[serde(rename = "xpath")]
     Xpath,
+
+    /// Extract from an RDF document
     #[serde(rename = "rdf")]
     Rdf,
+
+    /// Extract from Metalink's header or `.meta4` file
     #[serde(rename = "metalink")]
     Metalink,
+
+    /// Extract with Fosshub-specific built-in logic
     #[serde(rename = "fosshub")]
     Fosshub,
+
+    /// Extract with Sourceforge-specific built-in logic
     #[serde(rename = "sourceforge")]
     Sourceforge,
+
+    /// Extract with GitHub-specific built-in logic
+    #[serde(rename = "github")]
+    Github,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
