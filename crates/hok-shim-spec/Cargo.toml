@@ -1,0 +1,15 @@
+[package]
+name = "hok-shim-spec"
+version = "0.1.0"
+edition = "2024"
+description = "Shim configuration schema shared by hok-shim and libscoop"
+readme = "README.md"
+repository = "https://github.com/chawyehsu/hok"
+license = "MIT OR Apache-2.0"
+keywords = ["scoop", "shim", "windows"]
+categories = ["development-tools"]
+
+[dependencies]
+
+[lints.rust]
+unsafe_code = "deny"

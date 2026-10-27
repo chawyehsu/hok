@@ -132,6 +132,15 @@ pub enum Event {
     /// Package resolving has finished.
     PackageResolveDone,
 
+    /// Package shim creation has started.
+    PackageShimAddStart,
+
+    /// Package shim creation has made some progress.
+    PackageShimAddProgress(String),
+
+    /// Package shim creation has finished.
+    PackageShimAddDone,
+
     /// Package shim removal has started.
     PackageShimRemoveStart,
 

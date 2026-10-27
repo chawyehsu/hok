@@ -86,6 +86,27 @@ where
     Ok(serde_json::to_writer_pretty(file, &data)?)
 }
 
+/// Write `contents` to `path` through a temporary file in the same directory.
+///
+/// The rename replaces the file in one step, so a reader never observes a
+/// partially written file and a failure leaves the old one intact.
+pub fn write_atomic<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> io::Result<()> {
+    let path = path.as_ref();
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    ensure_dir(parent)?;
+
+    let mut name = path.file_name().unwrap().to_os_string();
+    name.push(format!(".{}.tmp", std::process::id()));
+    let temp = parent.join(name);
+
+    std::fs::write(&temp, contents)?;
+    if let Err(err) = std::fs::rename(&temp, path) {
+        let _ = std::fs::remove_file(&temp);
+        return Err(err);
+    }
+    Ok(())
+}
+
 /// Remove a symlink at `lnk`.
 #[cfg(windows)]
 pub fn remove_symlink<P: AsRef<Path>>(lnk: P) -> io::Result<()> {

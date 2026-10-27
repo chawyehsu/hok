@@ -1,0 +1,45 @@
+[package]
+name = "hok-shim"
+version = "0.1.0"
+edition = "2024"
+description = "Shim launcher template for hok"
+readme = "README.md"
+repository = "https://github.com/chawyehsu/hok"
+license = "MIT OR Apache-2.0"
+keywords = ["scoop", "shim", "windows"]
+categories = ["command-line-utilities"]
+publish = false
+
+[[bin]]
+name = "hok-shim"
+path = "src/main.rs"
+
+[features]
+default = []
+diagnostic = []
+
+[lints.rust]
+unsafe_code = "deny"
+
+[target."cfg(windows)".dependencies]
+hok-shim-spec = { path = "../hok-shim-spec", version = "0.1.0" }
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Console",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Environment",
+    # Gates ReadFile/WriteFile, which live in Storage::FileSystem but take an
+    # OVERLAPPED from System::IO.
+    "Win32_System_IO",
+    "Win32_System_JobObjects",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[build-dependencies]
+winres = "0.1.12"
